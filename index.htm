@@ -136,26 +136,6 @@
           <div class="about" style="display:none;">
             <h2 class="blog-post-title"><img src="res/dr-convnet-small.png">Chester the AI Radiology Assistant</h2>
 
-            <p>
-		<strong>NOT FOR MEDICAL USE.</strong>
-		This is an educational research prototype, not a medical device. It must not be used to diagnose, treat, or make clinical decisions.
-		The system demonstrates how deep-learning tools can process chest X-rays and where their limitations may appear.
-		All image processing and inference run locally in the browser, so uploaded images are not sent to a server.
-			</p>
-
-			<p>The goals of this system are:</p>
-			<ol>
-			<li>Demonstrate how AI systems work and their limitations.</li>
-			<li>Show the potential of open data for accessible medical-AI research.</li>
-			<li>Create a tool for teaching and research exploration.</li>
-			<li>Demonstrate a browser-based model delivery system that keeps images on the user's device.</li>
-			</ol>
-
-			<p>
-			The model predicts radiological findings from public research datasets, but its output can be incorrect or misleading.
-			Always rely on qualified medical professionals and validated clinical systems for patient care.
-			</p>
-
         <center><a href="javascript:hideAbout();"><button type="button" class="btn btn-warning">Hide this information</button></a></center>
           <hr>
           </div>
@@ -166,19 +146,6 @@
 		</div>
 
 <div class="col-sm-12">
-
-	<div class="alert alert-warning medical-warning" role="alert">
-		<center>
-			<div class="warning-mark" aria-hidden="true">!</div>
-			<div class="warning-copy">
-				<strong>NOT FOR MEDICAL USE</strong>
-				<span>This educational prototype is not a medical device and must not be used for diagnosis or treatment.</span>
-				<span>Images and inference stay on this device.</span>
-				<span class="hideiflocal">The first run downloads approximately 150 MB of model data.</span>
-			</div>
-			<button id="agree" type="button" class="btn btn-danger">Accept and continue</button>
-		</center>
-	</div>
 
 	<div class="col-sm-12">
 	<div style="float:right;">
@@ -333,16 +300,8 @@ $(function(){
 
 $(function(){
 	testBrowser();
-	$("#agree").click(function(){
-		$("#agree").hide();
-		run();
-	});
-
-	if (findGetParameter("accept") == "true"){
-		$("#agree").hide();
-		hideAbout();
-		run();
-	}
+	hideAbout();
+	run();
 });
 
 function testBrowser(){
