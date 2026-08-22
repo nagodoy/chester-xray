@@ -1,7 +1,8 @@
-modules = ["nodejs-20", "web", "python-3.12"]
+modules = ["nodejs-20", "web", "python-3.12", "postgresql-16"]
 
 [nix]
 channel = "stable-25_05"
+packages = ["freetype", "glibcLocales", "lcms2", "libimagequant", "libjpeg", "libjpeg_turbo", "libpng", "libtiff", "libwebp", "libxcrypt", "openjpeg", "postgresql", "tcl", "tk", "which", "zlib"]
 
 [agent]
 expertMode = true

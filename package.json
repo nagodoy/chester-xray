@@ -1,20 +1,32 @@
 {
   "name": "workspace",
   "version": "1.0.0",
-  "description": "Source code or this page: https://mlmed.org/tools/xray/",
-  "main": "server.js",
+  "description": "Authenticated chest X-ray research worklist powered by TorchXRayVision.",
+  "main": "app/main.py",
   "directories": {
     "example": "examples"
   },
   "scripts": {
-    "start": "node server.js"
+    "build": "vite build --config frontend/vite.config.js",
+    "start": "npm run build && python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-5000}",
+    "test": "pytest -q tests/backend",
+    "check": "python -m compileall -q app gateway && npm run build && pytest -q tests/backend"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@clerk/react": "^6.14.5",
+    "@clerk/themes": "^2.4.57",
+    "@vitejs/plugin-react": "^6.1.0",
     "cornerstone-core": "^2.6.1",
     "cornerstone-wado-image-loader": "^4.13.2",
-    "dicom-parser": "^1.8.21"
+    "dicom-parser": "^1.8.21",
+    "lucide-react": "^1.33.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "recharts": "^3.10.1",
+    "vite": "^8.2.2",
+    "wouter": "^3.10.0"
   }
 }

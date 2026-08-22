@@ -1,22 +1,80 @@
-# Chester the AI Radiology Assistant
+# Chester AI Radiology Assistant
 
-Source code or this page: https://mlmed.org/tools/xray/
+An authenticated research worklist for chest radiographs, built with FastAPI,
+React, PostgreSQL, pydicom and TorchXRayVision.
 
-![](res/dr-convnet-small.png)
+## Safety boundary
 
-NOT FOR MEDICAL USE. In order to bridge the gap between AI researchers and medical professionals we developed a very accessible free prototype system which can be used by medical professionals to understand the reality of Deep Learning tools for chest X-ray diagnostics. The system is designed to be a second opinion where a user can process an image to confirm or aid in their diagnosis. The tool predicts 18 different radiological findings based on data from the 7 largest public datasets. What makes this tool unique is that the web version runs entirely local and no data is sent off the device which allows this tool to scale to millions of users for free. The tool is available as a webpage which works on computers and mobile phones and with our new version 3 release we provide native windows and mac versions. The goals of this system are:
+**Use test or de-identified data only.** This Replit MVP is not a medical
+device, is not represented as HIPAA-compliant, and must not be used for
+diagnosis, treatment or management of real patients. Model values are research
+outputs. Operating-point normalized scores are not calibrated clinical
+probabilities.
 
-Demonstrate how AI systems work and their limitations.
-Show the potential of open data (needed to build a public system like this).
-Create a tool to help teach radiology.
-Demonstrate a model delivery system that can scale to provide free medical tools to the world.
+See [`docs/production-architecture.md`](docs/production-architecture.md) before
+considering any clinical deployment.
 
-Publications:
-- Chester: A Web Delivered Locally Computed Chest X-Ray Disease Prediction System, Joseph Paul Cohen and Paul Bertin and Vincent Frappier, arxiv, https://arxiv.org/abs/1901.11210
-- On the limits of cross-domain generalization in automated X-ray prediction, Joseph Paul Cohen and Mohammad Hashir and Rupert Brooks and Hadrien Bertrand, Medical Imaging with Deep Learning, https://arxiv.org/abs/2002.02497
-- A Benchmark of Medical Out of Distribution Detection, Tianshi Cao and Chinwei Huang and David Yu-Tung Hui and Joseph Paul Cohen, arxiv, https://arxiv.org/abs/2007.04250
+## What it does
 
+- Authenticated worklist and study detail views with Clerk
+- Manual DICOM, PNG and JPEG upload
+- DICOMweb STOW-RS ingestion with a service token
+- External/on-premises DICOM C-STORE gateway using pynetdicom
+- Conservative chest-radiograph validation with manual review for uncertain data
+- Persistent PostgreSQL studies, jobs, results and audit events
+- Replit App Storage support with an explicit database-backed development fallback
+- Background inference with TorchXRayVision `densenet121-res224-all`
+- Raw scores, operating-point normalization, thresholds and model/preprocessing versions
 
-A screenshot:
+## Run
 
-![](res/share.jpg)
+```bash
+npm start
+```
+
+The command builds the Vite frontend and starts FastAPI on port 5000. The
+configured Replit workflow already uses this command.
+
+## Validate
+
+```bash
+npm run check
+```
+
+This compiles the Python modules, builds the frontend and runs the backend test
+suite.
+
+## Main endpoints
+
+| Endpoint | Purpose | Authentication |
+|---|---|---|
+| `GET /api/health` | Runtime/database/storage health | Public |
+| `GET /api/studies` | Worklist | Clerk session |
+| `POST /api/uploads` | Manual multipart upload | Clerk session |
+| `GET /api/studies/{id}` | Study, instances and results | Clerk session |
+| `POST /api/studies/{id}/review` | Approve/reject uncertain study | Clerk session |
+| `POST /api/studies/{id}/retry` | Retry failed inference | Clerk session |
+| `POST /dicomweb/studies` | STOW-RS ingestion | Service token |
+
+Configure a dedicated `DICOM_INGEST_TOKEN` before connecting the external
+gateway. The MVP can fall back to `SESSION_SECRET`, but token separation and
+rotation are required for a production design.
+
+STOW-RS also requires `X-Worklist-Owner` (or `DICOM_INGEST_OWNER_ID`) containing
+the Clerk user ID that may view and manage the received studies. Browser
+uploads and every study/thumbnail action are isolated to the authenticated
+Clerk subject.
+
+## DICOM gateway
+
+The DIMSE listener is intentionally not exposed from Replit. Run
+[`gateway/dicom_scp.py`](gateway/dicom_scp.py) inside the protected network and
+follow [`gateway/README.md`](gateway/README.md).
+
+## Background
+
+Chester originated as the browser-delivered research prototype described in
+[Chester: A Web Delivered Locally Computed Chest X-Ray Disease Prediction
+System](https://arxiv.org/abs/1901.11210). This repository now uses a
+server-side worklist architecture; the original static files remain only as
+historical reference and are not served by the active application.
