@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "vVK8LCARaJHPaKKu8hTwv"
+uri = "file://docs/torchxrayvision-comparison.md"
+type = "text"
+title = "Relatório: comparação com TorchXRayVision"
+description = "Comparação técnica entre o TorchXRayVision e o Chester atual, incluindo modelos, datasets, pré-processamento, DICOM, compatibilidade e recomendações de pesquisa."
+logical_id = "e23f1002-bc29-424b-bcec-6d57e1a47267"
+content_hash = "sha256:c89233fe8cf0cdf26c5701009fb2141c2d1375f2d265db3c6a05cedf4b9e3da8"
+size = 11728
+mtime_ms = 1787409570000
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:d78c46c5-76e6-49a2-acbb-1a2edbe8b062/e23f1002-bc29-424b-bcec-6d57e1a47267/2f016282-6ddc-42e0-b653-467894afb15a"
+storage_version_token = "1787409976501553"
+content_type = "text/markdown"
