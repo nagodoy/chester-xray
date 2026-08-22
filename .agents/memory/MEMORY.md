@@ -1,0 +1,1 @@
+- [Cornerstone DICOM runtime](cornerstone-dicom-runtime.md) — validate codec upgrades in a real browser; worker packaging and missing metadata have non-obvious failure modes.

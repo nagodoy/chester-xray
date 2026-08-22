@@ -220,6 +220,79 @@ body {
   font-size: 12px;
 }
 
+.dicom-frame-selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 10px;
+  border: 1px solid #b8d7e7;
+  border-radius: 12px;
+  padding: 16px 18px;
+  background: #f3faff;
+  box-shadow: 0 7px 18px rgba(24, 118, 168, 0.07);
+}
+
+.dicom-frame-selector[hidden] {
+  display: none;
+}
+
+.dicom-frame-copy {
+  min-width: 0;
+}
+
+.dicom-frame-copy strong {
+  display: block;
+  overflow: hidden;
+  margin-top: 3px;
+  color: #18324d;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dicom-frame-copy p {
+  margin: 4px 0 0;
+  color: #65788b;
+  font-size: 12px;
+}
+
+.dicom-frame-controls {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+  color: #4b6680;
+  font-size: 12px;
+}
+
+.dicom-frame-controls label {
+  margin: 0;
+}
+
+.dicom-frame-controls input {
+  width: 72px;
+  height: 34px;
+  border: 1px solid #9cbdd0;
+  border-radius: 7px;
+  padding: 6px 8px;
+  color: #18324d;
+  background: #ffffff;
+  font-weight: 700;
+}
+
+.dicom-frame-controls .btn-primary {
+  border-color: #1876a8;
+  border-radius: 7px;
+  background: #1876a8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dicom-frame-controls .btn-link {
+  color: #667b8f;
+  font-size: 12px;
+}
+
 .upload-links {
   display: flex;
   gap: 18px;
@@ -396,6 +469,16 @@ body {
   .upload-icon,
   .upload-badge {
     display: none;
+  }
+
+  .dicom-frame-selector {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .dicom-frame-controls {
+    flex-wrap: wrap;
   }
 
   .prediction .col-xs-8,

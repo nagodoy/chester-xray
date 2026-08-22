@@ -14,9 +14,9 @@ loaded into the browser for local inference.
 
 ## Uploads
 
-The browser accepts PNG/JPEG images and uncompressed monochrome DICOM files.
-DICOM pixel data is decoded in the browser and is not uploaded to the server.
-Compressed DICOM exports should be converted to an uncompressed DICOM or PNG
-before uploading.
+The browser accepts PNG/JPEG images and monochrome DICOM files, including
+multi-frame studies and the common RLE, JPEG, JPEG-LS, and JPEG 2000 transfer
+syntaxes. DICOM pixel data is decoded in the browser and is not uploaded to the
+server. Multi-frame studies pause for frame selection before analysis.
 
 This is an educational prototype and is **not for medical use**.
