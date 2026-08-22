@@ -145,18 +145,6 @@
 
 <div class="col-sm-12">
 
-	<div class="alert alert-warning medical-warning" role="alert">
-		<center>
-			<div class="warning-mark">!</div>
-			<div class="warning-copy">
-				<strong>NOT FOR MEDICAL USE</strong>
-				<span>This educational prototype runs inference in your browser. Images are not sent to the server.</span>
-				<span class="hideiflocal">The first run downloads approximately 150 MB of model data.</span>
-			</div>
-			<button id="agree" type="button" class="btn btn-danger">Accept and continue</button>
-		</center>
-	</div>
-
 	<div class="col-sm-12">
 	<div style="float:right;">
 		<span style="" >Made by:
@@ -296,16 +284,8 @@ $(function(){
 
 $(function(){
 	testBrowser();
-	$("#agree").click(function(){
-		$("#agree").hide()
-		run();
-	});
-	
-	if (findGetParameter("accept") == "true"){
-		$("#agree").hide()
-		hideAbout()
-		run();
-	}
+	hideAbout()
+	run();
 });
 
 function testBrowser(){
