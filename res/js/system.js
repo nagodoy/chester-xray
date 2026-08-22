@@ -114,44 +114,61 @@ $(function(){
 
 
 	SYSTEM.filesElement = document.getElementById('files');
-	SYSTEM.filesElement.addEventListener('change', async evt => {
-		let files = evt.target.files;
+	SYSTEM.filesElement.addEventListener('change', evt => processSelectedFiles(evt.target.files));
 
+	const dropzone = document.getElementById('upload-dropzone');
+	dropzone.addEventListener('dragover', evt => {
+		evt.preventDefault();
+		dropzone.classList.add('dragging');
+	});
+	dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragging'));
+	dropzone.addEventListener('drop', evt => {
+		evt.preventDefault();
+		dropzone.classList.remove('dragging');
+		processSelectedFiles(evt.dataTransfer.files);
+	});
+
+	async function processSelectedFiles(files) {
 		idxs = [...Array(files.length).keys()]
 		if (findGetParameter("randomorder") == "true"){
 			console.log("In random order mode");
 			idxs.sort(() => Math.random() - 0.5);
 		}
 		for (var i = 0; i < idxs.length; i++) {
-			f = files[idxs[i]]
+			let f = files[idxs[i]]
 
-			// Only process image files (skip non image files)
-			if (!f.type.match('image.*')) {
-				return;
+			// Accept regular browser images and DICOM studies.
+			if (!f.type.match('image.*') && !window.isDicomFile(f)) {
+				$("#upload-status").text("Skipped " + f.name + ": unsupported file type.");
+				continue;
 			}
 
-			let reader = new FileReader();
-			//const idx = i;
-
-			var deferred = $.Deferred();
-
-			reader.onload = e => {
-				let img = document.createElement('img');
-				img.src = e.target.result;
-
-				img.onload = async g => {
-					console.log("Processing " + f.name);
-					await predict(img, false, f.name);
-					deferred.resolve();
-				}
-			};
-			reader.readAsDataURL(f);
-
-			await deferred.promise();
-			
+			try {
+				const isDicom = window.isDicomFile(f) && !f.type.match('image.*');
+				const imageSource = isDicom
+					? (await window.decodeDicomFile(f)).dataUrl
+					: await new Promise((resolve, reject) => {
+						const reader = new FileReader();
+						reader.onload = e => resolve(e.target.result);
+						reader.onerror = () => reject(new Error("Could not read this image."));
+						reader.readAsDataURL(f);
+					});
+				const img = new Image();
+				await new Promise((resolve, reject) => {
+					img.onload = resolve;
+					img.onerror = () => reject(new Error("Could not decode this image."));
+					img.src = imageSource;
+				});
+				console.log("Processing " + f.name);
+				$("#upload-status").text("Processing " + f.name + (isDicom ? " (DICOM)" : "") + "...");
+				await predict(img, false, f.name + (isDicom ? " · DICOM" : ""));
+			} catch (error) {
+				$("#upload-status").text("Could not process " + f.name + ": " + error.message);
+				console.log(error);
+			}
 		}
 		$("#files").val("");
-	});
+	}
 
 	SYSTEM.predictionsElement = document.getElementById('predictions');
 		

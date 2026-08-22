@@ -1,0 +1,22 @@
+# Chester on Replit
+
+## Run the web app
+
+The project is a static browser application. Start it with:
+
+```bash
+npm start
+```
+
+The Replit workflow serves the app on port 5000 through `server.js`. The
+TensorFlow.js models are served from the existing `models/` directory and are
+loaded into the browser for local inference.
+
+## Uploads
+
+The browser accepts PNG/JPEG images and uncompressed monochrome DICOM files.
+DICOM pixel data is decoded in the browser and is not uploaded to the server.
+Compressed DICOM exports should be converted to an uncompressed DICOM or PNG
+before uploading.
+
+This is an educational prototype and is **not for medical use**.

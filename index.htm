@@ -4,10 +4,11 @@
 	<link rel="stylesheet" href="res/css/bootstrap-theme-3.3.7.min.css">
 	<link rel='stylesheet' href='res/css/style.css' type='text/css' media='all' />
 	<link rel="stylesheet" href="res/css/magnify.css">
+	<link rel="icon" href="res/dr-convnet-icon.png">
 	
 	<title>Chester the AI Radiology Assistant</title>
 	
-	<meta name="viewport" content="width=1100, initial-scale=1.0">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta property="og:site_name" content="Chester the AI Radiology Assistant (V3)" />
 	<meta property="og:locale" content="en_US" />  
 	<meta property="og:type" content="article" />
@@ -27,6 +28,8 @@
 	<script async src="res/js/ssim.js"></script>
 	<script src="res/js/jquery-3.5.1.min.js"></script>
 	<script src="res/js/tf-2.0.1.min.js"></script>
+	<script src="vendor/dicom-parser.min.js"></script>
+	<script src="res/js/dicom.js"></script>
 	
 	<script>
 	
@@ -120,7 +123,7 @@
         </div>
       </div>
     </nav>
-	<div class="container" style="width: 100%;min-width: 1024px;">
+	<div class="container app-shell">
 
 
 	
@@ -174,14 +177,15 @@
 
 <div class="col-sm-12">
 
-	<div class="alert alert-warning" role="alert" style="width: 100%">
+	<div class="alert alert-warning medical-warning" role="alert">
 		<center>
-			NOT FOR MEDICAL USE. This is a prototype system for diagnosing
-			chest x-rays using neural networks. All processing is done on your
-			device and images are not sent to the server. If you continue you
-			assume all liability when using the system. <span class="hideiflocal">A neural network model
-            (~150mb) will be downloaded to your browser.</span>
-			<button id="agree" type="button" class="btn btn-danger">Accept NOT FOR MEDICAL USE</button>
+			<div class="warning-mark">!</div>
+			<div class="warning-copy">
+				<strong>NOT FOR MEDICAL USE</strong>
+				<span>This educational prototype runs inference in your browser. Images are not sent to the server.</span>
+				<span class="hideiflocal">The first run downloads approximately 150 MB of model data.</span>
+			</div>
+			<button id="agree" type="button" class="btn btn-danger">Accept and continue</button>
 		</center>
 	</div>
 
@@ -201,9 +205,28 @@
 
 	<div class="col-sm-12">
 		<div id="file-container" style="display: none">
-			Process an image locally: <input type="file" id="files" name="files[]" multiple> 
-			<span class="hideiflocal"><a target="_blank" href="examples/">Download example files (opens new window)</a><br></span>
-			<a href="javascript:downloadCSV();">Download all predictions as CSV</a>
+			<div id="upload-dropzone" class="upload-card">
+				<div class="upload-icon" aria-hidden="true">+</div>
+				<div class="upload-copy">
+					<span class="eyebrow">LOCAL ANALYSIS</span>
+					<h2>Upload chest X-rays</h2>
+					<p>Drop PNG, JPEG, or uncompressed DICOM files here. Everything stays on this device.</p>
+					<div class="upload-actions">
+						<label class="upload-button" for="files">Choose files</label>
+						<span>or drag and drop</span>
+					</div>
+					<input type="file" id="files" name="files[]" accept="image/*,.dcm,application/dicom,application/octet-stream" multiple>
+				</div>
+				<div class="upload-badge">
+					<span class="glyphicon glyphicon-lock" aria-hidden="true"></span>
+					<span>Private by design</span>
+				</div>
+			</div>
+			<div id="upload-status" class="upload-status" role="status"></div>
+			<div class="upload-links">
+				<span class="hideiflocal"><a target="_blank" href="examples/">Browse example files</a></span>
+				<a href="javascript:downloadCSV();">Download predictions as CSV</a>
+			</div>
 		</div>
 	</div>
 	
@@ -275,7 +298,7 @@
 			
 		</div>
 		<div class="col-xs-4 predviz">
-		<center class="loading"><img style="margin-top:40%;" alt="Loading..." src="https://i.imgur.com/yoS0cXm.gif"/></center>
+		<center class="loading"><img style="margin-top:40%;" alt="Loading..." src="res/loading1.gif"/></center>
 		
 		<center>
 		<div class="predbox" style="width:100%">

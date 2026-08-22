@@ -1,0 +1,18 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "Source code or this page: https://mlmed.org/tools/xray/",
+  "main": "server.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dicom-parser": "^1.8.21"
+  }
+}
