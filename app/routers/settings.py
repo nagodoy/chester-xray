@@ -47,7 +47,11 @@ def get_dicomweb_settings(
     _access: AccessContext = Depends(require_page("settings")),
 ) -> DicomwebSettingsSchema:
     """Return safe DICOM connectivity metadata for the authenticated console."""
-    stow_path = "/dicomweb/studies"
+    stow_path = (
+        "/wado/studies"
+        if settings.dicom_wado_anonymous_ingest
+        else "/dicomweb/studies"
+    )
     public_base_url = _safe_http_url(settings.public_app_url)
     stow_url = f"{public_base_url}{stow_path}" if public_base_url else stow_path
     stow_host, stow_port = (
@@ -94,4 +98,5 @@ def get_dicomweb_settings(
             request_limit="Sem limite definido pelo aplicativo",
         ),
         service_token_configured=bool(settings.dicom_ingest_token),
+        wado_anonymous=settings.dicom_wado_anonymous_ingest,
     )

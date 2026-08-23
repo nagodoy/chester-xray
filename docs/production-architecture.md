@@ -125,6 +125,9 @@ On-Premises DICOM Gateway (gateway/):
 - Auth: `X-DICOM-Ingest-Key` header or `Authorization: Bearer` compared in constant time
 - OsiriX authentication: HTTPS Basic auth is supported with username `dicom`
   and `DICOM_INGEST_TOKEN` as the password
+- Optional anonymous OsiriX mode: `DICOM_WADO_ANONYMOUS_INGEST=true` removes
+  authentication only from the WADO compatibility aliases; the canonical
+  DICOMweb endpoint and external gateway remain protected
 - Token: `DICOM_INGEST_TOKEN` (falls back to `SESSION_SECRET`)
 - Ownership: `X-Worklist-Owner` or `DICOM_INGEST_OWNER_ID` must identify an
   authorized email; all study API queries enforce the authenticated email as

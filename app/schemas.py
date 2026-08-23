@@ -126,3 +126,4 @@ class DicomwebSettingsSchema(BaseModel):
     scp: DicomScpSettingsSchema
     stow_rs: DicomwebStowSettingsSchema
     service_token_configured: bool
+    wado_anonymous: bool = False

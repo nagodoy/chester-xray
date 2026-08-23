@@ -168,6 +168,33 @@ def test_stow_wado_duplicate_path_compatibility(auth_client, db_session):
     assert resp.status_code in (200, 202, 409), resp.text
 
 
+def test_stow_wado_can_be_anonymous_when_explicitly_enabled(
+    client,
+    db_session,
+    monkeypatch,
+):
+    """Anonymous ingestion is limited to WADO compatibility routes."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "dicom_wado_anonymous_ingest", True)
+    dcm = make_minimal_dicom(modality="DX", body_part="CHEST", view_position="PA")
+    body, content_type = make_stow_multipart([dcm])
+
+    resp = client.post(
+        "/wado/studies",
+        content=body,
+        headers={"Content-Type": content_type},
+    )
+    assert resp.status_code in (200, 202), resp.text
+
+    protected_resp = client.post(
+        "/dicomweb/studies",
+        content=body,
+        headers={"Content-Type": content_type},
+    )
+    assert protected_resp.status_code == 401
+
+
 def test_stow_accepts_basic_auth_for_osirix(client, db_session):
     """OsiriX can authenticate STOW-RS with its HTTP username/password fields."""
     dcm = make_minimal_dicom(modality="DX", body_part="CHEST", view_position="PA")

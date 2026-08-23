@@ -66,6 +66,12 @@ OsiriX can authenticate with its HTTP username/password fields: use `dicom` as
 the username and the configured `DICOM_INGEST_TOKEN` as the password. The
 connection must use HTTPS.
 
+For a controlled OsiriX setup that cannot send a service credential, set
+`DICOM_WADO_ANONYMOUS_INGEST=true`. In this mode only the WADO compatibility
+paths accept uploads without authentication; `/dicomweb/studies` and the
+external gateway remain protected. `DICOM_INGEST_OWNER_ID` is still required
+to assign received studies to the authorized worklist owner.
+
 Configure a dedicated `DICOM_INGEST_TOKEN` before connecting the external
 gateway. The MVP can fall back to `SESSION_SECRET`, but token separation and
 rotation are required for a production design.

@@ -34,6 +34,9 @@ class Settings(BaseSettings):
         os.environ.get("STOW_API_KEY", ""),
     )
     dicom_ingest_owner_id: str = os.environ.get("DICOM_INGEST_OWNER_ID", "")
+    dicom_wado_anonymous_ingest: bool = os.environ.get(
+        "DICOM_WADO_ANONYMOUS_INGEST", ""
+    ).lower() in ("1", "true", "yes", "on")
 
     # External DICOM SCP gateway (read-only settings display)
     dicom_scp_host: str = os.environ.get("SCP_HOST", "")

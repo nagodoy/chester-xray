@@ -46,6 +46,20 @@ def test_dicomweb_settings_exposes_published_gateway_endpoint(auth_client, monke
     assert data["scp"]["gateway_target"] == "https://rx.nelsongodoy.com.br"
 
 
+def test_dicomweb_settings_exposes_anonymous_wado_endpoint(auth_client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "public_app_url", "https://rx.nelsongodoy.com.br")
+    monkeypatch.setattr(settings, "dicom_wado_anonymous_ingest", True)
+    response = auth_client.get("/api/settings/dicomweb")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["stow_rs"]["url"] == "https://rx.nelsongodoy.com.br/wado/studies"
+    assert data["stow_rs"]["path"] == "/wado/studies"
+    assert data["wado_anonymous"] is True
+
+
 def test_dicomweb_settings_marks_public_endpoint_local_when_unconfigured(
     auth_client,
     monkeypatch,

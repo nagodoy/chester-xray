@@ -53,3 +53,5 @@ build = ["npm", "run", "build"]
 [userenv.shared]
 PUBLIC_APP_URL = "https://rx.nelsongodoy.com.br"
 STOW_URL = "https://rx.nelsongodoy.com.br"
+DICOM_WADO_ANONYMOUS_INGEST = "true"
+DICOM_INGEST_OWNER_ID = "nelsonagodoy@gmail.com"

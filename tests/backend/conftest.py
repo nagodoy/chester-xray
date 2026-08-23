@@ -19,6 +19,7 @@ os.environ["DEBUG"] = "1"
 os.environ["SESSION_SECRET"] = "test-session-secret"
 os.environ["DICOM_INGEST_TOKEN"] = "test-dicom-ingest-token"
 os.environ["DICOM_INGEST_OWNER_ID"] = "test-user-123"
+os.environ["DICOM_WADO_ANONYMOUS_INGEST"] = "false"
 
 from app.database import Base, get_db
 from app.main import app

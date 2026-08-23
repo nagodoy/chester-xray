@@ -182,9 +182,11 @@ async def _handle_stow(
     request: Request,
     session: Session,
     study_uid: Optional[str] = None,
+    require_auth: bool = True,
 ) -> JSONResponse:
     """Common STOW-RS handler."""
-    await _require_dicom_auth(request)
+    if require_auth:
+        await _require_dicom_auth(request)
     owner_id = (
         request.headers.get("X-Worklist-Owner", "").strip()
         or settings.dicom_ingest_owner_id.strip()
@@ -342,7 +344,12 @@ async def stow_wado_compatibility(
     session: Session = Depends(get_db),
 ):
     """Compatibility alias for OsiriX configurations using the WADO base path."""
-    return await _handle_stow(request, session, study_uid=None)
+    return await _handle_stow(
+        request,
+        session,
+        study_uid=None,
+        require_auth=not settings.dicom_wado_anonymous_ingest,
+    )
 
 
 @router.post("/wado/studies/{study_uid}")
@@ -353,5 +360,15 @@ async def stow_wado_study_compatibility(
 ):
     """Study-specific compatibility alias for OsiriX WADO/STOW configurations."""
     if study_uid == "studies":
-        return await _handle_stow(request, session, study_uid=None)
-    return await _handle_stow(request, session, study_uid=study_uid)
+        return await _handle_stow(
+            request,
+            session,
+            study_uid=None,
+            require_auth=not settings.dicom_wado_anonymous_ingest,
+        )
+    return await _handle_stow(
+        request,
+        session,
+        study_uid=study_uid,
+        require_auth=not settings.dicom_wado_anonymous_ingest,
+    )
