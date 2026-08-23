@@ -98,21 +98,6 @@
   font-size: 12px;
 }
 
-.deidentified-confirmation {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin: 12px 0;
-  color: #b7c7d7;
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.deidentified-confirmation input {
-  accent-color: var(--teal);
-  margin-top: 2px;
-}
-
 .upload-result,
 .upload-error {
   margin-top: 10px;
