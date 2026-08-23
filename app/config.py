@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     )
     dicom_ingest_owner_id: str = os.environ.get("DICOM_INGEST_OWNER_ID", "")
 
+    # External DICOM SCP gateway (read-only settings display)
+    dicom_scp_host: str = os.environ.get("SCP_HOST", "")
+    dicom_scp_port: int = int(os.environ.get("SCP_PORT", "11112"))
+    dicom_scp_ae_title: str = os.environ.get("SCP_AE_TITLE", "WORKLIST_SCP")
+    dicom_stow_url: str = os.environ.get("STOW_URL", "")
+    public_app_url: str = os.environ.get("PUBLIC_APP_URL", "")
+
     # Object storage
     replit_object_storage_bucket: Optional[str] = os.environ.get(
         "REPLIT_OBJECT_STORAGE_BUCKET_ID", None

@@ -553,6 +553,383 @@
   }
 }
 
+/* DICOMweb settings */
+.sidebar-system-label {
+  margin-top: 3px;
+}
+
+.nav a span {
+  min-width: 0;
+}
+
+.nav a span small {
+  display: block;
+  margin-top: 2px;
+  color: #5f7893;
+  font: 8px "DM Mono", monospace;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.nav a.active span small {
+  color: rgba(84, 215, 202, .72);
+}
+
+.settings-page-heading {
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.settings-heading-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  color: #82a0b4;
+  border: 1px solid #29405e;
+  border-radius: 6px;
+  background: rgba(9, 21, 43, .72);
+  font: 9px "DM Mono", monospace;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.settings-heading-mark svg {
+  color: var(--cyan);
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: linear-gradient(145deg, rgba(14, 28, 55, .97), rgba(8, 18, 37, .97));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .12);
+}
+
+.settings-card-scp {
+  border-color: rgba(61, 183, 158, .34);
+}
+
+.settings-card-stow {
+  border-color: rgba(83, 158, 230, .34);
+}
+
+.settings-card-security {
+  grid-column: 1 / -1;
+  border-color: rgba(154, 99, 239, .46);
+  background: linear-gradient(145deg, rgba(25, 21, 57, .94), rgba(11, 18, 43, .98));
+}
+
+.settings-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 13px;
+}
+
+.settings-card-header h2 {
+  margin-top: 8px;
+  color: #e7f1fb;
+  font-size: 16px;
+}
+
+.settings-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #76e1be;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+}
+
+.settings-kicker-blue {
+  color: #80caff;
+}
+
+.settings-kicker-purple {
+  color: #c6a9ff;
+}
+
+.settings-kicker-muted {
+  color: #7390a4;
+  font-weight: 600;
+}
+
+.settings-dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 5px 7px;
+  border-radius: 5px;
+  color: #54e7b6;
+  background: rgba(43, 203, 154, .12);
+  font: 9px "DM Mono", monospace;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.connection-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.connection-status-not_configured {
+  color: #f0be6d;
+  background: rgba(240, 190, 109, .12);
+}
+
+.connection-status-local_only {
+  color: #80caff;
+  background: rgba(83, 158, 230, .12);
+}
+
+.settings-card-description {
+  max-width: 680px;
+  color: #94a9c0;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.settings-rows {
+  display: grid;
+  gap: 0;
+  margin: 15px 0 0;
+}
+
+.setting-row {
+  display: grid;
+  grid-template-columns: minmax(80px, .75fr) minmax(0, 1.65fr);
+  align-items: baseline;
+  gap: 13px;
+  min-height: 31px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(46, 68, 101, .48);
+}
+
+.setting-row:last-child {
+  border-bottom: 0;
+}
+
+.setting-row dt {
+  color: #a7b9cc;
+  font-size: 11px;
+}
+
+.setting-row dd {
+  min-width: 0;
+  margin: 0;
+  color: #edf5ff;
+  font-size: 11px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.setting-row dd.mono {
+  font-size: 10px;
+  letter-spacing: -.02em;
+}
+
+.settings-inset {
+  margin-top: 14px;
+  padding: 13px 13px 9px;
+  border: 1px solid rgba(42, 64, 94, .75);
+  border-radius: 8px;
+  background: rgba(5, 14, 30, .64);
+}
+
+.settings-inset-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  color: #dce8f4;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.settings-inset-title svg {
+  color: #7ea6c9;
+}
+
+.settings-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 14px 0 0;
+  color: #78d9bd;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.settings-note svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.settings-note-amber {
+  color: #f0be6d;
+}
+
+.settings-note-purple {
+  color: #c5a7ff;
+}
+
+.security-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(210px, .55fr);
+  gap: 20px;
+  align-items: center;
+}
+
+.credential-methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.credential-methods span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border: 1px solid rgba(155, 116, 234, .28);
+  border-radius: 6px;
+  color: #d1c0fa;
+  background: rgba(116, 71, 190, .12);
+  font: 9px "DM Mono", monospace;
+}
+
+.credential-methods svg {
+  color: #ae82fa;
+}
+
+.security-safe {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 9px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid rgba(155, 116, 234, .28);
+  border-radius: 8px;
+  color: #ae8df4;
+  background: rgba(10, 11, 33, .46);
+}
+
+.security-safe svg {
+  grid-row: span 2;
+}
+
+.security-safe strong {
+  color: #f0eaff;
+  font-size: 11px;
+}
+
+.security-safe span {
+  color: #9b8db8;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.settings-footer-note {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 4px;
+  color: #6c829a;
+  font: 9px "DM Mono", monospace;
+  letter-spacing: .03em;
+}
+
+.settings-footer-note svg {
+  color: #5c8ba4;
+}
+
+.settings-loading {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-loading .skeleton {
+  min-height: 230px;
+}
+
+.settings-error {
+  min-height: 250px;
+}
+
+@media (max-width: 900px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-card-security,
+  .settings-footer-note {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 620px) {
+  .settings-page-heading {
+    display: block;
+  }
+
+  .settings-heading-mark {
+    width: max-content;
+    margin-top: 14px;
+  }
+
+  .settings-card {
+    padding: 15px;
+  }
+
+  .settings-card-header {
+    display: block;
+  }
+
+  .settings-card-header .connection-status {
+    margin-top: 10px;
+  }
+
+  .setting-row {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .setting-row dd {
+    text-align: left;
+  }
+
+  .security-content {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}
+
 @media (max-width: 620px) {
   .app-shell {
     display: block;

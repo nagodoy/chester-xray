@@ -5,8 +5,8 @@ import { ptBR } from "@clerk/localizations";
 import { shadcn } from "@clerk/themes";
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useParams, useSearch } from "wouter";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Activity, AlertTriangle, ArrowLeft, Check, ChevronRight, CircleHelp, ClipboardList, CloudUpload, FileImage, Filter, LogOut, RotateCcw, Search, ShieldCheck, UploadCloud, X, XCircle } from "lucide-react";
-import { getStudy, listStudies, retryStudy, reviewStudy, uploadStudies } from "./api";
+import { Activity, AlertTriangle, ArrowLeft, Check, ChevronRight, CircleHelp, ClipboardList, CloudUpload, FileImage, Filter, Globe2, LockKeyhole, LogOut, RadioTower, RotateCcw, Search, Server, Settings2, ShieldCheck, UploadCloud, Wifi, X, XCircle } from "lucide-react";
+import { getDicomwebSettings, getStudy, listStudies, retryStudy, reviewStudy, uploadStudies } from "./api";
 import "./styles.css";
 import "./worklist-redesign.css";
 
@@ -53,7 +53,12 @@ function latestResultRows(results = []) {
 function Thumb({ url }) { return <div className="thumb">{url ? <img src={url} alt="Study radiograph" /> : <FileImage size={28} />}</div>; }
 function Sidebar() {
   const { signOut } = useClerk();
-  return <aside className="sidebar"><Brand /><div className="sidebar-section-label">Pesquisa</div><nav className="nav"><Link href="/worklist" className="active"><ClipboardList size={16}/><span>Todos os estudos</span></Link><Link href="/worklist?status=needs_review"><AlertTriangle size={16}/><span>Requer revisão</span></Link></nav><div className="sidebar-note"><ShieldCheck size={15}/><strong>Ambiente controlado</strong><br/>Resultados para pesquisa. Toda decisão requer revisão especializada.</div><button className="btn btn-subtle" onClick={() => signOut({ redirectUrl: basePath || "/" })}><LogOut size={15}/><span>Sair da console</span></button></aside>;
+  const [location] = useLocation();
+  const search = useSearch();
+  const reviewActive = location === "/worklist" && new URLSearchParams(search).get("status") === "needs_review";
+  const worklistActive = location === "/worklist" && !reviewActive;
+  const settingsActive = location === "/settings";
+  return <aside className="sidebar"><Brand /><div className="sidebar-section-label">Pesquisa</div><nav className="nav" aria-label="Pesquisa"><Link href="/worklist" aria-label="Todos os estudos" aria-current={worklistActive ? "page" : undefined} className={worklistActive ? "active" : ""}><ClipboardList size={16}/><span>Todos os estudos</span></Link><Link href="/worklist?status=needs_review" aria-label="Estudos que requerem revisão" aria-current={reviewActive ? "page" : undefined} className={reviewActive ? "active" : ""}><AlertTriangle size={16}/><span>Requer revisão</span></Link></nav><div className="sidebar-section-label sidebar-system-label">Sistema</div><nav className="nav nav-secondary" aria-label="Sistema"><Link href="/settings" aria-label="Ajustes DICOMweb" aria-current={settingsActive ? "page" : undefined} className={settingsActive ? "active" : ""}><Settings2 size={16}/><span>Ajustes <small>Settings</small></span></Link></nav><div className="sidebar-note"><ShieldCheck size={15}/><strong>Ambiente controlado</strong><br/>Resultados para pesquisa. Toda decisão requer revisão especializada.</div><button className="btn btn-subtle" onClick={() => signOut({ redirectUrl: basePath || "/" })}><LogOut size={15}/><span>Sair da console</span></button></aside>;
 }
 function AppShell({ children }) { const { user } = useUser(); return <div className="app-shell"><Sidebar/><main className="main"><div className="topbar"><div className="eyebrow">Sala de leitura / {new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}</div><div className="user-chip"><span>{user?.firstName || user?.primaryEmailAddress?.emailAddress || "Leitor"}</span><div className="avatar">{(user?.firstName || "L").slice(0,1)}</div></div></div>{children}</main></div>; }
 function UploadDialog({ onDone }) {
@@ -132,6 +137,45 @@ function Worklist() {
     {error ? <div className="error-box"><AlertTriangle size={22}/><h3>Worklist indisponível</h3><p>{error}</p><button className="btn btn-subtle retry-button" onClick={load}>Tentar novamente</button></div> : !data ? <div className="study-list"><div className="skeleton"/><div className="skeleton"/><div className="skeleton"/></div> : items.length ? <><div className="worklist-head"><span>Imagem</span><span>Estudo / paciente</span><span>Demografia</span><span>Origem / validação</span><span>Achados principais</span><span>Status</span><span/></div><div className="study-list">{items.map(s=><StudyCard key={s.id} study={s}/>)}</div></> : <div className="empty"><ClipboardList size={28}/><h3>Nenhum estudo nesta seleção</h3><p>Tente outros filtros ou envie uma radiografia desidentificada.</p></div>}
   </AppShell>;
 }
+function SettingRow({ label, value, mono = false }) { return <div className="setting-row"><dt>{label}</dt><dd className={mono ? "mono" : ""}>{value || "Não configurado"}</dd></div>; }
+function ConnectionStatus({ status, label }) { return <span className={`connection-status connection-status-${status}`}><i/>{label}</span>; }
+function SettingsCard({ children, className = "" }) { return <section className={`settings-card ${className}`}>{children}</section>; }
+function Settings() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState("");
+  const load = useCallback(async () => { try { setError(""); setData(await getDicomwebSettings()); } catch (e) { setError(e.message); } }, []);
+  useEffect(() => { load(); }, [load]);
+  const scp = data?.scp;
+  const stow = data?.stow_rs;
+  return <AppShell>
+    <div className="page-heading settings-page-heading">
+      <div><div className="eyebrow">Sistema / conectividade</div><h1>Configuração DICOMweb</h1><p className="page-subtitle">Endpoints de pesquisa e entrada para dispositivos autorizados.</p></div>
+      <div className="settings-heading-mark"><RadioTower size={18}/><span>somente leitura</span></div>
+    </div>
+    {error ? <div className="error-box settings-error"><Wifi size={22}/><h3>Configuração indisponível</h3><p>{error}</p><button className="btn btn-subtle retry-button" onClick={load}>Tentar novamente</button></div> : !data ? <div className="settings-loading"><div className="skeleton"/><div className="skeleton"/><div className="skeleton"/></div> : <div className="settings-grid">
+      <SettingsCard className="settings-card-scp">
+        <div className="settings-card-header"><div><div className="settings-kicker settings-kicker-green"><span className="settings-dot"/>DICOM SCP <span className="settings-kicker-muted">(C-STORE)</span></div><h2>Gateway de entrada</h2></div><ConnectionStatus status={scp.status} label={scp.status_label}/></div>
+        <p className="settings-card-description">Recebe estudos de PACS ou modalidades através do gateway externo e encaminha cada instância para o STOW-RS.</p>
+        <dl className="settings-rows"><SettingRow label="AE Title" value={scp.ae_title} mono/><SettingRow label="Porta" value={scp.port} mono/><SettingRow label="Serviços" value={scp.services.join(" / ")} mono/><SettingRow label="Transporte" value={scp.transport}/></dl>
+        <div className="settings-inset"><div className="settings-inset-title"><Server size={15}/>Gateway externo</div><dl className="settings-rows"><SettingRow label="Endereço" value={scp.host} mono/><SettingRow label="Destino STOW-RS" value={scp.gateway_target} mono/><SettingRow label="Owner da worklist" value={scp.owner_configured ? "Definido" : "Pendente"}/></dl></div>
+        <p className="settings-note settings-note-green"><RadioTower size={14}/>C-FIND e C-MOVE não fazem parte deste gateway de armazenamento.</p>
+      </SettingsCard>
+      <SettingsCard className="settings-card-stow">
+        <div className="settings-card-header"><div><div className="settings-kicker settings-kicker-blue"><span className="settings-dot"/>DICOMweb STOW-RS <span className="settings-kicker-muted">(Entrada / HTTP)</span></div><h2>Endpoint da worklist</h2></div><ConnectionStatus status={stow.status} label={stow.status_label}/></div>
+        <p className="settings-card-description">Endpoint para envio de instâncias DICOM via requisições multipart autenticadas.</p>
+        <dl className="settings-rows"><SettingRow label="URL" value={stow.url} mono/><SettingRow label="AE Title" value={stow.ae_title}/><SettingRow label="Criptografia" value={stow.https ? "HTTPS" : "HTTP · ambiente local"} mono/><SettingRow label="Serviço" value={stow.services.join(" / ")} mono/></dl>
+        <div className="settings-inset"><div className="settings-inset-title"><Globe2 size={15}/>Detalhes do endpoint</div><dl className="settings-rows"><SettingRow label="Hostname" value={stow.hostname} mono/><SettingRow label="Path" value={stow.path} mono/><SettingRow label="Porta" value={stow.port} mono/><SettingRow label="HTTPS" value={stow.https ? "Ativo" : "Não ativo"} /></dl></div>
+        <p className="settings-note settings-note-amber"><LockKeyhole size={14}/>{stow.request_limit}.</p>
+      </SettingsCard>
+      <SettingsCard className="settings-card-security">
+        <div className="settings-card-header"><div><div className="settings-kicker settings-kicker-purple"><span className="settings-dot"/>Credenciais para dispositivos</div><h2>Acesso de ingestão</h2></div><ConnectionStatus status={data.service_token_configured ? "configured" : "not_configured"} label={data.service_token_configured ? "Configurado" : "Não configurado"}/></div>
+        <div className="security-content"><div><p className="settings-card-description">Dispositivos que não usam sessão do navegador devem enviar uma credencial de serviço no cabeçalho da requisição.</p><div className="credential-methods"><span><LockKeyhole size={13}/>X-DICOM-Ingest-Key</span><span><LockKeyhole size={13}/>Authorization: Bearer</span></div></div><div className="security-safe"><ShieldCheck size={18}/><strong>Valor protegido</strong><span>O segredo nunca é exibido nesta tela.</span></div></div>
+        <p className="settings-note settings-note-purple"><Wifi size={14}/>Use somente com dados de teste ou desidentificados. A porta DICOM SCP não deve ser exposta à internet.</p>
+      </SettingsCard>
+      <div className="settings-footer-note"><Wifi size={14}/><span>Conectividade informativa · os valores refletem a configuração efetiva deste ambiente.</span></div>
+    </div>}
+  </AppShell>;
+}
 function Detail() {
   const { id } = useParams(); const [study,setStudy]=useState(null); const [error,setError]=useState(""); const [busy,setBusy]=useState(false);
   const load=useCallback(async()=>{try{setStudy(await getStudy(id))}catch(e){setError(e.message)}},[id]); useEffect(()=>{load()},[load]);
@@ -144,6 +188,6 @@ function Detail() {
 function AuthPage() { return <div className="auth-shell"><div className="clerk-wrap"><div className="auth-mark"><Brand light/><p>Console de pesquisa · radiografia torácica</p></div><SignIn routing="path" path={`${basePath}/sign-in`} fallbackRedirectUrl={`${basePath}/worklist`} withSignUp={false}/><div className="auth-research-note"><ShieldCheck size={14}/><span>Pesquisa somente · dados desidentificados</span></div><p className="auth-restricted">Acesso restrito a usuários autorizados</p></div></div>; }
 function HomeRoute(){return <><Show when="signed-in"><Redirect to="/worklist"/></Show><Show when="signed-out"><Redirect to="/sign-in"/></Show></>;}
 function Protected({children}){return <><Show when="signed-in">{children}</Show><Show when="signed-out"><Redirect to="/"/></Show></>;}
-function Routes(){ return <Switch><Route path="/" component={HomeRoute}/><Route path="/sign-in/*?" component={()=> <AuthPage/>}/><Route path="/worklist"><Protected><Worklist/></Protected></Route><Route path="/studies/:id"><Protected><Detail/></Protected></Route><Route><Redirect to="/"/></Route></Switch>; }
+function Routes(){ return <Switch><Route path="/" component={HomeRoute}/><Route path="/sign-in/*?" component={()=> <AuthPage/>}/><Route path="/worklist"><Protected><Worklist/></Protected></Route><Route path="/settings"><Protected><Settings/></Protected></Route><Route path="/studies/:id"><Protected><Detail/></Protected></Route><Route><Redirect to="/"/></Route></Switch>; }
 function ClerkRoutes(){ const [,setLocation]=useLocation(); return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={appearance} localization={localization} signInUrl={`${basePath}/sign-in`} routerPush={(to)=>setLocation(stripBase(to))} routerReplace={(to)=>setLocation(stripBase(to), { replace: true })}><Routes/></ClerkProvider>; }
 export default function App(){ if(!clerkPubKey) return <div className="error-box">Missing VITE_CLERK_PUBLISHABLE_KEY.</div>; return <WouterRouter base={basePath}><ClerkRoutes/></WouterRouter>; }

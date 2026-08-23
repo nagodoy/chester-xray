@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.database import Base, engine
-from app.routers import clerk_proxy, dicomweb, health, studies, thumbnails, uploads
+from app.routers import clerk_proxy, dicomweb, health, settings, studies, thumbnails, uploads
 
 logging.basicConfig(
     level=logging.INFO,
@@ -60,6 +60,7 @@ app.include_router(studies.router)
 app.include_router(uploads.router)
 app.include_router(thumbnails.router)
 app.include_router(dicomweb.router)
+app.include_router(settings.router)
 app.include_router(clerk_proxy.router)
 
 DIST_DIR = Path(__file__).resolve().parent.parent / "dist"

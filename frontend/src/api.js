@@ -19,3 +19,4 @@ export const uploadStudies = (files) => {
 export const retryStudy = (id) => request(`/api/studies/${encodeURIComponent(id)}/retry`, { method: "POST" });
 export const reviewStudy = (id, decision) =>
   request(`/api/studies/${encodeURIComponent(id)}/review`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision }) });
+export const getDicomwebSettings = () => request("/api/settings/dicomweb");

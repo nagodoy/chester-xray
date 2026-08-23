@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -95,3 +95,34 @@ class HealthResponse(BaseModel):
     storage_backend: str
     db_ok: bool
     model_version: Optional[str]
+
+
+class DicomScpSettingsSchema(BaseModel):
+    status: Literal["configured", "not_configured"]
+    status_label: str
+    host: str
+    ae_title: str
+    port: int
+    services: List[str]
+    transport: str
+    gateway_target: str
+    owner_configured: bool
+
+
+class DicomwebStowSettingsSchema(BaseModel):
+    status: Literal["configured", "local_only"]
+    status_label: str
+    url: str
+    hostname: str
+    path: str
+    port: str
+    https: bool
+    ae_title: str
+    services: List[str]
+    request_limit: str
+
+
+class DicomwebSettingsSchema(BaseModel):
+    scp: DicomScpSettingsSchema
+    stow_rs: DicomwebStowSettingsSchema
+    service_token_configured: bool
