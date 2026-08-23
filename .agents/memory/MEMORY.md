@@ -1,2 +1,3 @@
 - [Cornerstone DICOM runtime](cornerstone-dicom-runtime.md) — validate codec upgrades in a real browser; worker packaging and missing metadata have non-obvious failure modes.
 - [Task-agent merge reconciliation](task-agent-merge-reconciliation.md) — after isolated merges, recheck recent UI customizations; stale branches can reintroduce removed flows.
+- [Workflow listener cleanup](workflow-listener-cleanup.md) — after a restart reports a port conflict, check for and clear the stale listener before retrying.
