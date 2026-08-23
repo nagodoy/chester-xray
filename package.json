@@ -1,7 +1,7 @@
 {
   "name": "workspace",
   "version": "1.0.0",
-  "description": "Authenticated chest X-ray research worklist powered by TorchXRayVision.",
+  "description": "Authenticated chest X-ray research worklist powered by the local CHESTER model.",
   "main": "app/main.py",
   "directories": {
     "example": "examples"
@@ -19,6 +19,7 @@
     "@clerk/localizations": "^4.15.5",
     "@clerk/react": "^6.14.5",
     "@clerk/themes": "^2.4.57",
+    "@tensorflow/tfjs": "^4.22.0",
     "@vitejs/plugin-react": "^6.1.0",
     "cornerstone-core": "^2.6.1",
     "cornerstone-wado-image-loader": "^4.13.2",

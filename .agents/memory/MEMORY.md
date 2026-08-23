@@ -1,3 +1,2 @@
 - [Cornerstone DICOM runtime](cornerstone-dicom-runtime.md) — validate codec upgrades in a real browser; worker packaging and missing metadata have non-obvious failure modes.
 - [Task-agent merge reconciliation](task-agent-merge-reconciliation.md) — after isolated merges, recheck recent UI customizations; stale branches can reintroduce removed flows.
-- [TorchXRayVision output semantics](torchxrayvision-output-semantics.md) — weighted DenseNet forward values are already sigmoid and operating-point normalized.

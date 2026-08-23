@@ -1,7 +1,8 @@
 # Comparação com TorchXRayVision
 
 **Data da consulta:** 22 de agosto de 2026  
-**Objetivo:** comparação técnica e de pesquisa, sem integrar a biblioteca ao app.
+**Objetivo:** registrar a comparação técnica e a decisão de manter o GraphModel
+local do CHESTER como runtime ativo.
 
 ## Resumo executivo
 
@@ -18,11 +19,10 @@ operacionais do modelo “all”. Isso indica provável mesma linhagem de
 treinamento/conversão, mas não prova que os arquivos de pesos sejam
 numericamente idênticos.
 
-**Conclusão:** para pesquisa, a melhor próxima comparação é executar os dois
-modelos fora do navegador sobre exatamente as mesmas imagens e registrar
-pré-processamento, probabilidades brutas e scores normalizados. Trocar o
-modelo do Chester ou instalar TorchXRayVision no app não é necessário para
-responder à pergunta comparativa.
+**Conclusão:** o app usa o GraphModel local do CHESTER no backend. Uma comparação
+de pesquisa futura deve executar os dois modelos sobre exatamente as mesmas
+imagens e registrar pré-processamento, scores sigmoid brutos e scores
+normalizados; o TorchXRayVision não integra o runtime de produção.
 
 ## Nota sobre a URL fornecida
 

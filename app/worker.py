@@ -21,7 +21,7 @@ from app.models import AnalysisJob, AnalysisResult, Study
 
 logger = logging.getLogger(__name__)
 
-PREPROCESSING_VERSION = "1.0.0"
+PREPROCESSING_VERSION = "2.0.0"
 JOB_LEASE_MINUTES = 30
 _WORKER_ID = f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:12]}"
 
@@ -40,25 +40,22 @@ def get_model_version() -> Optional[str]:
 
 
 def _load_model():
-    """Lazy-load TorchXRayVision model. Returns (model, version) or raises."""
+    """Lazy-load the local CHESTER GraphModel. Returns (model, version)."""
     global _model, _model_version
     with _model_lock:
         if _model is not None:
             return _model, _model_version
 
-        import torch
-        import torchxrayvision as xrv  # type: ignore
+        from app.chester_runtime import ChesterModel
 
-        model_name = settings.model_name
-        logger.info("Loading TorchXRayVision model: %s", model_name)
-        model = xrv.models.DenseNet(weights=model_name)
-        model.eval()
-
-        package_version = getattr(xrv, "__version__", "unknown")
-        version = f"torchxrayvision-{package_version}:{model_name}"
+        model = ChesterModel(
+            model_directory=settings.chester_model_directory,
+            timeout_seconds=settings.chester_inference_timeout_seconds,
+        )
+        model.start()
+        version = model.version
         _model = model
         _model_version = version
-        logger.info("Model loaded: %s", version)
         return model, version
 
 
@@ -74,38 +71,12 @@ def run_inference(pixel_array: np.ndarray) -> dict:
       - above_threshold_findings: [pathology names above threshold]
       - model_version: str
     """
-    import torch
     model, version = _load_model()
-
-    import torchxrayvision as xrv  # type: ignore
-    from torchvision import transforms
-
-    # The renderer supplies arbitrary-value grayscale arrays. Normalize once to
-    # TorchXRayVision's expected [-1024, 1024] range.
-    from app.dicom_utils import normalize_for_model
-    arr = normalize_for_model(pixel_array)
-
-    # Center crop and resize to 224x224
-    transform = transforms.Compose([
-        xrv.datasets.XRayCenterCrop(),
-        xrv.datasets.XRayResizer(224),
-    ])
-    arr = transform(arr[None, ...])[0]  # Add/remove channel dim
-
-    # Build tensor: [1, 1, 224, 224]
-    tensor = torch.from_numpy(arr).unsqueeze(0).unsqueeze(0).float()
-
-    # TorchXRayVision's weighted DenseNet.forward() already applies sigmoid
-    # and operating-point normalization. Bypass that presentation transform so
-    # we can persist both the true sigmoid output and the normalized score once.
-    if not hasattr(model, "features2") or not hasattr(model, "classifier"):
-        raise RuntimeError("Loaded XRV model does not expose classifier features")
-    with torch.no_grad():
-        logits = model.classifier(model.features2(tensor))
-        sigmoid_scores = torch.sigmoid(logits).squeeze(0).cpu().numpy()
+    sigmoid_scores = model.infer(pixel_array)
 
     pathologies = model.pathologies
-    op_threshs = getattr(model, "op_threshs", None)
+    op_threshs = model.op_threshs
+    scale_upper = model.scale_upper
 
     raw_scores = {}
     op_normalized_scores = {}
@@ -121,12 +92,16 @@ def run_inference(pixel_array: np.ndarray) -> dict:
 
         if op_threshs is not None and i < len(op_threshs) and op_threshs[i] > 0:
             thresh = float(op_threshs[i])
-            # TorchXRayVision operating-point normalization: threshold -> 0.5,
-            # preserving both the below- and above-threshold ranges.
+            # CHESTER's original presentation mapping places the operating
+            # point at 0.5 and emphasizes confident upper-range findings.
             if raw < thresh:
-                normalized = 0.5 * raw / (thresh + 1e-8)
+                normalized = raw / (thresh * 2.0)
             else:
-                normalized = 0.5 + 0.5 * (raw - thresh) / (1.0 - thresh + 1e-8)
+                normalized = 1.0 - (
+                    (1.0 - raw) / ((1.0 - thresh) * 2.0)
+                )
+                if normalized > 0.6 and scale_upper:
+                    normalized = min(1.0, normalized * scale_upper)
             normalized = min(1.0, max(0.0, normalized))
         else:
             thresh = 0.5
@@ -187,7 +162,7 @@ def _process_job(job_id: str) -> None:
 
 def _process_claimed_job(job_id: str, lease_owner: str) -> None:
     """Process a job that was atomically claimed by this worker."""
-    from app.dicom_utils import render_dicom_frame, normalize_for_model
+    from app.dicom_utils import render_dicom_frame_for_chester
     from app.storage import retrieve_bytes
 
     with get_db_session() as session:
@@ -233,11 +208,12 @@ def _process_claimed_job(job_id: str, lease_owner: str) -> None:
             import pydicom
             from pydicom.filebase import DicomBytesIO
             ds = pydicom.dcmread(DicomBytesIO(raw_bytes), force=True)
-            arr = render_dicom_frame(ds, frame_index=0)
+            arr = render_dicom_frame_for_chester(ds, frame_index=0)
         else:
             from PIL import Image
-            img = Image.open(io.BytesIO(raw_bytes)).convert("L")
-            arr = np.array(img, dtype=np.float32)
+            img = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
+            rgb = np.array(img, dtype=np.float32)
+            arr = rgb.mean(axis=2)
 
         inference_result = run_inference(arr)
 
@@ -357,6 +333,14 @@ def start_worker() -> None:
 
 def stop_worker() -> None:
     """Stop the background worker thread."""
+    global _model, _model_version
     _worker_stop.set()
     if _worker_thread:
         _worker_thread.join(timeout=5.0)
+    with _model_lock:
+        if _model is not None:
+            close = getattr(_model, "close", None)
+            if close is not None:
+                close()
+        _model = None
+        _model_version = None

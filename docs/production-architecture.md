@@ -56,7 +56,7 @@ Background Worker Thread:
   ┌─────────────────────────────────────────┐
   │  Single-threaded inference worker        │
   │  - Polls analysis_jobs (queued)          │
-  │  - Loads TorchXRayVision densenet121    │
+  │  - Uses persistent local CHESTER runtime │
   │  - Stores AnalysisResult in DB          │
   └─────────────────────────────────────────┘
 
@@ -103,12 +103,15 @@ On-Premises DICOM Gateway (gateway/):
 
 ### 4. AI Inference Worker
 
-- **Model**: TorchXRayVision `densenet121-res224-all`
-- **Preprocessing**: grayscale/windowed pixels → XRV-compatible `[-1024, 1024]`
-  normalization → `XRayCenterCrop` → `XRayResizer(224)`
+- **Model**: local CHESTER TensorFlow.js GraphModel `xrv-all-45rot15trans15scale`
+- **Runtime**: persistent local Node process; model and seven weight shards load
+  once, with no external model download and no TorchXRayVision fallback
+- **Preprocessing**: grayscale/windowed pixels → resize shorter side to 224 →
+  center crop → CHESTER-compatible `[-1024, 1024]` scaling
 - **Output**: Raw sigmoid scores + op-normalized scores + above-threshold flags
 - **⚠️ Note**: Op-normalized scores are NOT calibrated probabilities; they remap the
-  operational threshold to approximately 0.5 for display purposes only
+  operational threshold to 0.5 and apply the original CHESTER upper-range display
+  emphasis; they are for research presentation only
 - **Concurrency**: 1 worker thread; no parallel inference
 - **Failure**: Sets job + study to `error`; retry supported via `POST /api/studies/{id}/retry`
 
@@ -210,13 +213,13 @@ Browser → POST /api/uploads (multipart, confirm_deidentified=true)
 Background worker (separate thread):
   → Poll analysis_jobs WHERE status='queued'
   → Retrieve original file from storage
-  → Decode + preprocess (pydicom/PIL + xrv transforms)
-  → Run densenet121 inference (TorchXRayVision)
+  → Decode + preprocess (pydicom/PIL + CHESTER transforms)
+  → Run local CHESTER GraphModel inference (persistent TensorFlow.js runtime)
   → Store AnalysisResult (raw_scores, op_normalized_scores, thresholds, above_threshold)
   → Update Study.status → completed
 ```
 
 ---
 
-*Last updated: 2026-08-22*  
-*Version: 1.0.0 MVP*
+*Last updated: 2026-08-23*
+*Version: 1.1.0 MVP*

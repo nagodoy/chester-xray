@@ -12,7 +12,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-PREPROCESSING_VERSION = "1.0.0"
+PREPROCESSING_VERSION = "2.0.0"
 
 # Chest-suggestive modalities
 CHEST_MODALITIES = {"DX", "CR", "RG"}
@@ -259,18 +259,56 @@ def render_dicom_frame(ds, frame_index: int = 0) -> np.ndarray:
     return arr
 
 
-def normalize_for_model(arr: np.ndarray) -> np.ndarray:
-    """
-    Normalize array to [-1024, 1024] range (xrv.datasets.normalize equivalent).
-    Input may be any float range.
-    """
-    arr = arr.astype(np.float32)
-    vmin, vmax = arr.min(), arr.max()
-    if vmax > vmin:
-        arr = (arr - vmin) / (vmax - vmin) * 2048.0 - 1024.0
-    else:
-        arr = np.zeros_like(arr)
-    return arr
+def render_dicom_frame_for_chester(ds, frame_index: int = 0) -> np.ndarray:
+    """Render a DICOM frame as the 8-bit grayscale raster used by CHESTER."""
+    try:
+        pixel_array = ds.pixel_array
+    except Exception as exc:
+        raise ValueError(f"Cannot decode pixel data: {exc}") from exc
+
+    if pixel_array.ndim == 3:
+        pixel_array = pixel_array[frame_index]
+    if pixel_array.ndim != 2:
+        raise ValueError(f"Unexpected pixel array shape: {pixel_array.shape}")
+
+    raw = pixel_array.astype(np.float32)
+    slope = float(getattr(ds, "RescaleSlope", 1.0) or 1.0)
+    intercept = float(getattr(ds, "RescaleIntercept", 0.0) or 0.0)
+    values = raw * slope + intercept
+    low = float(raw.min()) * slope + intercept
+    high = float(raw.max()) * slope + intercept
+
+    wc = getattr(ds, "WindowCenter", None)
+    ww = getattr(ds, "WindowWidth", None)
+    if wc is not None and ww is not None:
+        try:
+            wc_value = (
+                float(wc[0])
+                if hasattr(wc, "__iter__") and not isinstance(wc, str)
+                else float(wc)
+            )
+            ww_value = (
+                float(ww[0])
+                if hasattr(ww, "__iter__") and not isinstance(ww, str)
+                else float(ww)
+            )
+            if ww_value > 1:
+                low = wc_value - ww_value / 2.0
+                high = wc_value + ww_value / 2.0
+        except (ValueError, TypeError):
+            pass
+
+    if not high > low:
+        high = low + 1.0
+    normalized = np.clip((values - low) / (high - low), 0.0, 1.0)
+
+    photometric = str(
+        getattr(ds, "PhotometricInterpretation", "MONOCHROME2")
+    ).upper()
+    if "MONOCHROME1" in photometric:
+        normalized = 1.0 - normalized
+
+    return np.rint(normalized * 255.0).astype(np.float32)
 
 
 def render_to_pil(arr: np.ndarray):

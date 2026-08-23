@@ -18,7 +18,6 @@ from app.dicom_utils import (
     make_synthetic_uids,
     parse_dicom_bytes,
     render_dicom_frame,
-    normalize_for_model,
     validate_study,
 )
 from app.models import AnalysisJob, AuditEvent, Instance, StoredObject, Study

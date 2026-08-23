@@ -1,7 +1,7 @@
 # Chester AI Radiology Assistant
 
 An authenticated research worklist for chest radiographs, built with FastAPI,
-React, PostgreSQL, pydicom and TorchXRayVision.
+React, PostgreSQL, pydicom and the local CHESTER TensorFlow.js model.
 
 ## Safety boundary
 
@@ -23,7 +23,7 @@ considering any clinical deployment.
 - Conservative chest-radiograph validation with manual review for uncertain data
 - Persistent PostgreSQL studies, jobs, results and audit events
 - Replit App Storage support with an explicit database-backed development fallback
-- Background inference with TorchXRayVision `densenet121-res224-all`
+- Background inference with the local CHESTER `xrv-all-45rot15trans15scale` GraphModel
 - Raw scores, operating-point normalization, thresholds and model/preprocessing versions
 
 ## Run
@@ -75,6 +75,7 @@ follow [`gateway/README.md`](gateway/README.md).
 
 Chester originated as the browser-delivered research prototype described in
 [Chester: A Web Delivered Locally Computed Chest X-Ray Disease Prediction
-System](https://arxiv.org/abs/1901.11210). This repository now uses a
-server-side worklist architecture; the original static files remain only as
-historical reference and are not served by the active application.
+System](https://arxiv.org/abs/1901.11210). This repository now runs the original
+local GraphModel through a persistent server-side TensorFlow.js runtime. The
+legacy static interface remains historical reference and is not served by the
+active application.

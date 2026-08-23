@@ -30,8 +30,9 @@ class Settings(BaseSettings):
     # Worker
     worker_concurrency: int = 1
 
-    # Model
-    model_name: str = "densenet121-res224-all"
+    # CHESTER model
+    chester_model_directory: str = "models/xrv-all-45rot15trans15scale"
+    chester_inference_timeout_seconds: float = 90.0
 
     # App
     debug: bool = os.environ.get("DEBUG", "").lower() in ("1", "true", "yes")
