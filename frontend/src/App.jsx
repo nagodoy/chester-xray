@@ -194,6 +194,17 @@ function isUnknownUserError(error) {
     code === "form_identifier_not_found" || /user|usuário|account|conta/i.test(message) && /not found|não foi possível encontrar|does not exist|não existe/i.test(message)
   );
 }
+function isExistingUserError(error) {
+  return error?.errors?.some(({ code, message = "" }) =>
+    code === "form_identifier_exists" || /already exists|já existe|already registered|já cadastrado/i.test(message)
+  );
+}
+function withAuthTimeout(promise, timeout = 15000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("O serviço de autenticação demorou para responder. Tente novamente.")), timeout)),
+  ]);
+}
 function AuthPage() {
   const { signIn, isLoaded: signInLoaded } = useSignIn();
   const { signUp, isLoaded: signUpLoaded } = useSignUp();
@@ -207,16 +218,16 @@ function AuthPage() {
   const ready = signInLoaded && signUpLoaded;
 
   const startSignIn = async (value) => {
-    await signIn.create({ identifier: value });
+    await withAuthTimeout(signIn.create({ identifier: value }));
     const factor = signIn.supportedFirstFactors?.find((item) => item.strategy === "email_code");
     if (!factor?.emailAddressId) throw new Error("Este ambiente não disponibilizou o código por email.");
-    await signIn.prepareFirstFactor({ strategy: "email_code", emailAddressId: factor.emailAddressId });
+    await withAuthTimeout(signIn.prepareFirstFactor({ strategy: "email_code", emailAddressId: factor.emailAddressId }));
     setMode("sign-in");
   };
 
   const startSignUp = async (value) => {
-    await signUp.create({ emailAddress: value });
-    await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+    await withAuthTimeout(signUp.create({ emailAddress: value }));
+    await withAuthTimeout(signUp.prepareEmailAddressVerification({ strategy: "email_code" }));
     setMode("sign-up");
   };
 
@@ -232,10 +243,10 @@ function AuthPage() {
     setBusy(true);
     try {
       try {
-        await startSignIn(normalized);
-      } catch (signInError) {
-        if (!isUnknownUserError(signInError)) throw signInError;
         await startSignUp(normalized);
+      } catch (signUpError) {
+        if (!isExistingUserError(signUpError) && !isUnknownUserError(signUpError)) throw signUpError;
+        await startSignIn(normalized);
       }
       setEmail(normalized);
       setStep("code");
@@ -253,8 +264,8 @@ function AuthPage() {
     setBusy(true);
     try {
       const result = mode === "sign-in"
-        ? await signIn.attemptFirstFactor({ strategy: "email_code", code: code.trim() })
-        : await signUp.attemptEmailAddressVerification({ code: code.trim() });
+        ? await withAuthTimeout(signIn.attemptFirstFactor({ strategy: "email_code", code: code.trim() }))
+        : await withAuthTimeout(signUp.attemptEmailAddressVerification({ code: code.trim() }));
       if (result.status !== "complete" || !result.createdSessionId) {
         throw new Error("A verificação ainda não foi concluída.");
       }
