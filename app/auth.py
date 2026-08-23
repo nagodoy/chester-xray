@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Optional
 
 from fastapi import HTTPException, Request, status
@@ -10,6 +11,41 @@ from starlette.concurrency import run_in_threadpool
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+_AUTHORIZATION_CACHE_TTL_SECONDS = 60
+_authorization_cache: dict[str, tuple[float, bool]] = {}
+
+
+def is_authorized_email(email: Optional[str]) -> bool:
+    """Compare the configured allowlisted email without case sensitivity."""
+    return bool(email) and email.strip().casefold() == settings.authorized_email.casefold()
+
+
+def _primary_email(user) -> Optional[str]:
+    primary_id = getattr(user, "primary_email_address_id", None)
+    addresses = getattr(user, "email_addresses", []) or []
+    for address in addresses:
+        if getattr(address, "id", None) == primary_id:
+            return getattr(address, "email_address", None)
+    return None
+
+
+def _fetch_authorization(subject: str) -> bool:
+    """Fetch the verified primary email from Clerk for a signed-in subject."""
+    from clerk_backend_api import Clerk
+
+    clerk = Clerk(bearer_auth=settings.clerk_secret_key)
+    user = clerk.users.get(user_id=subject)
+    return is_authorized_email(_primary_email(user))
+
+
+async def _is_authorized_subject(subject: str) -> bool:
+    now = time.monotonic()
+    cached = _authorization_cache.get(subject)
+    if cached and now - cached[0] < _AUTHORIZATION_CACHE_TTL_SECONDS:
+        return cached[1]
+    authorized = await run_in_threadpool(_fetch_authorization, subject)
+    _authorization_cache[subject] = (now, authorized)
+    return authorized
 
 
 async def _authenticate_clerk(request: Request) -> Optional[str]:
@@ -52,6 +88,11 @@ async def _authenticate_clerk(request: Request) -> Optional[str]:
             )
         payload = request_state.payload
         subject = payload.get("sub") if payload else None
+        if not subject or not await _is_authorized_subject(subject):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User is not authorized for this application",
+            )
         return subject
     except HTTPException:
         raise

@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     # Auth
     clerk_secret_key: str = os.environ.get("CLERK_SECRET_KEY", "")
     session_secret: str = os.environ.get("SESSION_SECRET", "dev-session-secret-change-me")
+    authorized_email: str = os.environ.get(
+        "AUTHORIZED_EMAIL",
+        "nelsonagodoy@gmail.com",
+    ).strip().lower()
 
     # DICOM ingestion token
     dicom_ingest_token: str = os.environ.get(

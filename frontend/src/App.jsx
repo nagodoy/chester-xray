@@ -39,6 +39,7 @@ const localization = {
   },
 };
 const stripBase = (path) => basePath && path.startsWith(basePath) ? path.slice(basePath.length) || "/" : path;
+const authorizedEmail = "nelsonagodoy@gmail.com";
 
 function Brand({ light = false }) { return <div className={`brand ${light ? "light" : ""}`}><img src={`${basePath}/logo.svg`} alt="Chester AI" /><div>chester<small>research console · cxr</small></div></div>; }
 const statusLabels = { received: "recebido", validating: "validando", queued: "na fila", processing: "processando", completed: "concluído", needs_review: "requer revisão", rejected: "rejeitado", error: "erro" };
@@ -187,7 +188,18 @@ function Detail() {
 }
 function AuthPage() { return <div className="auth-shell"><div className="clerk-wrap"><div className="auth-mark"><Brand light/><p>Console de pesquisa · radiografia torácica</p></div><SignIn routing="path" path={`${basePath}/sign-in`} fallbackRedirectUrl={`${basePath}/worklist`} withSignUp={false}/><div className="auth-research-note"><ShieldCheck size={14}/><span>Pesquisa somente · dados desidentificados</span></div><p className="auth-restricted">Acesso restrito a usuários autorizados</p></div></div>; }
 function HomeRoute(){return <><Show when="signed-in"><Redirect to="/worklist"/></Show><Show when="signed-out"><Redirect to="/sign-in"/></Show></>;}
-function Protected({children}){return <><Show when="signed-in">{children}</Show><Show when="signed-out"><Redirect to="/"/></Show></>;}
+function AccessDenied({ email }) { const { signOut } = useClerk(); return <div className="auth-shell"><div className="access-denied"><ShieldCheck size={28}/><h1>Acesso restrito</h1><p>Este ambiente está liberado inicialmente apenas para o email autorizado.</p><span className="mono">{email || "Email não identificado"}</span><button className="btn btn-primary" onClick={() => signOut({ redirectUrl: `${basePath}/sign-in` })}>Sair e tentar outro email</button></div></div>; }
+function Protected({children}) {
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
+  const email = user?.primaryEmailAddress?.emailAddress?.trim().toLowerCase();
+  const authorized = email === authorizedEmail;
+  useEffect(() => { if (isLoaded && user && !authorized) signOut({ redirectUrl: `${basePath}/sign-in` }); }, [authorized, isLoaded, signOut, user]);
+  if (!isLoaded) return <div className="auth-shell"><div className="auth-loading">Verificando acesso…</div></div>;
+  if (!user) return <Redirect to="/"/>;
+  if (!authorized) return <AccessDenied email={email}/>;
+  return children;
+}
 function Routes(){ return <Switch><Route path="/" component={HomeRoute}/><Route path="/sign-in/*?" component={()=> <AuthPage/>}/><Route path="/worklist"><Protected><Worklist/></Protected></Route><Route path="/settings"><Protected><Settings/></Protected></Route><Route path="/studies/:id"><Protected><Detail/></Protected></Route><Route><Redirect to="/"/></Route></Switch>; }
 function ClerkRoutes(){ const [,setLocation]=useLocation(); return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={appearance} localization={localization} signInUrl={`${basePath}/sign-in`} routerPush={(to)=>setLocation(stripBase(to))} routerReplace={(to)=>setLocation(stripBase(to), { replace: true })}><Routes/></ClerkProvider>; }
 export default function App(){ if(!clerkPubKey) return <div className="error-box">Missing VITE_CLERK_PUBLISHABLE_KEY.</div>; return <WouterRouter base={basePath}><ClerkRoutes/></WouterRouter>; }

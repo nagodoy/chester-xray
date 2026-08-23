@@ -930,6 +930,50 @@
   }
 }
 
+.access-denied {
+  width: min(440px, calc(100vw - 32px));
+  padding: 34px 30px;
+  border: 1px solid #29405e;
+  border-radius: 12px;
+  background: #0f1a32;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  text-align: center;
+}
+
+.access-denied > svg {
+  margin-bottom: 14px;
+  color: var(--cyan);
+}
+
+.access-denied h1 {
+  color: #eff6ff;
+  font-size: 24px;
+}
+
+.access-denied p {
+  margin: 10px 0 14px;
+  color: #9aaec4;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.access-denied .mono {
+  display: block;
+  margin-bottom: 22px;
+  color: #7be4d0;
+  font-size: 11px;
+}
+
+.access-denied .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.auth-loading {
+  color: #9aaec4;
+  font-size: 12px;
+}
+
 @media (max-width: 620px) {
   .app-shell {
     display: block;

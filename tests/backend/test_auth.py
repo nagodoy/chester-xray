@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import pytest
+from fastapi import HTTPException
+from starlette.requests import Request
 
 
 def test_studies_requires_auth(client):
@@ -23,3 +25,58 @@ def test_upload_requires_confirm_deidentified(auth_client):
     )
     assert resp.status_code == 400
     assert "confirm_deidentified" in resp.json()["detail"].lower()
+
+
+@pytest.mark.parametrize(
+    ("email", "expected"),
+    [
+        ("nelsonagodoy@gmail.com", True),
+        ("NELSONAGODOY@GMAIL.COM", True),
+        ("other@example.com", False),
+        ("nelsonagodoy@gmail.com ", True),
+        ("", False),
+        (None, False),
+    ],
+)
+def test_only_configured_email_is_authorized(email, expected):
+    from app.auth import is_authorized_email
+
+    assert is_authorized_email(email) is expected
+
+
+@pytest.mark.anyio
+async def test_authenticated_user_outside_allowlist_is_forbidden(monkeypatch):
+    import app.auth as auth
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "clerk_secret_key", "test-clerk-secret")
+
+    async def signed_in_request(*_args):
+        return type(
+            "RequestState",
+            (),
+            {"is_signed_in": True, "payload": {"sub": "user_not_allowed"}},
+        )()
+
+    async def user_is_not_authorized(_subject):
+        return False
+
+    monkeypatch.setattr(auth, "run_in_threadpool", signed_in_request)
+    monkeypatch.setattr(auth, "_is_authorized_subject", user_is_not_authorized)
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "scheme": "http",
+            "path": "/",
+            "raw_path": b"/",
+            "query_string": b"",
+            "headers": [(b"host", b"testserver")],
+        }
+    )
+
+    with pytest.raises(HTTPException) as error:
+        await auth.require_auth(request)
+
+    assert error.value.status_code == 403
+    assert error.value.detail == "User is not authorized for this application"
