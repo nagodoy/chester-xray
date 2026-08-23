@@ -1,6 +1,8 @@
 """Tests for DICOM STOW-RS endpoints."""
 from __future__ import annotations
 
+import base64
+
 import pytest
 
 from tests.backend.conftest import make_minimal_dicom, make_stow_multipart
@@ -132,6 +134,57 @@ def test_stow_study_specific_endpoint(auth_client, db_session):
         },
     )
     assert resp.status_code in (200, 202, 409)
+
+
+def test_stow_wado_compatibility_endpoint(auth_client, db_session):
+    """STOW-RS accepts the compatibility path used by some OsiriX setups."""
+    dcm = make_minimal_dicom(modality="DX", body_part="CHEST", view_position="PA")
+    body, content_type = make_stow_multipart([dcm])
+
+    resp = auth_client.post(
+        "/wado/studies",
+        content=body,
+        headers={
+            "Content-Type": content_type,
+            "X-DICOM-Ingest-Key": "test-dicom-ingest-token",
+        },
+    )
+    assert resp.status_code in (200, 202, 409), resp.text
+
+
+def test_stow_wado_duplicate_path_compatibility(auth_client, db_session):
+    """OsiriX may append /studies twice to a configured WADO base URL."""
+    dcm = make_minimal_dicom(modality="DX", body_part="CHEST", view_position="PA")
+    body, content_type = make_stow_multipart([dcm])
+
+    resp = auth_client.post(
+        "/wado/studies/studies",
+        content=body,
+        headers={
+            "Content-Type": content_type,
+            "X-DICOM-Ingest-Key": "test-dicom-ingest-token",
+        },
+    )
+    assert resp.status_code in (200, 202, 409), resp.text
+
+
+def test_stow_accepts_basic_auth_for_osirix(client, db_session):
+    """OsiriX can authenticate STOW-RS with its HTTP username/password fields."""
+    dcm = make_minimal_dicom(modality="DX", body_part="CHEST", view_position="PA")
+    body, content_type = make_stow_multipart([dcm])
+    basic_credentials = base64.b64encode(
+        b"dicom:test-dicom-ingest-token"
+    ).decode("ascii")
+
+    resp = client.post(
+        "/dicomweb/studies",
+        content=body,
+        headers={
+            "Content-Type": content_type,
+            "Authorization": f"Basic {basic_credentials}",
+        },
+    )
+    assert resp.status_code in (200, 202), resp.text
 
 
 def test_stow_non_dicom_rejected(auth_client, db_session):

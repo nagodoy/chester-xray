@@ -3,3 +3,4 @@
 - [Workflow listener cleanup](workflow-listener-cleanup.md) — after a restart reports a port conflict, check for and clear the stale listener before retrying.
 - [Restricted admin bootstrap](restricted-admin-bootstrap.md) — custom OTP access starts with configured admins; removed environment admins lose their managed access.
 - [Legacy study ownership](legacy-study-ownership.md) — pre-OTP studies require an explicit, audited identifier-to-email migration before email sessions can see them.
+- [OsiriX STOW interoperability](osirix-stow-interoperability.md) — support OsiriX WADO-style STOW paths and HTTPS Basic token authentication without accepting uploads at the app root.

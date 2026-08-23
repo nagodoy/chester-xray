@@ -118,7 +118,13 @@ On-Premises DICOM Gateway (gateway/):
 ### 5. STOW-RS Gateway
 
 - Endpoint: `POST /dicomweb/studies` and `POST /dicomweb/studies/{study_uid}`
+- OsiriX compatibility: `POST /wado/studies` and
+  `POST /wado/studies/{study_uid}` are accepted aliases, including the
+  duplicated `/wado/studies/studies` path; the server root is not a STOW
+  endpoint
 - Auth: `X-DICOM-Ingest-Key` header or `Authorization: Bearer` compared in constant time
+- OsiriX authentication: HTTPS Basic auth is supported with username `dicom`
+  and `DICOM_INGEST_TOKEN` as the password
 - Token: `DICOM_INGEST_TOKEN` (falls back to `SESSION_SECRET`)
 - Ownership: `X-Worklist-Owner` or `DICOM_INGEST_OWNER_ID` must identify an
   authorized email; all study API queries enforce the authenticated email as

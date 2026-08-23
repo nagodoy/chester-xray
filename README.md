@@ -56,6 +56,16 @@ suite.
 | `POST /api/studies/{id}/retry` | Retry failed inference | Session token |
 | `POST /dicomweb/studies` | STOW-RS ingestion | Service token |
 
+The canonical STOW-RS URL is `/dicomweb/studies`. For compatibility with
+OsiriX configurations that use a WADO base path, `/wado/studies` is also
+accepted for POST uploads, including the duplicate `/wado/studies/studies`
+path emitted by some configurations. Do not configure the server root; posting
+to `/` returns HTTP 405.
+
+OsiriX can authenticate with its HTTP username/password fields: use `dicom` as
+the username and the configured `DICOM_INGEST_TOKEN` as the password. The
+connection must use HTTPS.
+
 Configure a dedicated `DICOM_INGEST_TOKEN` before connecting the external
 gateway. The MVP can fall back to `SESSION_SECRET`, but token separation and
 rotation are required for a production design.

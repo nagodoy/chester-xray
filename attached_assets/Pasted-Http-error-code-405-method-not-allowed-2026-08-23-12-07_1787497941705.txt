@@ -1,0 +1,26 @@
+Http error code: 405
+
+method not allowed
+2026-08-23 12:07:45.891 Df OsiriX MD[1878:298b79] --- STOW-RS Client finished in 0.28 [s], 2 files, 21.21 MB, 7.24 files/[s], 76.79 MB/[s]
+2026-08-23 12:07:47.359 Df OsiriX MD[1878:3d9f] SendController Released
+2026-08-23 12:07:49.430 Df OsiriX MD[1878:3d9f] ---- log fetch request: type == "Send" (<QueryLogController: 0x7e0483800>[entity: LogEntry, number of selected objects: 1])
+2026-08-23 12:09:34.254 Df OsiriX MD[1878:299a7c] ******** addAuthenticationToRequest: no password defined / found for: https://rm.nelsongodoy.com.br
+2026-08-23 12:09:34.979 Df OsiriX MD[1878:299ae6] Request error = (null)
+2026-08-23 12:09:34.979 Df OsiriX MD[1878:299ae6] HTTP response = 404, https://77949501-56b8-489d-bbb8-51cb39803e5d-00-1hdqfi9pli07x.spock.replit.dev/wado/studies/studies?PatientID=11235813&StudyDate=20130509
+2026-08-23 12:09:41.347 Df OsiriX MD[1878:3d9f] SendController initWithFiles: 3 files
+2026-08-23 12:09:41.368 Df OsiriX MD[1878:3d9f] SendController window: <NSWindow: 0x7e302f480>
+2026-08-23 12:09:59.071 Df OsiriX MD[1878:299d22] --- WADO-RS Transfer Syntax Updating in 0.06[s]
+2026-08-23 12:09:59.071 Df OsiriX MD[1878:299d22] --- STOW-RS Transfer Syntax Updating Finished
+2026-08-23 12:09:59.278 Df OsiriX MD[1878:299acf] ***** uploadTask HTTP status code = 405 (method not allowed)
+2026-08-23 12:09:59.278 Df OsiriX MD[1878:299acf] ***** uploadTask HTTP errror = Error Domain=OsiriX Code=405 "method not allowed" UserInfo={NSLocalizedDescription=method not allowed}
+2026-08-23 12:09:59.278 Df OsiriX MD[1878:299acf] ****** NSInvalidArgumentException (in -[DicomBridge fillDcmData:fromDictionary:metaHeader:]) [DicomBridge.mm:1335]: -[__NSCFString objectForKey:]: unrecognized selector sent to instance 0x7bb20e400
+2026-08-23 12:09:59.278 Df OsiriX MD[1878:299acf] ***** logNumberError (0) + logNumberReceived (0) != logNumberTotal (2)
+2026-08-23 12:09:59.278 Df OsiriX MD[1878:3d9f] **** DICOM STOW-RS error
+2026-08-23 12:09:59.278 Df OsiriX MD[1878:3d9f] DICOM STOW-RS operation failed.
+
+Http error code: 405
+
+method not allowed
+2026-08-23 12:09:59.290 Df OsiriX MD[1878:299d22] --- STOW-RS Client finished in 0.27 [s], 2 files, 21.21 MB, 7.30 files/[s], 77.46 MB/[s]
+2026-08-23 12:10:01.006 Df OsiriX MD[1878:3d9f] SendController Released
+2026-08-23 12:10:02.834 Df OsiriX MD[1878:3d9f] ---- log fetch request: type == "Send" (<QueryLogController: 0x7e0483800>[entity: LogEntry, number of selected objects: 1])

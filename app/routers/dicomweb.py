@@ -1,6 +1,7 @@
 """STOW-RS DICOM web endpoints."""
 from __future__ import annotations
 
+import base64
 import email
 import email.parser
 import hashlib
@@ -31,7 +32,7 @@ STOW_FAILURE_STATUS = "C122"  # Failure: referenced SOP class not supported
 
 def _verify_service_token(request: Request) -> bool:
     """
-    Verify service token from X-DICOM-Ingest-Key header or Bearer token.
+    Verify service token from X-DICOM-Ingest-Key, Bearer, or Basic auth.
     Constant-time comparison to the dedicated DICOM ingestion token.
     """
     token = settings.dicom_ingest_token
@@ -50,6 +51,19 @@ def _verify_service_token(request: Request) -> bool:
         if bearer == token:
             return True
         return hmac.compare_digest(bearer, token)
+
+    if auth_header.startswith("Basic "):
+        try:
+            encoded_credentials = auth_header[6:].strip()
+            decoded_credentials = base64.b64decode(
+                encoded_credentials, validate=True
+            ).decode("utf-8")
+            username, separator, password = decoded_credentials.partition(":")
+        except (UnicodeDecodeError, ValueError):
+            return False
+        if not username or not separator:
+            return False
+        return hmac.compare_digest(password, token)
 
     return False
 
@@ -319,4 +333,25 @@ async def stow_study(
     session: Session = Depends(get_db),
 ):
     """STOW-RS: Store DICOM instances for a specific study."""
+    return await _handle_stow(request, session, study_uid=study_uid)
+
+
+@router.post("/wado/studies")
+async def stow_wado_compatibility(
+    request: Request,
+    session: Session = Depends(get_db),
+):
+    """Compatibility alias for OsiriX configurations using the WADO base path."""
+    return await _handle_stow(request, session, study_uid=None)
+
+
+@router.post("/wado/studies/{study_uid}")
+async def stow_wado_study_compatibility(
+    study_uid: str,
+    request: Request,
+    session: Session = Depends(get_db),
+):
+    """Study-specific compatibility alias for OsiriX WADO/STOW configurations."""
+    if study_uid == "studies":
+        return await _handle_stow(request, session, study_uid=None)
     return await _handle_stow(request, session, study_uid=study_uid)
