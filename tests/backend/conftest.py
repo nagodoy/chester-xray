@@ -17,7 +17,7 @@ os.environ["DATABASE_URL"] = "sqlite:///./test.db"
 os.environ["TESTING"] = "1"
 os.environ["DEBUG"] = "1"
 os.environ["SESSION_SECRET"] = "test-session-secret"
-os.environ["CLERK_SECRET_KEY"] = ""
+os.environ["DICOM_INGEST_TOKEN"] = "test-dicom-ingest-token"
 os.environ["DICOM_INGEST_OWNER_ID"] = "test-user-123"
 
 from app.database import Base, get_db
@@ -70,15 +70,20 @@ def client(setup_test_db, db_session):
 
 @pytest.fixture
 def auth_client(client, monkeypatch):
-    """Test client with auth mocked."""
-    from app.auth import require_auth
+    """Test client with a complete own-auth access context mocked."""
+    from app.api.auth_deps import AccessContext, get_current_access
 
-    async def mock_auth(request=None):
-        return "test-user-123"
+    def mock_auth():
+        return AccessContext(
+            email="test-user-123",
+            role="admin",
+            allowed_pages=None,
+            is_admin=True,
+        )
 
-    app.dependency_overrides[require_auth] = mock_auth
+    app.dependency_overrides[get_current_access] = mock_auth
     yield client
-    app.dependency_overrides.pop(require_auth, None)
+    app.dependency_overrides.pop(get_current_access, None)
 
 
 def _write_uint16_le(value: int) -> bytes:

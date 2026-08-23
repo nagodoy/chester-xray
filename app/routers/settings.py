@@ -5,7 +5,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends
 
-from app.auth import require_auth
+from app.api.auth_deps import AccessContext, require_page
 from app.config import settings
 from app.schemas import (
     DicomScpSettingsSchema,
@@ -44,7 +44,7 @@ def _hostname_and_port(url: str) -> tuple[str, str]:
 
 @router.get("/api/settings/dicomweb", response_model=DicomwebSettingsSchema)
 def get_dicomweb_settings(
-    _actor_id: str = Depends(require_auth),
+    _access: AccessContext = Depends(require_page("settings")),
 ) -> DicomwebSettingsSchema:
     """Return safe DICOM connectivity metadata for the authenticated console."""
     stow_path = "/dicomweb/studies"

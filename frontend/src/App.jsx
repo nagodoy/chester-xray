@@ -1,45 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
-import { ClerkProvider, Show, useClerk, useSignIn, useSignUp, useUser } from "@clerk/react";
-import { publishableKeyFromHost } from "@clerk/react/internal";
-import { ptBR } from "@clerk/localizations";
-import { shadcn } from "@clerk/themes";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useParams, useSearch } from "wouter";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Activity, AlertTriangle, ArrowLeft, Check, ChevronRight, CircleHelp, ClipboardList, CloudUpload, FileImage, Filter, Globe2, LockKeyhole, LogOut, RadioTower, RotateCcw, Search, Server, Settings2, ShieldCheck, UploadCloud, Wifi, X, XCircle } from "lucide-react";
-import { getDicomwebSettings, getStudy, listStudies, retryStudy, reviewStudy, uploadStudies } from "./api";
+import { createAllowedDomain, createAllowedEmail, deleteAllowedDomain, deleteAllowedEmail, getAccessMetadata, getDicomwebSettings, getSessionToken, getStudy, listAccessAudit, listAllowedDomains, listAllowedEmails, listStudies, logout, requestAccessCode, retryStudy, reviewStudy, updateAllowedDomain, updateAllowedEmail, uploadStudies, validateSession, verifyAccessCode } from "./api";
 import "./styles.css";
 import "./worklist-redesign.css";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
-const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
-const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
-const appearance = {
-  theme: shadcn, cssLayerName: "clerk",
-  options: { logoPlacement: "inside", logoLinkUrl: basePath || "/", logoImageUrl: `${window.location.origin}${basePath}/logo.svg` },
-  variables: { colorPrimary: "#19bda7", colorForeground: "#eff6ff", colorMutedForeground: "#9aaec4", colorBackground: "#0f1a32", colorInput: "#09162c", colorInputForeground: "#eff6ff", colorDanger: "#fb6d78", colorNeutral: "#29405e", fontFamily: "Plus Jakarta Sans", borderRadius: "0.55rem" },
-  elements: { rootBox: "w-full flex justify-center", cardBox: "rounded-xl w-[440px] max-w-full overflow-hidden", card: "!shadow-none !border-0 !bg-transparent", footer: "!shadow-none !border-0 !bg-transparent", main: "bg-transparent" }
-};
-const localization = {
-  ...ptBR,
-  signIn: {
-    ...ptBR.signIn,
-    start: {
-      ...ptBR.signIn?.start,
-      title: "Entrar no Chester AI",
-      titleCombined: "Entrar no Chester AI",
-      subtitle: "Informe seu email para receber o código de acesso.",
-      subtitleCombined: "Informe seu email para receber o código de acesso.",
-    },
-    emailCode: {
-      ...ptBR.signIn?.emailCode,
-      title: "Verifique seu email",
-      formTitle: "Código de verificação",
-      subtitle: "Enviamos um código de 6 dígitos para seu email.",
-    },
-  },
-};
-const stripBase = (path) => basePath && path.startsWith(basePath) ? path.slice(basePath.length) || "/" : path;
-const authorizedEmail = "nelsonagodoy@gmail.com";
+const AuthContext = createContext(null);
+const useAuth = () => useContext(AuthContext);
+const canAccess = (access, page) => Boolean(page === "access-control" ? access?.is_admin : access?.is_admin || access?.allowed_pages === null || access?.allowed_pages?.includes(page));
 
 function Brand({ light = false }) { return <div className={`brand ${light ? "light" : ""}`}><img src={`${basePath}/logo.svg`} alt="Chester AI" /><div>chester<small>research console · cxr</small></div></div>; }
 const statusLabels = { received: "recebido", validating: "validando", queued: "na fila", processing: "processando", completed: "concluído", needs_review: "requer revisão", rejected: "rejeitado", error: "erro" };
@@ -51,17 +21,30 @@ function latestResultRows(results = []) {
   const keys = [...new Set([...Object.keys(run.raw_scores || {}), ...Object.keys(run.op_normalized_scores || {}), ...Object.keys(run.thresholds || {})])];
   return keys.map((pathology) => ({ pathology, raw_score: run.raw_scores?.[pathology], normalized_score: run.op_normalized_scores?.[pathology], threshold: run.thresholds?.[pathology], above_threshold: run.above_threshold?.[pathology] ?? run.above_threshold_findings?.includes?.(pathology) }));
 }
-function Thumb({ url }) { return <div className="thumb">{url ? <img src={url} alt="Study radiograph" /> : <FileImage size={28} />}</div>; }
+function Thumb({ url }) {
+  const [imageUrl, setImageUrl] = useState("");
+  useEffect(() => {
+    if (!url) { setImageUrl(""); return undefined; }
+    if (!url.startsWith("/api/")) { setImageUrl(url); return undefined; }
+    let objectUrl = "";
+    fetch(url, { headers: { "X-Session-Token": getSessionToken() || "" }, credentials: "same-origin" })
+      .then((response) => response.ok ? response.blob() : Promise.reject(new Error("Thumbnail unavailable")))
+      .then((blob) => { objectUrl = URL.createObjectURL(blob); setImageUrl(objectUrl); })
+      .catch(() => setImageUrl(""));
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [url]);
+  return <div className="thumb">{imageUrl ? <img src={imageUrl} alt="Study radiograph" /> : <FileImage size={28} />}</div>;
+}
 function Sidebar() {
-  const { signOut } = useClerk();
+  const { access, signOut } = useAuth();
   const [location] = useLocation();
   const search = useSearch();
   const reviewActive = location === "/worklist" && new URLSearchParams(search).get("status") === "needs_review";
   const worklistActive = location === "/worklist" && !reviewActive;
   const settingsActive = location === "/settings";
-  return <aside className="sidebar"><Brand /><div className="sidebar-section-label">Pesquisa</div><nav className="nav" aria-label="Pesquisa"><Link href="/worklist" aria-label="Todos os estudos" aria-current={worklistActive ? "page" : undefined} className={worklistActive ? "active" : ""}><ClipboardList size={16}/><span>Todos os estudos</span></Link><Link href="/worklist?status=needs_review" aria-label="Estudos que requerem revisão" aria-current={reviewActive ? "page" : undefined} className={reviewActive ? "active" : ""}><AlertTriangle size={16}/><span>Requer revisão</span></Link></nav><div className="sidebar-section-label sidebar-system-label">Sistema</div><nav className="nav nav-secondary" aria-label="Sistema"><Link href="/settings" aria-label="Ajustes DICOMweb" aria-current={settingsActive ? "page" : undefined} className={settingsActive ? "active" : ""}><Settings2 size={16}/><span>Ajustes <small>Settings</small></span></Link></nav><div className="sidebar-note"><ShieldCheck size={15}/><strong>Ambiente controlado</strong><br/>Resultados para pesquisa. Toda decisão requer revisão especializada.</div><button className="btn btn-subtle" onClick={() => signOut({ redirectUrl: basePath || "/" })}><LogOut size={15}/><span>Sair da console</span></button></aside>;
+  return <aside className="sidebar"><Brand /><div className="sidebar-section-label">Pesquisa</div><nav className="nav" aria-label="Pesquisa">{canAccess(access, "worklist") && <Link href="/worklist" aria-label="Todos os estudos" aria-current={worklistActive ? "page" : undefined} className={worklistActive ? "active" : ""}><ClipboardList size={16}/><span>Todos os estudos</span></Link>}{canAccess(access, "review") && <Link href="/worklist?status=needs_review" aria-label="Estudos que requerem revisão" aria-current={reviewActive ? "page" : undefined} className={reviewActive ? "active" : ""}><AlertTriangle size={16}/><span>Requer revisão</span></Link>}</nav><div className="sidebar-section-label sidebar-system-label">Sistema</div><nav className="nav nav-secondary" aria-label="Sistema">{canAccess(access, "settings") && <Link href="/settings" aria-label="Ajustes DICOMweb" aria-current={settingsActive ? "page" : undefined} className={settingsActive ? "active" : ""}><Settings2 size={16}/><span>Ajustes <small>Settings</small></span></Link>}{access?.is_admin && <Link href="/access-control" aria-label="Controle de acesso" className={location === "/access-control" ? "active" : ""}><ShieldCheck size={16}/><span>Acessos</span></Link>}</nav><div className="sidebar-note"><ShieldCheck size={15}/><strong>Ambiente controlado</strong><br/>Resultados para pesquisa. Toda decisão requer revisão especializada.</div><button className="btn btn-subtle" onClick={signOut}><LogOut size={15}/><span>Sair da console</span></button></aside>;
 }
-function AppShell({ children }) { const { user } = useUser(); return <div className="app-shell"><Sidebar/><main className="main"><div className="topbar"><div className="eyebrow">Sala de leitura / {new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}</div><div className="user-chip"><span>{user?.firstName || user?.primaryEmailAddress?.emailAddress || "Leitor"}</span><div className="avatar">{(user?.firstName || "L").slice(0,1)}</div></div></div>{children}</main></div>; }
+function AppShell({ children }) { const { access } = useAuth(); return <div className="app-shell"><Sidebar/><main className="main"><div className="topbar"><div className="eyebrow">Sala de leitura / {new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}</div><div className="user-chip"><span>{access?.email || "Leitor"}</span><div className="avatar">{(access?.email || "L").slice(0,1).toUpperCase()}</div></div></div>{children}</main></div>; }
 function UploadDialog({ onDone }) {
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -86,6 +69,7 @@ function UploadDialog({ onDone }) {
 }
 function StudyCard({ study }) { return <Link href={`/studies/${study.id}`} className="study-card"><Thumb url={study.thumbnail_url}/><div className="study-primary"><strong>{study.patient_id || "Não identificado"}</strong><div className="meta-row">{study.description || "Radiografia de tórax"} · {study.modality || "XR"} {study.view_position ? `· ${study.view_position}` : ""}</div></div><div className="study-cell"><b>{displayAge(study.patient_age)} / {study.patient_sex || "—"}</b><span className="mono">{study.study_date || "Sem data"}</span></div><div className="study-cell"><b>{study.source || "Upload manual"}</b><span>{study.validation_reason || study.validation_state || "Validação pendente"}</span></div><div className="findings">{study.top_findings?.length ? study.top_findings.slice(0,2).map((finding,index)=><span className="finding" key={`${finding.pathology}-${index}`}>{finding.pathology} {Number(finding.normalized_score).toFixed(2)}</span>) : <span className="finding">Aguardando modelo</span>}</div><Status value={study.status}/><ChevronRight size={15} color="#6f90aa"/></Link>; }
 function Worklist() {
+  const { access } = useAuth();
   const searchParams = useSearch();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState(()=>new URLSearchParams(searchParams).get("status") || "");
@@ -111,7 +95,7 @@ function Worklist() {
   return <AppShell>
     <div className="page-heading">
       <div><div className="eyebrow">CXR / sistema de controle de qualidade</div><h1>Chester AI Worklist</h1><p className="page-subtitle">Pipeline de triagem e análise para estudos torácicos desidentificados.</p></div>
-      <div className="heading-actions"><div className="live-indicator"><i/> sincronizado</div><button className="btn btn-primary" onClick={()=>setUploadOpen(!uploadOpen)}><CloudUpload size={15}/>{uploadOpen ? "Fechar envio" : "Analisar estudo"}</button></div>
+      <div className="heading-actions"><div className="live-indicator"><i/> sincronizado</div>{canAccess(access, "upload") && <button className="btn btn-primary" onClick={()=>setUploadOpen(!uploadOpen)}><CloudUpload size={15}/>{uploadOpen ? "Fechar envio" : "Analisar estudo"}</button>}</div>
     </div>
     {uploadOpen && <UploadDialog onDone={()=>{setUploadOpen(false);load()}}/>}
     <div className="stats stats-five">
@@ -130,7 +114,7 @@ function Worklist() {
       <button className="filter-heading" onClick={()=>setFiltersOpen(value=>!value)} aria-expanded={filtersOpen}><span><Filter size={15}/>Filtros da worklist</span><ChevronRight size={15}/></button>
       {filtersOpen && <div className="filter-grid">
         <label className="filter-search"><span>Busca</span><div className="search"><Search size={15}/><input className="input" placeholder="Paciente ou descrição…" value={query} onChange={event=>setQuery(event.target.value)}/></div></label>
-        <label><span>Status</span><select className="select" value={status} onChange={event=>setStatus(event.target.value)}><option value="">Todos</option>{Object.entries(statusLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+        <label><span>Status</span><select className="select" value={status} onChange={event=>setStatus(event.target.value)}><option value="">Todos</option>{Object.entries(statusLabels).filter(([value])=>value !== "needs_review" || canAccess(access, "review")).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
         <button className="btn btn-subtle filter-reset" onClick={resetFilters} disabled={!hasFilters}><RotateCcw size={14}/>Limpar filtros</button>
       </div>}
     </section>
@@ -178,124 +162,71 @@ function Settings() {
   </AppShell>;
 }
 function Detail() {
+  const { access } = useAuth();
   const { id } = useParams(); const [study,setStudy]=useState(null); const [error,setError]=useState(""); const [busy,setBusy]=useState(false);
   const load=useCallback(async()=>{try{setStudy(await getStudy(id))}catch(e){setError(e.message)}},[id]); useEffect(()=>{load()},[load]);
   const action=async(fn)=>{setBusy(true);try{await fn();await load()}catch(e){setError(e.message)}finally{setBusy(false)}};
   if(error) return <AppShell><div className="error-box"><AlertTriangle size={22}/><h3>Could not load study</h3><p>{error}</p><button className="btn btn-subtle" style={{marginTop:15}} onClick={load}>Try again</button></div></AppShell>;
   if(!study) return <AppShell><div className="detail-grid"><div className="skeleton"/><div className="skeleton"/></div></AppShell>;
-  const results=latestResultRows(study.results || []); const chartData=results.map((r,i)=>({name:r.pathology || `Finding ${i+1}`, score:Number(r.normalized_score ?? 0)})); const canReview=study.status==="needs_review";
+  const results=latestResultRows(study.results || []); const chartData=results.map((r,i)=>({name:r.pathology || `Finding ${i+1}`, score:Number(r.normalized_score ?? 0)})); const canReview=study.status==="needs_review" && canAccess(access, "review") && ["admin","radiologist","validador_radiologista"].includes(access?.role);
   return <AppShell><Link href="/worklist" className="eyebrow" style={{display:"inline-flex",gap:7,alignItems:"center",marginBottom:20}}><ArrowLeft size={14}/> Back to worklist</Link><div className="detail-header"><div><h1>{study.description || "Chest radiograph"}</h1><div className="meta-row" style={{marginTop:10}}><span className="mono">{study.id}</span><Status value={study.status}/><span>{study.source || "Manual upload"}</span></div></div><div className="detail-actions">{study.status==="error" && <button className="btn btn-subtle" disabled={busy} onClick={()=>action(()=>retryStudy(id))}>Retry analysis</button>}{canReview && <><button className="btn btn-accent" disabled={busy} onClick={()=>action(()=>reviewStudy(id,"approve"))}><Check size={15}/> Approve for analysis</button><button className="btn btn-danger" disabled={busy} onClick={()=>action(()=>reviewStudy(id,"reject"))}><X size={15}/> Reject study</button></>}</div></div>{study.status==="error" && <div className="notice" style={{marginBottom:14}}><strong>Inference error.</strong> {study.error_message || "Analysis could not be completed. Retry when ready."}</div>}{study.status==="needs_review" && <div className="notice" style={{marginBottom:14}}><strong>Review required.</strong> Confirm this study before analysis proceeds.</div>}<div className="detail-grid"><div><div className="panel"><div className="panel-title"><h3>Study image</h3><span>{study.modality || "XR"}</span></div><div style={{background:"#263b40",borderRadius:9,minHeight:315,display:"grid",placeItems:"center"}}><Thumb url={study.thumbnail_url}/></div></div><div className="panel"><div className="panel-title"><h3>Exam metadata</h3><span>source record</span></div><dl className="metadata"><div><dt>Patient</dt><dd>{study.patient_id || "Unidentified"}</dd></div><div><dt>Age / sex</dt><dd>{displayAge(study.patient_age)} / {study.patient_sex || "—"}</dd></div><div><dt>Study date</dt><dd>{study.study_date || "—"}</dd></div><div><dt>View position</dt><dd>{study.view_position || "—"}</dd></div><div><dt>Model version</dt><dd>{study.model_version || "—"}</dd></div><div><dt>Preprocessing</dt><dd>{study.preprocessing_version || "—"}</dd></div></dl></div></div><div><div className="panel"><div className="panel-title"><h3>AI findings</h3><span>{results.length} outputs · latest run</span></div><div className="notice"><strong>Research score, not probability.</strong> Raw model output and operating-point normalized scores are shown for research interpretation. Neither is a calibrated clinical probability.</div><div style={{overflowX:"auto",marginTop:15}}><table><thead><tr><th>Pathology</th><th>Raw output</th><th>Normalized research score</th><th>Threshold</th><th>Flag</th></tr></thead><tbody>{results.map((r,i)=><tr key={r.pathology || i}><td><b>{r.pathology || "Unnamed output"}</b></td><td className="mono">{Number(r.raw_score ?? 0).toFixed(4)}</td><td><div style={{display:"flex",alignItems:"center",gap:9}}><div className="bar"><i style={{width:`${Math.min(100,Number(r.normalized_score ?? 0)*100)}%`}}/></div><span className="mono">{Number(r.normalized_score ?? 0).toFixed(3)}</span></div></td><td className="mono">{Number(r.threshold ?? 0).toFixed(3)}</td><td>{r.above_threshold ? <span className="pill pill-needs_review">above</span> : <span className="pill pill-completed">below</span>}</td></tr>)}</tbody></table></div></div>{results.length>0 && <div className="panel"><div className="panel-title"><h3>Score distribution</h3><span>normalized research score</span></div><div className="chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData}><CartesianGrid stroke="#e1e6df" vertical={false}/><XAxis dataKey="name" tick={{fontSize:10}} angle={-20} height={55} interval={0}/><YAxis domain={[0,1]} tick={{fontSize:10}}/><Tooltip/><Area type="monotone" dataKey="score" stroke="#28796d" fill="#d6f2e7" strokeWidth={2}/></AreaChart></ResponsiveContainer></div></div>}</div></div></AppShell>;
 }
-function clerkErrorMessage(error) {
-  return error?.errors?.[0]?.longMessage || error?.errors?.[0]?.message || error?.message || "Não foi possível concluir o acesso.";
-}
-function isUnknownUserError(error) {
-  return error?.errors?.some(({ code, message = "" }) =>
-    code === "form_identifier_not_found" || /user|usuário|account|conta/i.test(message) && /not found|não foi possível encontrar|does not exist|não existe/i.test(message)
-  );
-}
-function isExistingUserError(error) {
-  return error?.errors?.some(({ code, message = "" }) =>
-    code === "form_identifier_exists" || /already exists|já existe|already registered|já cadastrado/i.test(message)
-  );
-}
-function withAuthTimeout(promise, timeout = 15000) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error("O serviço de autenticação demorou para responder. Tente novamente.")), timeout)),
-  ]);
-}
 function AuthPage() {
-  const { signIn, isLoaded: signInLoaded } = useSignIn();
-  const { signUp, isLoaded: signUpLoaded } = useSignUp();
-  const { setActive } = useClerk();
+  const [, setLocation] = useLocation();
+  const { setAccess } = useAuth();
   const [step, setStep] = useState("email");
-  const [mode, setMode] = useState("sign-in");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const ready = signInLoaded && signUpLoaded;
 
-  const startSignIn = async (value) => {
-    await withAuthTimeout(signIn.create({ identifier: value }));
-    const factor = signIn.supportedFirstFactors?.find((item) => item.strategy === "email_code");
-    if (!factor?.emailAddressId) throw new Error("Este ambiente não disponibilizou o código por email.");
-    await withAuthTimeout(signIn.prepareFirstFactor({ strategy: "email_code", emailAddressId: factor.emailAddressId }));
-    setMode("sign-in");
-  };
-
-  const startSignUp = async (value) => {
-    await withAuthTimeout(signUp.create({ emailAddress: value }));
-    await withAuthTimeout(signUp.prepareEmailAddressVerification({ strategy: "email_code" }));
-    setMode("sign-up");
-  };
-
-  const submitEmail = async (event) => {
-    event.preventDefault();
+  const sendCode = async () => {
     const normalized = email.trim().toLowerCase();
-    setError("");
-    if (normalized !== authorizedEmail) {
-      setError("Este email não está autorizado para este ambiente.");
-      return;
-    }
-    if (!ready || busy) return;
-    setBusy(true);
+    if (!normalized || busy) return;
+    setBusy(true); setError("");
     try {
-      try {
-        await startSignUp(normalized);
-      } catch (signUpError) {
-        if (!isExistingUserError(signUpError) && !isUnknownUserError(signUpError)) throw signUpError;
-        await startSignIn(normalized);
-      }
-      setEmail(normalized);
-      setStep("code");
+      await requestAccessCode(normalized);
+      setEmail(normalized); setCode(""); setStep("code");
     } catch (requestError) {
-      setError(clerkErrorMessage(requestError));
-    } finally {
-      setBusy(false);
-    }
+      setError(requestError.message.replace(/^"|"$/g, ""));
+    } finally { setBusy(false); }
   };
-
+  const submitEmail = (event) => { event.preventDefault(); sendCode(); };
   const submitCode = async (event) => {
     event.preventDefault();
-    setError("");
-    if (!ready || busy || code.trim().length < 6) return;
-    setBusy(true);
+    if (busy || code.length !== 6) return;
+    setBusy(true); setError("");
     try {
-      const result = mode === "sign-in"
-        ? await withAuthTimeout(signIn.attemptFirstFactor({ strategy: "email_code", code: code.trim() }))
-        : await withAuthTimeout(signUp.attemptEmailAddressVerification({ code: code.trim() }));
-      if (result.status !== "complete" || !result.createdSessionId) {
-        throw new Error("A verificação ainda não foi concluída.");
-      }
-      await setActive({ session: result.createdSessionId });
-      window.location.assign(`${basePath}/worklist`);
+      const access = await verifyAccessCode(email, code);
+      setAccess(access);
+      setLocation("/worklist", { replace: true });
     } catch (requestError) {
-      setError(clerkErrorMessage(requestError));
-    } finally {
-      setBusy(false);
-    }
+      setError(requestError.message.replace(/^"|"$/g, ""));
+    } finally { setBusy(false); }
   };
 
-  return <div className="auth-shell"><div className="clerk-wrap"><div className="auth-mark"><Brand light/><p>Console de pesquisa · radiografia torácica</p></div><section className="auth-card" aria-labelledby="auth-title">
+  return <div className="auth-shell"><div className="auth-wrap"><div className="auth-mark"><Brand light/><p>Console de pesquisa · radiografia torácica</p></div><section className="auth-card" aria-labelledby="auth-title">
     <div className="auth-card-mark"><img src={`${basePath}/logo.svg`} alt="" /></div>
-    {step === "email" ? <><h1 id="auth-title">Entrar no Chester AI</h1><p className="auth-card-subtitle">Informe seu email para receber o código de acesso.</p><form onSubmit={submitEmail}><label className="auth-field"><span>Seu e-mail</span><input className="auth-input" type="email" autoComplete="email" autoFocus value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Digite o endereço de e-mail" required /></label>{error && <p className="auth-error" role="alert"><XCircle size={14}/>{error}</p>}<button className="auth-submit" type="submit" disabled={busy || !ready}>{busy ? "Verificando…" : "Continuar"} <ChevronRight size={15}/></button></form></> : <><h1 id="auth-title">Verifique seu email</h1><p className="auth-card-subtitle">Enviamos um código de 6 dígitos para <strong>{email}</strong>.</p><form onSubmit={submitCode}><label className="auth-field"><span>Código de verificação</span><input className="auth-input auth-code-input" type="text" inputMode="numeric" autoComplete="one-time-code" autoFocus value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" required /></label>{error && <p className="auth-error" role="alert"><XCircle size={14}/>{error}</p>}<button className="auth-submit" type="submit" disabled={busy || code.length < 6}>{busy ? "Validando…" : "Confirmar acesso"} <ChevronRight size={15}/></button></form><button className="auth-back" type="button" onClick={() => { setStep("email"); setCode(""); setError(""); }}>Usar outro email</button></>}
+    {step === "email" ? <><h1 id="auth-title">Entrar no Chester AI</h1><p className="auth-card-subtitle">Informe seu email para receber o código de acesso.</p><form onSubmit={submitEmail}><label className="auth-field"><span>Seu e-mail</span><input className="auth-input" type="email" autoComplete="email" autoFocus value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Digite o endereço de e-mail" required /></label>{error && <p className="auth-error" role="alert"><XCircle size={14}/>{error}</p>}<button className="auth-submit" type="submit" disabled={busy}>{busy ? "Enviando…" : "Continuar"} <ChevronRight size={15}/></button></form></> : <><h1 id="auth-title">Verifique seu email</h1><p className="auth-card-subtitle">Enviamos um código de 6 dígitos para <strong>{email}</strong>.</p><form onSubmit={submitCode}><label className="auth-field"><span>Código de verificação</span><input className="auth-input auth-code-input" type="text" inputMode="numeric" autoComplete="one-time-code" autoFocus value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" required /></label>{error && <p className="auth-error" role="alert"><XCircle size={14}/>{error}</p>}<button className="auth-submit" type="submit" disabled={busy || code.length < 6}>{busy ? "Validando…" : "Confirmar acesso"} <ChevronRight size={15}/></button></form><button className="auth-back" type="button" disabled={busy} onClick={sendCode}>Reenviar código</button><button className="auth-back" type="button" disabled={busy} onClick={() => { setStep("email"); setCode(""); setError(""); }}>Usar outro email</button></>}
   </section><div className="auth-research-note"><ShieldCheck size={14}/><span>Pesquisa somente · dados desidentificados</span></div><p className="auth-restricted">Acesso restrito a usuários autorizados</p></div></div>;
 }
-function HomeRoute(){return <><Show when="signed-in"><Redirect to="/worklist"/></Show><Show when="signed-out"><Redirect to="/sign-in"/></Show></>;}
-function AccessDenied({ email }) { const { signOut } = useClerk(); return <div className="auth-shell"><div className="access-denied"><ShieldCheck size={28}/><h1>Acesso restrito</h1><p>Este ambiente está liberado inicialmente apenas para o email autorizado.</p><span className="mono">{email || "Email não identificado"}</span><button className="btn btn-primary" onClick={() => signOut({ redirectUrl: `${basePath}/sign-in` })}>Sair e tentar outro email</button></div></div>; }
-function Protected({children}) {
-  const { user, isLoaded } = useUser();
-  const { signOut } = useClerk();
-  const email = user?.primaryEmailAddress?.emailAddress?.trim().toLowerCase();
-  const authorized = email === authorizedEmail;
-  useEffect(() => { if (isLoaded && user && !authorized) signOut({ redirectUrl: `${basePath}/sign-in` }); }, [authorized, isLoaded, signOut, user]);
-  if (!isLoaded) return <div className="auth-shell"><div className="auth-loading">Verificando acesso…</div></div>;
-  if (!user) return <Redirect to="/"/>;
-  if (!authorized) return <AccessDenied email={email}/>;
-  return children;
+
+function AccessControl() {
+  const [metadata, setMetadata] = useState({ roles: [], pages: [] });
+  const [emails, setEmails] = useState([]); const [domains, setDomains] = useState([]); const [audit, setAudit] = useState([]);
+  const [email, setEmail] = useState(""); const [domain, setDomain] = useState(""); const [role, setRole] = useState("technician"); const [pages, setPages] = useState(""); const [error, setError] = useState("");
+  const load = useCallback(async () => { try { setError(""); const [meta, nextEmails, nextDomains, nextAudit] = await Promise.all([getAccessMetadata(), listAllowedEmails(), listAllowedDomains(), listAccessAudit()]); setMetadata(meta); setEmails(nextEmails); setDomains(nextDomains); setAudit(nextAudit); } catch (e) { setError(e.message); } }, []);
+  useEffect(() => { load(); }, [load]);
+  const selectedPages = () => pages.split(",").map((item) => item.trim()).filter(Boolean);
+  const addEmail = async (event) => { event.preventDefault(); try { await createAllowedEmail({ email, role, allowed_pages: selectedPages() }); setEmail(""); setPages(""); await load(); } catch (e) { setError(e.message); } };
+  const addDomain = async (event) => { event.preventDefault(); try { await createAllowedDomain({ domain, role, allowed_pages: selectedPages() }); setDomain(""); setPages(""); await load(); } catch (e) { setError(e.message); } };
+  const editPages = async (item, kind) => { const next = window.prompt("Páginas permitidas, separadas por vírgula. Deixe vazio para todas.", (item.allowed_pages || []).join(", ")); if (next === null) return; try { const fn = kind === "email" ? updateAllowedEmail : updateAllowedDomain; await fn(item.id, { allowed_pages: next.split(",").map((value) => value.trim()).filter(Boolean) }); await load(); } catch (e) { setError(e.message); } };
+  return <AppShell><div className="page-heading"><div><div className="eyebrow">Sistema / segurança</div><h1>Controle de acesso</h1><p className="page-subtitle">E-mails, domínios, papéis e páginas autorizadas.</p></div></div>{error && <div className="error-box">{error}</div>}<section className="panel"><div className="panel-title"><h3>Novo acesso por email</h3></div><form className="toolbar" onSubmit={addEmail}><input className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@empresa.com" required/><select className="select" value={role} onChange={(e) => setRole(e.target.value)}>{metadata.roles.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select><input className="input" value={pages} onChange={(e) => setPages(e.target.value)} placeholder="Páginas: worklist, upload…" /><button className="btn btn-primary">Adicionar email</button></form></section><section className="panel"><div className="panel-title"><h3>Novo acesso por domínio</h3></div><form className="toolbar" onSubmit={addDomain}><input className="input" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="empresa.com" required/><select className="select" value={role} onChange={(e) => setRole(e.target.value)}>{metadata.roles.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select><button className="btn btn-primary">Adicionar domínio</button></form></section><section className="panel"><div className="panel-title"><h3>E-mails autorizados</h3></div><table><thead><tr><th>Email</th><th>Papel</th><th>Páginas</th><th>Status</th><th/></tr></thead><tbody>{emails.map((item) => <tr key={item.id}><td>{item.email}{item.is_env_admin && <small className="mono"> · ambiente</small>}</td><td>{item.role_label}</td><td>{item.allowed_pages?.join(", ") || "Todas"}</td><td>{item.active ? "Ativo" : "Inativo"}</td><td>{!item.is_env_admin && <><button className="btn btn-subtle" onClick={() => editPages(item, "email")}>Páginas</button> <button className="btn btn-danger" onClick={async () => { if (window.confirm("Remover este email?")) { try { await deleteAllowedEmail(item.id); await load(); } catch (e) { setError(e.message); } } }}>Remover</button></>}</td></tr>)}</tbody></table></section><section className="panel"><div className="panel-title"><h3>Domínios autorizados</h3></div><table><thead><tr><th>Domínio</th><th>Papel</th><th>Páginas</th><th>Status</th><th/></tr></thead><tbody>{domains.map((item) => <tr key={item.id}><td>{item.domain}</td><td>{item.role_label}</td><td>{item.allowed_pages?.join(", ") || "Todas"}</td><td>{item.active ? "Ativo" : "Inativo"}</td><td><button className="btn btn-subtle" onClick={() => editPages(item, "domain")}>Páginas</button> <button className="btn btn-danger" onClick={async () => { if (window.confirm("Remover este domínio?")) { try { await deleteAllowedDomain(item.id); await load(); } catch (e) { setError(e.message); } } }}>Remover</button></td></tr>)}</tbody></table></section><section className="panel"><div className="panel-title"><h3>Auditoria</h3></div><table><thead><tr><th>Quando</th><th>Ator</th><th>Ação</th><th>Alvo</th></tr></thead><tbody>{audit.slice(0, 20).map((item) => <tr key={item.id}><td className="mono">{new Date(item.created_at).toLocaleString("pt-BR")}</td><td>{item.actor_email}</td><td>{item.action}</td><td>{item.target_key}</td></tr>)}</tbody></table></section></AppShell>;
 }
-function Routes(){ return <Switch><Route path="/" component={HomeRoute}/><Route path="/sign-in/*?" component={()=> <AuthPage/>}/><Route path="/worklist"><Protected><Worklist/></Protected></Route><Route path="/settings"><Protected><Settings/></Protected></Route><Route path="/studies/:id"><Protected><Detail/></Protected></Route><Route><Redirect to="/"/></Route></Switch>; }
-function ClerkRoutes(){ const [,setLocation]=useLocation(); return <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl} appearance={appearance} localization={localization} signInUrl={`${basePath}/sign-in`} routerPush={(to)=>setLocation(stripBase(to))} routerReplace={(to)=>setLocation(stripBase(to), { replace: true })}><Routes/></ClerkProvider>; }
-export default function App(){ if(!clerkPubKey) return <div className="error-box">Missing VITE_CLERK_PUBLISHABLE_KEY.</div>; return <WouterRouter base={basePath}><ClerkRoutes/></WouterRouter>; }
+
+function HomeRoute(){ const { access, loading } = useAuth(); if (loading) return <div className="auth-shell"><div className="auth-loading">Verificando acesso…</div></div>; return <Redirect to={access ? "/worklist" : "/sign-in"}/>; }
+function AccessDenied() { const { signOut } = useAuth(); return <div className="auth-shell"><div className="access-denied"><ShieldCheck size={28}/><h1>Acesso restrito</h1><p>Seu perfil não tem acesso a esta página.</p><button className="btn btn-primary" onClick={signOut}>Sair</button></div></div>; }
+function Protected({ page, children }) { const { access, loading } = useAuth(); if (loading) return <div className="auth-shell"><div className="auth-loading">Verificando acesso…</div></div>; if (!access) return <Redirect to="/sign-in"/>; if (!canAccess(access, page)) { const fallback = ["worklist", "settings", "access-control"].find((candidate) => canAccess(access, candidate)); return fallback ? <Redirect to={`/${fallback === "worklist" ? "worklist" : fallback}`}/> : <AccessDenied/>; } return children; }
+function Routes(){ const { access } = useAuth(); return <Switch><Route path="/" component={HomeRoute}/><Route path="/sign-in/*?">{access ? <Redirect to="/worklist"/> : <AuthPage/>}</Route><Route path="/worklist"><Protected page="worklist"><Worklist/></Protected></Route><Route path="/settings"><Protected page="settings"><Settings/></Protected></Route><Route path="/access-control"><Protected page="access-control"><AccessControl/></Protected></Route><Route path="/studies/:id"><Protected page="study-detail"><Detail/></Protected></Route><Route><Redirect to="/"/></Route></Switch>; }
+function AppRoot() { const [access, setAccess] = useState(null); const [loading, setLoading] = useState(true); const refresh = useCallback(async () => { if (!getSessionToken()) { setAccess(null); setLoading(false); return; } try { const result = await validateSession(); setAccess(result.access); } catch { setAccess(null); } finally { setLoading(false); } }, []); useEffect(() => { refresh(); }, [refresh]); const signOut = useCallback(async () => { await logout(); setAccess(null); }, []); const value = useMemo(() => ({ access, setAccess, loading, signOut }), [access, loading, signOut]); return <AuthContext.Provider value={value}><WouterRouter base={basePath}><Routes/></WouterRouter></AuthContext.Provider>; }
+export default function App(){ return <AppRoot/>; }

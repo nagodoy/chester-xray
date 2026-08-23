@@ -16,7 +16,7 @@ def test_stow_success(auth_client, db_session):
         content=body,
         headers={
             "Content-Type": content_type,
-            "X-DICOM-Ingest-Key": "test-session-secret",
+            "X-DICOM-Ingest-Key": "test-dicom-ingest-token",
         },
     )
     assert resp.status_code in (200, 202), resp.text
@@ -60,7 +60,7 @@ def test_stow_duplicate(auth_client, db_session):
     body, content_type = make_stow_multipart([dcm])
     headers = {
         "Content-Type": content_type,
-        "X-DICOM-Ingest-Key": "test-session-secret",
+        "X-DICOM-Ingest-Key": "test-dicom-ingest-token",
     }
 
     # First upload
@@ -71,7 +71,7 @@ def test_stow_duplicate(auth_client, db_session):
     body2, content_type2 = make_stow_multipart([dcm])
     headers2 = {
         "Content-Type": content_type2,
-        "X-DICOM-Ingest-Key": "test-session-secret",
+        "X-DICOM-Ingest-Key": "test-dicom-ingest-token",
     }
     resp2 = auth_client.post("/dicomweb/studies", content=body2, headers=headers2)
     # Duplicate returns 409
@@ -85,7 +85,7 @@ def test_stow_wrong_content_type(auth_client, db_session):
         content=b"not a multipart body",
         headers={
             "Content-Type": "application/dicom",
-            "X-DICOM-Ingest-Key": "test-session-secret",
+            "X-DICOM-Ingest-Key": "test-dicom-ingest-token",
         },
     )
     assert resp.status_code == 400
@@ -102,7 +102,7 @@ def test_stow_multiple_instances(auth_client, db_session):
         content=body,
         headers={
             "Content-Type": content_type,
-            "X-DICOM-Ingest-Key": "test-session-secret",
+            "X-DICOM-Ingest-Key": "test-dicom-ingest-token",
         },
     )
     assert resp.status_code in (200, 202)
@@ -128,7 +128,7 @@ def test_stow_study_specific_endpoint(auth_client, db_session):
         content=body,
         headers={
             "Content-Type": content_type,
-            "X-DICOM-Ingest-Key": "test-session-secret",
+            "X-DICOM-Ingest-Key": "test-dicom-ingest-token",
         },
     )
     assert resp.status_code in (200, 202, 409)
@@ -144,7 +144,7 @@ def test_stow_non_dicom_rejected(auth_client, db_session):
         content=body,
         headers={
             "Content-Type": content_type,
-            "X-DICOM-Ingest-Key": "test-session-secret",
+            "X-DICOM-Ingest-Key": "test-dicom-ingest-token",
         },
     )
     # Should be 400 (all failures) or have failure sequence

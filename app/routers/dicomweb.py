@@ -18,6 +18,7 @@ from app.config import settings
 from app.database import get_db
 from app.ingestion import ingest_file
 from app.models import Study
+from app.security.ownership import resolve_ingest_owner
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -31,9 +32,11 @@ STOW_FAILURE_STATUS = "C122"  # Failure: referenced SOP class not supported
 def _verify_service_token(request: Request) -> bool:
     """
     Verify service token from X-DICOM-Ingest-Key header or Bearer token.
-    Constant-time comparison to DICOM_INGEST_TOKEN, falling back to SESSION_SECRET.
+    Constant-time comparison to the dedicated DICOM ingestion token.
     """
-    token = settings.dicom_ingest_token or settings.session_secret
+    token = settings.dicom_ingest_token
+    if not token:
+        return False
 
     # Check X-DICOM-Ingest-Key header
     ingest_key = request.headers.get("X-DICOM-Ingest-Key", "")
@@ -44,7 +47,6 @@ def _verify_service_token(request: Request) -> bool:
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         bearer = auth_header[7:].strip()
-        # Try Clerk auth fallback (service accounts)
         if bearer == token:
             return True
         return hmac.compare_digest(bearer, token)
@@ -180,6 +182,7 @@ async def _handle_stow(
         )
     if len(owner_id) > 128 or not re.fullmatch(r"[A-Za-z0-9_.:@-]+", owner_id):
         raise HTTPException(status_code=400, detail="Invalid worklist owner identifier")
+    owner_id = resolve_ingest_owner(session, owner_id)
 
     content_type = request.headers.get("content-type", "")
 

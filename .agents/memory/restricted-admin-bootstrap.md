@@ -1,10 +1,10 @@
 ---
 name: Restricted admin bootstrap
-description: The authentication boundary for the first authorized Chester user.
+description: The custom OTP authentication boundary and configuration-owned administrator lifecycle.
 ---
 
-The app intentionally keeps public registration hidden. If the sole allowlisted administrator is missing from a Clerk environment, the login screen may bootstrap only that exact allowlisted email through Clerk's email verification flow; all other emails remain blocked before authentication.
+The app intentionally keeps public registration hidden. Email codes may be requested only after the backend resolves access. Environment-configured administrators take precedence over individual email rules and domain rules, and the environment configuration is the source of truth for those managed administrator accounts.
 
-**Why:** Development and Production Clerk user stores are separate, so a user present in preview is not automatically available in the published app.
+**Why:** Access needs to remain explicit while allowing the initial administrator to sign in without a manually pre-created account. Treating an inactive direct email as a domain fallback, or retaining an admin removed from environment configuration, can silently preserve access.
 
-**How to apply:** Preserve the backend allowlist as the authority. Any future onboarding change must keep email verification and must not expose a general public sign-up path.
+**How to apply:** Preserve backend authorization as the authority: resolve environment admin, then direct email, then domain; an inactive direct email is a terminal deny. Reconcile removed environment-managed admins at startup by deactivating and unmarking them, with an audit event. Keep public sign-up disabled and require verified OTP before creating a session.

@@ -448,29 +448,6 @@
   margin-top: 15px;
 }
 
-.clerk-wrap [class*="socialButtons"],
-.clerk-wrap [class*="dividerRow"] {
-  display: none !important;
-}
-
-.clerk-wrap [class*="footerAction"] {
-  display: none !important;
-}
-
-.clerk-wrap [class*="formButtonPrimary"] {
-  min-height: 42px !important;
-}
-
-.clerk-wrap [class*="otpCodeFieldInputs"] {
-  gap: 9px !important;
-}
-
-.clerk-wrap [class*="otpCodeFieldInput"] {
-  min-width: 0 !important;
-  height: 54px !important;
-  border-radius: 10px !important;
-}
-
 :where(button, a, input, select):focus-visible {
   outline: 2px solid var(--cyan);
   outline-offset: 2px;
@@ -1074,11 +1051,4 @@
     height: 46px;
   }
 
-  .clerk-wrap [class*="otpCodeFieldInputs"] {
-    gap: 5px !important;
-  }
-
-  .clerk-wrap [class*="otpCodeFieldInput"] {
-    height: 48px !important;
-  }
 }

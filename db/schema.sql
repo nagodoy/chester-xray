@@ -142,4 +142,80 @@ ALTER TABLE audit_events
 CREATE INDEX IF NOT EXISTS idx_audit_actor_id  ON audit_events (actor_id);
 CREATE INDEX IF NOT EXISTS idx_audit_type      ON audit_events (event_type);
 
+-- Access control rules, append-only management audit and browser sessions
+CREATE TABLE IF NOT EXISTS allowed_emails (
+    id              VARCHAR(36) PRIMARY KEY,
+    email           VARCHAR(320) NOT NULL UNIQUE,
+    role            VARCHAR(64) NOT NULL,
+    allowed_pages   JSONB,
+    active          BOOLEAN NOT NULL DEFAULT TRUE,
+    is_env_admin    BOOLEAN NOT NULL DEFAULT FALSE,
+    created_by      VARCHAR(320),
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_allowed_emails_email ON allowed_emails (email);
+
+CREATE TABLE IF NOT EXISTS allowed_domains (
+    id              VARCHAR(36) PRIMARY KEY,
+    domain          VARCHAR(253) NOT NULL UNIQUE,
+    role            VARCHAR(64) NOT NULL,
+    allowed_pages   JSONB,
+    active          BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by      VARCHAR(320),
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_allowed_domains_domain ON allowed_domains (domain);
+
+CREATE TABLE IF NOT EXISTS access_control_audit_log (
+    id              VARCHAR(36) PRIMARY KEY,
+    actor_email     VARCHAR(320) NOT NULL,
+    actor_role      VARCHAR(64),
+    action          VARCHAR(64) NOT NULL,
+    target_type     VARCHAR(64) NOT NULL,
+    target_key      VARCHAR(320) NOT NULL,
+    target_role     VARCHAR(64),
+    details         JSONB,
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_access_control_audit_created ON access_control_audit_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_access_control_audit_actor ON access_control_audit_log (actor_email);
+
+CREATE TABLE IF NOT EXISTS auth_challenges (
+    id              VARCHAR(36) PRIMARY KEY,
+    email           VARCHAR(320) NOT NULL,
+    code_hash       VARCHAR(128) NOT NULL,
+    expires_at      TIMESTAMP NOT NULL,
+    attempts        INTEGER NOT NULL DEFAULT 0,
+    max_attempts    INTEGER NOT NULL DEFAULT 5,
+    consumed_at     TIMESTAMP,
+    requested_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+    request_ip      VARCHAR(64)
+);
+CREATE INDEX IF NOT EXISTS idx_auth_challenges_email_requested ON auth_challenges (email, requested_at DESC);
+
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    id              VARCHAR(36) PRIMARY KEY,
+    token_hash      VARCHAR(128) NOT NULL UNIQUE,
+    email           VARCHAR(320) NOT NULL,
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    expires_at      TIMESTAMP NOT NULL,
+    last_seen_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+    revoked_at      TIMESTAMP,
+    user_agent      VARCHAR(512),
+    request_ip      VARCHAR(64)
+);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_email ON auth_sessions (email);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_expiry ON auth_sessions (expires_at);
+
+CREATE TABLE IF NOT EXISTS legacy_owner_aliases (
+    id              VARCHAR(36) PRIMARY KEY,
+    legacy_owner_id VARCHAR(128) NOT NULL UNIQUE,
+    email           VARCHAR(320) NOT NULL,
+    created_by      VARCHAR(320) NOT NULL,
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_legacy_owner_aliases_email ON legacy_owner_aliases (email);
+
 COMMIT;

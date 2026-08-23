@@ -70,7 +70,6 @@ def test_dicomweb_settings_requires_auth_when_development_bypass_is_disabled(
     from app.config import settings
 
     monkeypatch.setattr(settings, "debug", False)
-    monkeypatch.setattr(settings, "clerk_secret_key", "")
     response = client.get("/api/settings/dicomweb")
 
-    assert response.status_code == 503
+    assert response.status_code == 401

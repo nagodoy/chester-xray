@@ -12,17 +12,26 @@ class Settings(BaseSettings):
     database_url: str = os.environ.get("DATABASE_URL", "sqlite:///./dev.db")
 
     # Auth
-    clerk_secret_key: str = os.environ.get("CLERK_SECRET_KEY", "")
     session_secret: str = os.environ.get("SESSION_SECRET", "dev-session-secret-change-me")
-    authorized_email: str = os.environ.get(
-        "AUTHORIZED_EMAIL",
-        "nelsonagodoy@gmail.com",
-    ).strip().lower()
+    admin_users: str = os.environ.get(
+        "ADMIN_USERS",
+        os.environ.get("ADMIN_EMAILS", os.environ.get("AUTHORIZED_EMAIL", "nelsonagodoy@gmail.com")),
+    )
+    auth_session_hours: int = int(os.environ.get("AUTH_SESSION_HOURS", "12"))
+    auth_otp_minutes: int = int(os.environ.get("AUTH_OTP_MINUTES", "10"))
+    auth_otp_attempts: int = int(os.environ.get("AUTH_OTP_ATTEMPTS", "5"))
+    auth_otp_cooldown_seconds: int = int(os.environ.get("AUTH_OTP_COOLDOWN_SECONDS", "60"))
+
+    # SMTP email delivery
+    smtp_from: str = os.environ.get("SMTP_FROM", "")
+    smtp_host: str = os.environ.get("SMTP_HOST", "")
+    smtp_password: str = os.environ.get("SMTP_PASSWORD", "")
+    smtp_port: int = int(os.environ.get("SMTP_PORT", "587"))
 
     # DICOM ingestion token
     dicom_ingest_token: str = os.environ.get(
         "DICOM_INGEST_TOKEN",
-        os.environ.get("SESSION_SECRET", "dev-session-secret-change-me"),
+        os.environ.get("STOW_API_KEY", ""),
     )
     dicom_ingest_owner_id: str = os.environ.get("DICOM_INGEST_OWNER_ID", "")
 
@@ -47,6 +56,14 @@ class Settings(BaseSettings):
 
     # App
     debug: bool = os.environ.get("DEBUG", "").lower() in ("1", "true", "yes")
+
+    @property
+    def admin_emails(self) -> list[str]:
+        return [
+            email.strip().casefold()
+            for email in self.admin_users.split(",")
+            if email.strip()
+        ]
 
     class Config:
         env_file = ".env"

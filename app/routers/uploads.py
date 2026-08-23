@@ -7,7 +7,7 @@ from typing import List
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 
-from app.auth import require_auth
+from app.api.auth_deps import AccessContext, require_page
 from app.database import get_db
 from app.ingestion import ingest_file
 from app.models import Study
@@ -33,13 +33,14 @@ async def upload_files(
     request: Request,
     files: List[UploadFile],
     confirm_deidentified: bool = Form(...),
-    actor_id: str = Depends(require_auth),
+    access: AccessContext = Depends(require_page("upload")),
     session: Session = Depends(get_db),
 ):
     """
     Multipart file upload. Requires confirm_deidentified=true.
     Accepts DICOM (.dcm), PNG, JPEG.
     """
+    actor_id = access.actor_id
     if not confirm_deidentified:
         raise HTTPException(
             status_code=400,

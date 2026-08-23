@@ -189,9 +189,9 @@ def test_retry_error_study(auth_client, db_session):
     assert data["status"] == "queued"
 
 
-def test_studies_are_isolated_by_clerk_subject(auth_client, db_session):
-    """A second authenticated subject cannot list, read, or mutate an owner's study."""
-    from app.auth import require_auth
+def test_studies_are_isolated_by_session_identity(auth_client, db_session):
+    """A second authenticated session identity cannot read or mutate an owner's study."""
+    from app.api.auth_deps import AccessContext, get_current_access
     from app.main import app
 
     study = _create_study(
@@ -201,12 +201,17 @@ def test_studies_are_isolated_by_clerk_subject(auth_client, db_session):
         body_part="CHEST",
         view_position="PA",
     )
-    original_override = app.dependency_overrides[require_auth]
+    original_override = app.dependency_overrides[get_current_access]
 
-    async def other_user(request=None):
-        return "other-user-456"
+    def other_user():
+        return AccessContext(
+            email="other-user-456",
+            role="admin",
+            allowed_pages=None,
+            is_admin=True,
+        )
 
-    app.dependency_overrides[require_auth] = other_user
+    app.dependency_overrides[get_current_access] = other_user
     try:
         listed = auth_client.get("/api/studies")
         assert listed.status_code == 200
@@ -215,4 +220,4 @@ def test_studies_are_isolated_by_clerk_subject(auth_client, db_session):
         assert auth_client.get(f"/api/studies/{study['id']}/thumbnail").status_code == 404
         assert auth_client.post(f"/api/studies/{study['id']}/retry").status_code == 404
     finally:
-        app.dependency_overrides[require_auth] = original_override
+        app.dependency_overrides[get_current_access] = original_override

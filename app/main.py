@@ -10,8 +10,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.database import Base, engine
-from app.routers import clerk_proxy, dicomweb, health, settings, studies, thumbnails, uploads
+from app.api.auth_deps import bootstrap_env_admins
+from app.config import settings as app_settings
+from app.database import Base, engine, get_db_session
+from app.api import routes_auth
+from app.routers import access_control, dicomweb, health, settings, studies, thumbnails, uploads
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,7 +36,14 @@ def _ensure_tables() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown."""
+    if not os.environ.get("TESTING") and not app_settings.debug:
+        if app_settings.session_secret == "dev-session-secret-change-me":
+            raise RuntimeError("SESSION_SECRET must be configured outside development.")
+        if not app_settings.dicom_ingest_token:
+            raise RuntimeError("DICOM_INGEST_TOKEN (or STOW_API_KEY) must be configured outside development.")
     _ensure_tables()
+    with get_db_session() as session:
+        bootstrap_env_admins(session)
 
     # Start worker only in production mode (not during tests)
     if not os.environ.get("TESTING"):
@@ -61,7 +71,8 @@ app.include_router(uploads.router)
 app.include_router(thumbnails.router)
 app.include_router(dicomweb.router)
 app.include_router(settings.router)
-app.include_router(clerk_proxy.router)
+app.include_router(routes_auth.router)
+app.include_router(access_control.router)
 
 DIST_DIR = Path(__file__).resolve().parent.parent / "dist"
 ASSETS_DIR = DIST_DIR / "assets"

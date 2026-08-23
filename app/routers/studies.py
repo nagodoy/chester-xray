@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.auth import require_auth
+from app.api.auth_deps import AccessContext, require_page
 from app.database import get_db
 from app.models import AnalysisJob, AuditEvent, Study
 from app.schemas import ReviewRequest, StudyDetailSchema, StudyListResponse, StudySchema
@@ -30,10 +30,11 @@ def list_studies(
     study_status: Optional[str] = Query(None, alias="status"),
     limit: int = Query(20, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    actor_id: str = Depends(require_auth),
+    access: AccessContext = Depends(require_page("worklist")),
     session: Session = Depends(get_db),
 ):
     """List studies with optional search, status filter, pagination."""
+    actor_id = access.actor_id
     q = session.query(Study).filter(Study.owner_id == actor_id)
 
     if search:
@@ -47,6 +48,8 @@ def list_studies(
     if study_status:
         if study_status not in STATUS_VALUES:
             raise HTTPException(status_code=400, detail=f"Invalid status: {study_status}")
+        if study_status == "needs_review" and not access.can_access_page("review"):
+            raise HTTPException(status_code=403, detail="Review queue access denied")
         q = q.filter(Study.status == study_status)
 
     total = q.count()
@@ -72,11 +75,11 @@ def list_studies(
 def get_study(
     study_id: str,
     request: Request,
-    actor_id: str = Depends(require_auth),
+    access: AccessContext = Depends(require_page("study-detail")),
     session: Session = Depends(get_db),
 ):
     """Get a single study with instances and results."""
-    study = session.query(Study).filter_by(id=study_id, owner_id=actor_id).first()
+    study = session.query(Study).filter_by(id=study_id, owner_id=access.actor_id).first()
     if study is None:
         raise HTTPException(status_code=404, detail="Study not found")
     return _to_study_detail_schema(study)
@@ -86,10 +89,11 @@ def get_study(
 def retry_study(
     study_id: str,
     request: Request,
-    actor_id: str = Depends(require_auth),
+    access: AccessContext = Depends(require_page("study-detail")),
     session: Session = Depends(get_db),
 ):
     """Retry a failed study by creating a new queued job."""
+    actor_id = access.actor_id
     study = session.query(Study).filter_by(id=study_id, owner_id=actor_id).first()
     if study is None:
         raise HTTPException(status_code=404, detail="Study not found")
@@ -124,13 +128,16 @@ def review_study(
     study_id: str,
     body: ReviewRequest,
     request: Request,
-    actor_id: str = Depends(require_auth),
+    access: AccessContext = Depends(require_page("review")),
     session: Session = Depends(get_db),
 ):
     """Review a study: approve (queues inference) or reject."""
+    if access.role not in {"admin", "radiologist", "validador_radiologista"}:
+        raise HTTPException(status_code=403, detail="Este papel não pode revisar estudos.")
     if body.decision not in ("approve", "reject"):
         raise HTTPException(status_code=400, detail="decision must be 'approve' or 'reject'")
 
+    actor_id = access.actor_id
     study = session.query(Study).filter_by(id=study_id, owner_id=actor_id).first()
     if study is None:
         raise HTTPException(status_code=404, detail="Study not found")

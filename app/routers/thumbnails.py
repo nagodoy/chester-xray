@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from app.auth import require_auth
+from app.api.auth_deps import AccessContext, require_page
 from app.database import get_db
 from app.models import Study
 from app.storage import retrieve_bytes
@@ -20,11 +20,11 @@ router = APIRouter()
 def get_thumbnail(
     study_id: str,
     request: Request,
-    actor_id: str = Depends(require_auth),
+    access: AccessContext = Depends(require_page("study-detail")),
     session: Session = Depends(get_db),
 ):
     """Return the thumbnail PNG for a study."""
-    study = session.query(Study).filter_by(id=study_id, owner_id=actor_id).first()
+    study = session.query(Study).filter_by(id=study_id, owner_id=access.actor_id).first()
     if study is None:
         raise HTTPException(status_code=404, detail="Study not found")
 
