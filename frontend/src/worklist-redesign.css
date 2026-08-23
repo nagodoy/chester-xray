@@ -429,6 +429,20 @@
   height: 52px;
 }
 
+.detail-grid > div:first-child > .panel:first-child > div > .thumb {
+  width: 100%;
+  height: clamp(315px, 58vh, 620px);
+  min-height: 315px;
+  border-radius: 9px;
+  background: #263b40;
+}
+
+.detail-grid > div:first-child > .panel:first-child > div > .thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .retry-button {
   margin-top: 15px;
 }
