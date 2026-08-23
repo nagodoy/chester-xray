@@ -2,12 +2,10 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
-from starlette.background import BackgroundTask
 
 from app.config import settings
 
@@ -27,10 +25,47 @@ HOP_BY_HOP = {
     "transfer-encoding",
     "upgrade",
 }
+REQUEST_HEADERS_TO_REBUILD = HOP_BY_HOP | {"host", "content-length", "accept-encoding"}
 
 
 def _strip_hop_by_hop(headers: dict) -> dict:
     return {k: v for k, v in headers.items() if k.lower() not in HOP_BY_HOP}
+
+
+def _first_forwarded_value(request: Request, header_name: str) -> str:
+    value = request.headers.get(header_name, "")
+    return value.split(",")[0].strip()
+
+
+def _clerk_proxy_url(request: Request) -> str:
+    """Build Clerk's required public proxy URL behind the deployment edge."""
+    host = _first_forwarded_value(request, "x-forwarded-host") or request.headers.get(
+        "host", ""
+    ).strip()
+    protocol = _first_forwarded_value(request, "x-forwarded-proto") or "https"
+    if protocol not in {"http", "https"}:
+        protocol = "https"
+    return f"{protocol}://{host}/api/__clerk"
+
+
+def _upstream_headers(request: Request) -> dict[str, str]:
+    """Prepare headers for Clerk without forwarding the app's Host header."""
+    headers = {
+        key: value
+        for key, value in request.headers.items()
+        if key.lower() not in REQUEST_HEADERS_TO_REBUILD
+    }
+    client_ip = _first_forwarded_value(request, "x-forwarded-for")
+    if not client_ip and request.client:
+        client_ip = request.client.host
+    if client_ip:
+        headers["X-Forwarded-For"] = client_ip
+    # httpx reads complete responses before relaying them; avoid returning a
+    # decompressed body with stale compression headers.
+    headers["Accept-Encoding"] = "identity"
+    headers["Clerk-Proxy-Url"] = _clerk_proxy_url(request)
+    headers["Clerk-Secret-Key"] = settings.clerk_secret_key
+    return headers
 
 
 @router.api_route("/api/__clerk/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
@@ -45,20 +80,9 @@ async def clerk_proxy(path: str, request: Request) -> Response:
 
     # Build target URL
     query_string = request.url.query
-    target_url = f"{CLERK_FRONTEND_API}/{path}"
+    target_url = f"{CLERK_FRONTEND_API}/{path.lstrip('/')}"
     if query_string:
         target_url = f"{target_url}?{query_string}"
-
-    # Build forwarded headers
-    proxy_url = str(request.base_url).rstrip("/") + "/api/__clerk"
-    forward_headers = dict(request.headers)
-
-    # Strip hop-by-hop
-    forward_headers = _strip_hop_by_hop(forward_headers)
-
-    # Set required Clerk proxy headers
-    forward_headers["Clerk-Proxy-Url"] = proxy_url
-    forward_headers["Clerk-Secret-Key"] = settings.clerk_secret_key
 
     # Read body
     body = await request.body()
@@ -68,7 +92,7 @@ async def clerk_proxy(path: str, request: Request) -> Response:
             resp = await client.request(
                 method=request.method,
                 url=target_url,
-                headers=forward_headers,
+                headers=_upstream_headers(request),
                 content=body,
             )
 
