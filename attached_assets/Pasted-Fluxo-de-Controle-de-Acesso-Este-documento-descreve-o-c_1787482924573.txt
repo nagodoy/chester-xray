@@ -1,0 +1,180 @@
+Fluxo de Controle de Acesso
+Este documento descreve o controle de acesso usado pelo sistema e pode ser copiado para outro projeto junto com o diretório access-control-export/.
+
+1. Visão geral
+O acesso é resolvido em camadas:
+
+Usuário informa e-mail
+        |
+        v
+Autorização de entrada: e-mail permitido OU domínio permitido OU admin de ambiente
+        |
+        v
+Código temporário enviado por e-mail
+        |
+        v
+Código correto -> sessão temporária criada
+        |
+        v
+Cada requisição autenticada resolve:
+  identidade -> admin? -> papel -> páginas permitidas
+        |
+        +--> rota comum: sessão válida + regra da página
+        |
+        +--> rota administrativa: sessão válida + papel admin
+        |
+        +--> alteração de acesso: admin + validações + auditoria
+
+O pacote exportado não implementa o provedor de e-mail nem o mecanismo de sessão do projeto consumidor. Esses pontos são adaptadores deliberados: o projeto deve autenticar o usuário e disponibilizar o e-mail autenticado para as rotas do pacote.
+
+2. Fontes de autorização
+E-mail individual
+Uma linha em allowed_email autoriza uma pessoa específica. O endereço é normalizado com strip().lower() antes de ser comparado. A linha contém:
+
+Campo	Função
+email	endereço único autorizado
+label	descrição opcional para operadores
+role	papel do usuário
+allowed_pages	lista JSON de páginas; NULL significa todas
+is_active	permite bloquear sem apagar o histórico
+created_at	data de criação
+Domínio
+Uma linha em allowed_domain autoriza endereços cujo domínio coincide após normalização. O valor deve ser armazenado sem @, por exemplo example.org. A regra de e-mail individual tem prioridade sobre a regra de domínio para papel e páginas.
+
+Administrador por ambiente
+ADMIN_USERS é uma lista separada por vírgulas. ADMIN_EMAILS é aceito como nome legado quando ADMIN_USERS não estiver definido:
+
+ADMIN_USERS=admin@example.org, owner@example.org
+
+Os valores são normalizados e tratados como administradores em todos os checks de autorização. No sistema atual, eles também são copiados para allowed_email no startup para visibilidade e auditoria. Enquanto permanecer na variável de ambiente, a entrada correspondente é somente leitura: alterar ou apagar a linha do banco não remove o privilégio real. Para mudar o acesso, altere a variável e reinicie/republique o serviço.
+
+3. Autenticação por código e sessão
+O usuário envia o e-mail para POST /api/auth/send-code.
+O servidor aceita a solicitação somente se o e-mail estiver autorizado.
+Um código de seis dígitos é criado, com validade curta e cooldown para evitar múltiplos envios.
+O código é enviado por um provedor de e-mail configurado no projeto.
+O usuário envia e-mail e código para POST /api/auth/verify-code.
+O servidor aplica limite de tentativas, marca o código como usado e cria uma sessão aleatória com expiração.
+O frontend guarda o token de sessão e o envia no header X-Session-Token.
+POST /api/auth/validate-session devolve email, is_admin, role e allowed_pages.
+POST /api/auth/logout invalida a sessão.
+O pacote exportado começa no passo 7. O consumidor pode manter seu fluxo de OTP atual ou substituí-lo por outro provedor, desde que forneça uma identidade autenticada às rotas.
+
+4. Resolução de identidade e permissões
+Em cada requisição:
+
+A sessão é validada pelo middleware/dependency do projeto consumidor.
+O e-mail é normalizado.
+Se o e-mail estiver em ADMIN_USERS ou ADMIN_EMAILS, o resultado é admin e allowed_pages = NULL.
+Caso contrário, é procurada uma linha ativa em allowed_email.
+Se não houver linha individual, é procurada uma linha ativa em allowed_domain.
+O papel da linha encontrada é validado contra o vocabulário permitido.
+allowed_pages = NULL libera todas as páginas; uma lista limita o acesso aos slugs nela contidos.
+Uma lista vazia ou composta apenas de slugs desconhecidos é normalizada para NULL, evitando uma interpretação ambígua de “nenhuma página”.
+Papéis previstos pelo contrato atual:
+
+technician
+radiologist
+admin
+consultor
+validador_tecnico
+validador_radiologista
+
+Os slugs de página devem ser definidos pelo projeto consumidor. A exportação inclui os slugs atuais como exemplo, mas eles podem ser substituídos por uma lista própria.
+
+5. Controle da interface
+O frontend recebe o resultado da validação de sessão e aplica duas regras:
+
+a barra lateral mostra somente páginas presentes em allowed_pages;
+páginas administrativas também exigem is_admin, independentemente de uma lista de páginas recebida por engano.
+O bloqueio no frontend é apenas de experiência do usuário. A proteção real continua no backend e deve ser aplicada em todas as rotas sensíveis.
+
+Quando o usuário tenta abrir uma página não permitida, o frontend redireciona para a primeira página acessível. Se nenhuma regra específica for configurada, o usuário é encaminhado para a página inicial.
+
+6. Administração de acessos
+Todas as rotas de administração exigem uma sessão autenticada e papel admin:
+
+Operação	Rota	Resultado
+Listar e-mails	GET /api/allowed-emails	lista de entradas
+Criar e-mail	POST /api/allowed-emails	entrada criada
+Alterar e-mail	PATCH /api/allowed-emails/{id}	entrada atualizada
+Remover e-mail	DELETE /api/allowed-emails/{id}	entrada removida
+Listar domínios	GET /api/allowed-domains	lista de entradas
+Criar domínio	POST /api/allowed-domains	entrada criada
+Alterar domínio	PATCH /api/allowed-domains/{id}	entrada atualizada
+Remover domínio	DELETE /api/allowed-domains/{id}	entrada removida
+Ver admins de ambiente	GET /api/allowed-emails/env-admins	lista normalizada
+Ver auditoria	GET /api/access-control-audit	eventos paginados
+Payload de criação de e-mail:
+
+{
+  "email": "person@example.org",
+  "label": "Operador",
+  "role": "technician",
+  "is_active": true,
+  "allowed_pages": ["analyses", "upload"]
+}
+
+Para liberar todas as páginas, use allowed_pages: null. O servidor deve validar e normalizar o payload, nunca confiar na lista enviada pelo navegador.
+
+7. Proteções obrigatórias
+Normalização: e-mails em minúsculas e domínios sem @.
+Validação: rejeitar e-mail, domínio, papel e página desconhecidos.
+Admin atual: toda alteração administrativa exige sessão e papel admin.
+Último administrador: não permitir despromover, desativar ou remover o último admin ativo.
+Própria conta: não permitir que o admin atual se desative, se despromova ou se remova por acidente.
+Admin de ambiente: linhas correspondentes a variáveis de ambiente não podem ser alteradas pela UI nem por endpoints CRUD.
+Auditoria: registrar ator, papel do ator, ação, alvo, papel do alvo e detalhes da mudança na mesma transação.
+Fail closed: se a sessão não puder ser validada, responder 401; se o usuário não tiver papel suficiente, responder 403.
+Sem dados sensíveis em exportação: não distribuir tokens, códigos OTP, PII, segredos ou registros de produção.
+8. Auditoria
+A tabela access_control_audit_log é append-only para a aplicação. Ações esperadas:
+
+email_added | email_updated | email_deleted
+domain_added | domain_updated | domain_deleted
+
+Cada evento deve conter:
+
+{
+  "actor_email": "admin@example.org",
+  "actor_role": "admin",
+  "action": "email_updated",
+  "target_email": "person@example.org",
+  "target_role": "technician",
+  "detail_json": {
+    "is_active": {"from": true, "to": false}
+  }
+}
+
+O bootstrap de admins de ambiente usa um ator técnico, como system:env-bootstrap, para deixar explícita a origem da alteração.
+
+9. Respostas de erro
+Código	Situação
+400	e-mail, domínio, papel ou payload inválido
+401	sessão ausente, inválida ou expirada
+403	usuário autenticado sem papel admin ou sem autorização
+404	entrada inexistente
+409	duplicidade, último admin, própria conta ou admin de ambiente somente leitura
+Mensagens de 409 devem explicar a ação necessária, por exemplo promover outro administrador antes de remover o último.
+
+10. Integração em outro projeto
+Copie access-control-export/ para o novo repositório.
+Instale FastAPI, Pydantic e SQLAlchemy, ou conecte os módulos às versões já usadas pelo projeto.
+Use a migração SQL incluída ou traduza-a para o sistema de migrações do projeto.
+Registre as rotas com create_access_control_router(get_db, get_current_user_email).
+Faça get_current_user_email retornar o e-mail autenticado ou lançar 401; nunca use um e-mail vindo diretamente do corpo da requisição.
+Configure ACCESS_CONTROL_PAGE_SLUGS/a lista equivalente para as páginas reais do novo projeto.
+Execute o bootstrap de admins de ambiente depois da migração e antes de liberar a tela administrativa.
+Integre frontend/access-control.ts ao estado de sessão, à navegação e ao roteador.
+Adicione testes de autorização para usuário comum, domínio, admin, restrição de páginas, último admin e admin definido por ambiente.
+Remova qualquer exemplo de e-mail ou domínio antes de publicar.
+11. Checklist de segurança antes de reutilizar
+ O endpoint de sessão é o único responsável por definir o e-mail atual.
+ Todas as rotas de administração usam a dependência de admin.
+ O banco tem índices/uniqueness para e-mail e domínio.
+ allowed_pages desconhecidos não ampliam o acesso silenciosamente.
+ Admins de ambiente são tratados como somente leitura.
+ O último admin não pode ser removido.
+ Auditoria é gravada na mesma transação da alteração.
+ A variável de ambiente não contém exemplos reais no repositório.
+ O pacote distribuído não contém .env, tokens, banco ou dados de usuário.
