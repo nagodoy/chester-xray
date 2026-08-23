@@ -8,7 +8,7 @@ It accepts C-STORE requests and forwards received PS3.10 files to the Radiology 
 - Accepts C-STORE requests for DX, CR, SC, and XA SOP classes (plus all standard storage contexts)
 - Forwards received DICOM files to `/dicomweb/studies` as `multipart/related; type=application/dicom`
 - Authenticates via `X-DICOM-Ingest-Key` header (DICOM_INGEST_TOKEN or SESSION_SECRET)
-- Assigns forwarded studies to one Clerk user via `X-Worklist-Owner`
+- Assigns forwarded studies to one authorized email via `X-Worklist-Owner`
 - Configurable AE title, host, port, and allowed calling AE titles
 - Automatic retry with exponential backoff on STOW-RS failures
 
@@ -28,7 +28,7 @@ python gateway/dicom_scp.py \
   --ae-title MY_SCP \
   --stow-url https://my-worklist.example.com \
   --token my-ingest-token \
-  --owner-id user_2abc123 \
+  --owner-id reader@example.com \
   --allowed-calling-aes PACS_1,MODALITY_1
 ```
 
@@ -42,7 +42,7 @@ python gateway/dicom_scp.py \
 | `SCP_ALLOWED_AES` | *(any)* | Comma-separated allowed calling AE titles |
 | `STOW_URL` | `http://localhost:5000` | STOW-RS base URL |
 | `DICOM_INGEST_TOKEN` | `SESSION_SECRET` | Service authentication token |
-| `DICOM_INGEST_OWNER_ID` | *(required)* | Clerk user ID that owns received studies |
+| `DICOM_INGEST_OWNER_ID` | *(required)* | Authorized email that owns received studies |
 
 ## Published Chester deployment
 

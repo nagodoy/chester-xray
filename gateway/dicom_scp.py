@@ -7,7 +7,7 @@ to the STOW-RS endpoint using HTTPS and a service token.
 Usage:
     python gateway/dicom_scp.py [--host HOST] [--port PORT] [--ae-title AE_TITLE]
                                  [--stow-url STOW_URL] [--token TOKEN]
-                                 [--owner-id CLERK_USER_ID]
+                                  [--owner-id AUTHORIZED_EMAIL]
                                  [--allowed-calling-aes AE1,AE2]
 
 Environment variables:
@@ -17,7 +17,7 @@ Environment variables:
     SCP_ALLOWED_AES     Comma-separated allowed calling AE titles (default: any)
     STOW_URL            STOW-RS base URL (default: http://localhost:5000)
     DICOM_INGEST_TOKEN  Service token for STOW-RS
-    DICOM_INGEST_OWNER_ID Clerk user ID that owns forwarded studies
+    DICOM_INGEST_OWNER_ID Authorized email that owns forwarded studies
     SESSION_SECRET      Fallback token
 """
 from __future__ import annotations
@@ -151,7 +151,7 @@ def main():
     parser.add_argument(
         "--owner-id",
         default=os.environ.get("DICOM_INGEST_OWNER_ID", ""),
-        help="Clerk user ID that owns studies forwarded by this gateway",
+        help="Authorized email that owns studies forwarded by this gateway",
     )
     parser.add_argument(
         "--allowed-calling-aes",

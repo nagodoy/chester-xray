@@ -27,7 +27,7 @@ used for clinical diagnosis, treatment decisions, or patient management.**
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     Client (Browser)                         │
-│  React/Vite SPA     ←→  Clerk Auth (Replit-managed tenant) │
+│  React/Vite SPA     ←→  Email OTP + internal sessions      │
 └─────────────────────┬───────────────────────────────────────┘
                       │ HTTPS
                       ▼
@@ -35,9 +35,8 @@ used for clinical diagnosis, treatment decisions, or patient management.**
 │                   FastAPI Backend (app/)                      │
 │                                                              │
 │  /api/health          — Public health check                  │
-│  /api/studies/*       — Protected CRUD (Clerk JWT)           │
+│  /api/studies/*       — Protected CRUD (session token)       │
 │  /api/uploads         — Protected multipart upload           │
-│  /api/__clerk/*       — Clerk proxy (Replit template)        │
 │  /dicomweb/studies*   — STOW-RS (service token)              │
 └──────┬──────────────────────────┬───────────────────────────┘
        │                          │
@@ -76,7 +75,8 @@ On-Premises DICOM Gateway (gateway/):
 ### 1. FastAPI Backend
 
 - **Framework**: FastAPI 0.141+ with SQLAlchemy 2 sync ORM
-- **Auth**: Clerk Backend API `authenticate_request` (session cookie or Bearer token)
+- **Auth**: email OTP challenges and hashed database sessions, verified through
+  the `X-Session-Token` request header
 - **Database**: PostgreSQL via psycopg3 (or SQLite for local development/tests)
 - **Storage**: Replit Object Storage (primary) or database-backed bytes (fallback)
 - **Schema**: `db/schema.sql` — no startup DDL in production
@@ -120,8 +120,9 @@ On-Premises DICOM Gateway (gateway/):
 - Endpoint: `POST /dicomweb/studies` and `POST /dicomweb/studies/{study_uid}`
 - Auth: `X-DICOM-Ingest-Key` header or `Authorization: Bearer` compared in constant time
 - Token: `DICOM_INGEST_TOKEN` (falls back to `SESSION_SECRET`)
-- Ownership: `X-Worklist-Owner` or `DICOM_INGEST_OWNER_ID`; all study API
-  queries enforce the authenticated Clerk subject as owner
+- Ownership: `X-Worklist-Owner` or `DICOM_INGEST_OWNER_ID` must identify an
+  authorized email; all study API queries enforce the authenticated email as
+  owner. Historical non-email owners require an explicit audited alias.
 - Response: DICOM JSON-style success/failure sequences
 - Status codes: 200 (all success), 202 (partial), 409 (all duplicate), 400 (all failure)
 
@@ -187,9 +188,8 @@ If this system were to be used with real patient data, it would require:
 |---|---|---|
 | `DATABASE_URL` | PostgreSQL connection string | Yes |
 | `SESSION_SECRET` | HMAC key for patient ID pseudonymization; fallback service token | Yes |
-| `CLERK_SECRET_KEY` | Clerk Backend API secret key for auth | Yes (prod) |
 | `DICOM_INGEST_TOKEN` | Service token for STOW-RS; defaults to SESSION_SECRET | Recommended |
-| `DICOM_INGEST_OWNER_ID` | Clerk user ID that owns STOW/C-STORE studies | Required for gateway |
+| `DICOM_INGEST_OWNER_ID` | Authorized email that owns STOW/C-STORE studies | Required for gateway |
 | `REPLIT_OBJECT_STORAGE_BUCKET_ID` | Replit Object Storage bucket ID | Optional |
 | `DEBUG` | Enable debug mode (dev-user passthrough) | Dev only |
 | `TESTING` | Suppress worker startup during tests | Test only |
@@ -200,7 +200,7 @@ If this system were to be used with real patient data, it would require:
 
 ```
 Browser → POST /api/uploads (multipart, confirm_deidentified=true)
-  → Clerk auth verification
+  → Internal session-token verification
   → SHA-256 dedup check
   → DICOM parse (pydicom + pylibjpeg)
   → Patient ID pseudonymization (HMAC-SHA256)

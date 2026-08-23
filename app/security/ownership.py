@@ -1,4 +1,4 @@
-"""Safe owner identity translation used during the Clerk-to-email cutover."""
+"""Safe owner identity translation for pre-OTP study records."""
 from sqlalchemy.orm import Session
 
 from app.models import LegacyOwnerAlias

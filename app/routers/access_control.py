@@ -376,7 +376,7 @@ def migrate_legacy_study_owner(
     if not re.fullmatch(r"user_[A-Za-z0-9]+", legacy_owner_id):
         raise HTTPException(
             status_code=400,
-            detail="A origem deve ser um subject legado do Clerk no formato user_…",
+            detail="A origem deve ser um identificador legado no formato user_…",
         )
     if not legacy_owner_id or legacy_owner_id == email:
         raise HTTPException(status_code=400, detail="Owner legado inválido.")

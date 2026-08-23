@@ -2,4 +2,4 @@
 - [Task-agent merge reconciliation](task-agent-merge-reconciliation.md) — after isolated merges, recheck recent UI customizations; stale branches can reintroduce removed flows.
 - [Workflow listener cleanup](workflow-listener-cleanup.md) — after a restart reports a port conflict, check for and clear the stale listener before retrying.
 - [Restricted admin bootstrap](restricted-admin-bootstrap.md) — custom OTP access starts with configured admins; removed environment admins lose their managed access.
-- [Legacy study ownership](legacy-study-ownership.md) — Clerk-owned studies require an explicit, audited subject-to-email migration before email sessions can see them.
+- [Legacy study ownership](legacy-study-ownership.md) — pre-OTP studies require an explicit, audited identifier-to-email migration before email sessions can see them.

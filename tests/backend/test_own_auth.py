@@ -125,7 +125,7 @@ def test_review_filter_requires_review_page_permission(auth_client):
         app.dependency_overrides[get_current_access] = original_override
 
 
-def test_admin_can_migrate_clerk_owned_study_to_authorized_email(auth_client, db_session):
+def test_admin_can_migrate_legacy_owned_study_to_authorized_email(auth_client, db_session):
     from app.api.auth_deps import AccessContext, get_current_access
     from app.main import app
 

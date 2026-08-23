@@ -16,7 +16,7 @@ considering any clinical deployment.
 
 ## What it does
 
-- Authenticated worklist and study detail views with Clerk
+- Authenticated worklist and study detail views with email OTP and internal sessions
 - Manual DICOM, PNG and JPEG upload
 - DICOMweb STOW-RS ingestion with a service token
 - External/on-premises DICOM C-STORE gateway using pynetdicom
@@ -49,11 +49,11 @@ suite.
 | Endpoint | Purpose | Authentication |
 |---|---|---|
 | `GET /api/health` | Runtime/database/storage health | Public |
-| `GET /api/studies` | Worklist | Clerk session |
-| `POST /api/uploads` | Manual multipart upload | Clerk session |
-| `GET /api/studies/{id}` | Study, instances and results | Clerk session |
-| `POST /api/studies/{id}/review` | Approve/reject uncertain study | Clerk session |
-| `POST /api/studies/{id}/retry` | Retry failed inference | Clerk session |
+| `GET /api/studies` | Worklist | Session token |
+| `POST /api/uploads` | Manual multipart upload | Session token |
+| `GET /api/studies/{id}` | Study, instances and results | Session token |
+| `POST /api/studies/{id}/review` | Approve/reject uncertain study | Session token |
+| `POST /api/studies/{id}/retry` | Retry failed inference | Session token |
 | `POST /dicomweb/studies` | STOW-RS ingestion | Service token |
 
 Configure a dedicated `DICOM_INGEST_TOKEN` before connecting the external
@@ -61,9 +61,10 @@ gateway. The MVP can fall back to `SESSION_SECRET`, but token separation and
 rotation are required for a production design.
 
 STOW-RS also requires `X-Worklist-Owner` (or `DICOM_INGEST_OWNER_ID`) containing
-the Clerk user ID that may view and manage the received studies. Browser
+an authorized email that may view and manage the received studies. Browser
 uploads and every study/thumbnail action are isolated to the authenticated
-Clerk subject.
+email. Historical non-email identifiers can only be mapped by an administrator
+through an explicit, audited legacy-owner alias.
 
 ## DICOM gateway
 
