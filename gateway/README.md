@@ -44,6 +44,25 @@ python gateway/dicom_scp.py \
 | `DICOM_INGEST_TOKEN` | `SESSION_SECRET` | Service authentication token |
 | `DICOM_INGEST_OWNER_ID` | *(required)* | Clerk user ID that owns received studies |
 
+## Published Chester deployment
+
+For the current published Chester deployment, configure the gateway service
+with this base URL:
+
+```text
+STOW_URL=https://rx.nelsongodoy.com.br
+```
+
+The gateway appends `/dicomweb/studies` when forwarding each C-STORE, so the
+resulting STOW-RS endpoint is:
+
+```text
+https://rx.nelsongodoy.com.br/dicomweb/studies
+```
+
+The alternate published hostname `https://torax.replit.app` remains valid but
+is not the canonical gateway target.
+
 ## Security Notes
 
 - Use TLS termination (e.g., nginx) in front of the STOW-RS endpoint in production.

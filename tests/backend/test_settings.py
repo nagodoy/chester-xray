@@ -31,6 +31,21 @@ def test_dicomweb_settings_uses_configured_public_origin_not_request_headers(
     assert "test-session-secret" not in response.text
 
 
+def test_dicomweb_settings_exposes_published_gateway_endpoint(auth_client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "public_app_url", "https://rx.nelsongodoy.com.br")
+    monkeypatch.setattr(settings, "dicom_stow_url", "https://rx.nelsongodoy.com.br")
+    response = auth_client.get("/api/settings/dicomweb")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["stow_rs"]["url"] == "https://rx.nelsongodoy.com.br/dicomweb/studies"
+    assert data["stow_rs"]["hostname"] == "rx.nelsongodoy.com.br"
+    assert data["stow_rs"]["https"] is True
+    assert data["scp"]["gateway_target"] == "https://rx.nelsongodoy.com.br"
+
+
 def test_dicomweb_settings_marks_public_endpoint_local_when_unconfigured(
     auth_client,
     monkeypatch,
@@ -51,6 +66,7 @@ def test_dicomweb_settings_marks_public_endpoint_local_when_unconfigured(
 def test_dicomweb_settings_sanitizes_gateway_target(auth_client, monkeypatch):
     from app.config import settings
 
+    monkeypatch.setattr(settings, "public_app_url", "")
     monkeypatch.setattr(
         settings,
         "dicom_stow_url",
