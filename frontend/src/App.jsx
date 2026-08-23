@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ClerkProvider, Show, SignIn, useClerk, useUser } from "@clerk/react";
+import { ClerkProvider, Show, useClerk, useSignIn, useSignUp, useUser } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { ptBR } from "@clerk/localizations";
 import { shadcn } from "@clerk/themes";
@@ -186,7 +186,92 @@ function Detail() {
   const results=latestResultRows(study.results || []); const chartData=results.map((r,i)=>({name:r.pathology || `Finding ${i+1}`, score:Number(r.normalized_score ?? 0)})); const canReview=study.status==="needs_review";
   return <AppShell><Link href="/worklist" className="eyebrow" style={{display:"inline-flex",gap:7,alignItems:"center",marginBottom:20}}><ArrowLeft size={14}/> Back to worklist</Link><div className="detail-header"><div><h1>{study.description || "Chest radiograph"}</h1><div className="meta-row" style={{marginTop:10}}><span className="mono">{study.id}</span><Status value={study.status}/><span>{study.source || "Manual upload"}</span></div></div><div className="detail-actions">{study.status==="error" && <button className="btn btn-subtle" disabled={busy} onClick={()=>action(()=>retryStudy(id))}>Retry analysis</button>}{canReview && <><button className="btn btn-accent" disabled={busy} onClick={()=>action(()=>reviewStudy(id,"approve"))}><Check size={15}/> Approve for analysis</button><button className="btn btn-danger" disabled={busy} onClick={()=>action(()=>reviewStudy(id,"reject"))}><X size={15}/> Reject study</button></>}</div></div>{study.status==="error" && <div className="notice" style={{marginBottom:14}}><strong>Inference error.</strong> {study.error_message || "Analysis could not be completed. Retry when ready."}</div>}{study.status==="needs_review" && <div className="notice" style={{marginBottom:14}}><strong>Review required.</strong> Confirm this study before analysis proceeds.</div>}<div className="detail-grid"><div><div className="panel"><div className="panel-title"><h3>Study image</h3><span>{study.modality || "XR"}</span></div><div style={{background:"#263b40",borderRadius:9,minHeight:315,display:"grid",placeItems:"center"}}><Thumb url={study.thumbnail_url}/></div></div><div className="panel"><div className="panel-title"><h3>Exam metadata</h3><span>source record</span></div><dl className="metadata"><div><dt>Patient</dt><dd>{study.patient_id || "Unidentified"}</dd></div><div><dt>Age / sex</dt><dd>{displayAge(study.patient_age)} / {study.patient_sex || "—"}</dd></div><div><dt>Study date</dt><dd>{study.study_date || "—"}</dd></div><div><dt>View position</dt><dd>{study.view_position || "—"}</dd></div><div><dt>Model version</dt><dd>{study.model_version || "—"}</dd></div><div><dt>Preprocessing</dt><dd>{study.preprocessing_version || "—"}</dd></div></dl></div></div><div><div className="panel"><div className="panel-title"><h3>AI findings</h3><span>{results.length} outputs · latest run</span></div><div className="notice"><strong>Research score, not probability.</strong> Raw model output and operating-point normalized scores are shown for research interpretation. Neither is a calibrated clinical probability.</div><div style={{overflowX:"auto",marginTop:15}}><table><thead><tr><th>Pathology</th><th>Raw output</th><th>Normalized research score</th><th>Threshold</th><th>Flag</th></tr></thead><tbody>{results.map((r,i)=><tr key={r.pathology || i}><td><b>{r.pathology || "Unnamed output"}</b></td><td className="mono">{Number(r.raw_score ?? 0).toFixed(4)}</td><td><div style={{display:"flex",alignItems:"center",gap:9}}><div className="bar"><i style={{width:`${Math.min(100,Number(r.normalized_score ?? 0)*100)}%`}}/></div><span className="mono">{Number(r.normalized_score ?? 0).toFixed(3)}</span></div></td><td className="mono">{Number(r.threshold ?? 0).toFixed(3)}</td><td>{r.above_threshold ? <span className="pill pill-needs_review">above</span> : <span className="pill pill-completed">below</span>}</td></tr>)}</tbody></table></div></div>{results.length>0 && <div className="panel"><div className="panel-title"><h3>Score distribution</h3><span>normalized research score</span></div><div className="chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData}><CartesianGrid stroke="#e1e6df" vertical={false}/><XAxis dataKey="name" tick={{fontSize:10}} angle={-20} height={55} interval={0}/><YAxis domain={[0,1]} tick={{fontSize:10}}/><Tooltip/><Area type="monotone" dataKey="score" stroke="#28796d" fill="#d6f2e7" strokeWidth={2}/></AreaChart></ResponsiveContainer></div></div>}</div></div></AppShell>;
 }
-function AuthPage() { return <div className="auth-shell"><div className="clerk-wrap"><div className="auth-mark"><Brand light/><p>Console de pesquisa · radiografia torácica</p></div><SignIn routing="path" path={`${basePath}/sign-in`} fallbackRedirectUrl={`${basePath}/worklist`} withSignUp={false}/><div className="auth-research-note"><ShieldCheck size={14}/><span>Pesquisa somente · dados desidentificados</span></div><p className="auth-restricted">Acesso restrito a usuários autorizados</p></div></div>; }
+function clerkErrorMessage(error) {
+  return error?.errors?.[0]?.longMessage || error?.errors?.[0]?.message || error?.message || "Não foi possível concluir o acesso.";
+}
+function isUnknownUserError(error) {
+  return error?.errors?.some(({ code, message = "" }) =>
+    code === "form_identifier_not_found" || /user|usuário|account|conta/i.test(message) && /not found|não foi possível encontrar|does not exist|não existe/i.test(message)
+  );
+}
+function AuthPage() {
+  const { signIn, isLoaded: signInLoaded } = useSignIn();
+  const { signUp, isLoaded: signUpLoaded } = useSignUp();
+  const { setActive } = useClerk();
+  const [step, setStep] = useState("email");
+  const [mode, setMode] = useState("sign-in");
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const ready = signInLoaded && signUpLoaded;
+
+  const startSignIn = async (value) => {
+    await signIn.create({ identifier: value });
+    const factor = signIn.supportedFirstFactors?.find((item) => item.strategy === "email_code");
+    if (!factor?.emailAddressId) throw new Error("Este ambiente não disponibilizou o código por email.");
+    await signIn.prepareFirstFactor({ strategy: "email_code", emailAddressId: factor.emailAddressId });
+    setMode("sign-in");
+  };
+
+  const startSignUp = async (value) => {
+    await signUp.create({ emailAddress: value });
+    await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+    setMode("sign-up");
+  };
+
+  const submitEmail = async (event) => {
+    event.preventDefault();
+    const normalized = email.trim().toLowerCase();
+    setError("");
+    if (normalized !== authorizedEmail) {
+      setError("Este email não está autorizado para este ambiente.");
+      return;
+    }
+    if (!ready || busy) return;
+    setBusy(true);
+    try {
+      try {
+        await startSignIn(normalized);
+      } catch (signInError) {
+        if (!isUnknownUserError(signInError)) throw signInError;
+        await startSignUp(normalized);
+      }
+      setEmail(normalized);
+      setStep("code");
+    } catch (requestError) {
+      setError(clerkErrorMessage(requestError));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitCode = async (event) => {
+    event.preventDefault();
+    setError("");
+    if (!ready || busy || code.trim().length < 6) return;
+    setBusy(true);
+    try {
+      const result = mode === "sign-in"
+        ? await signIn.attemptFirstFactor({ strategy: "email_code", code: code.trim() })
+        : await signUp.attemptEmailAddressVerification({ code: code.trim() });
+      if (result.status !== "complete" || !result.createdSessionId) {
+        throw new Error("A verificação ainda não foi concluída.");
+      }
+      await setActive({ session: result.createdSessionId });
+      window.location.assign(`${basePath}/worklist`);
+    } catch (requestError) {
+      setError(clerkErrorMessage(requestError));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <div className="auth-shell"><div className="clerk-wrap"><div className="auth-mark"><Brand light/><p>Console de pesquisa · radiografia torácica</p></div><section className="auth-card" aria-labelledby="auth-title">
+    <div className="auth-card-mark"><img src={`${basePath}/logo.svg`} alt="" /></div>
+    {step === "email" ? <><h1 id="auth-title">Entrar no Chester AI</h1><p className="auth-card-subtitle">Informe seu email para receber o código de acesso.</p><form onSubmit={submitEmail}><label className="auth-field"><span>Seu e-mail</span><input className="auth-input" type="email" autoComplete="email" autoFocus value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Digite o endereço de e-mail" required /></label>{error && <p className="auth-error" role="alert"><XCircle size={14}/>{error}</p>}<button className="auth-submit" type="submit" disabled={busy || !ready}>{busy ? "Verificando…" : "Continuar"} <ChevronRight size={15}/></button></form></> : <><h1 id="auth-title">Verifique seu email</h1><p className="auth-card-subtitle">Enviamos um código de 6 dígitos para <strong>{email}</strong>.</p><form onSubmit={submitCode}><label className="auth-field"><span>Código de verificação</span><input className="auth-input auth-code-input" type="text" inputMode="numeric" autoComplete="one-time-code" autoFocus value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" required /></label>{error && <p className="auth-error" role="alert"><XCircle size={14}/>{error}</p>}<button className="auth-submit" type="submit" disabled={busy || code.length < 6}>{busy ? "Validando…" : "Confirmar acesso"} <ChevronRight size={15}/></button></form><button className="auth-back" type="button" onClick={() => { setStep("email"); setCode(""); setError(""); }}>Usar outro email</button></>}
+  </section><div className="auth-research-note"><ShieldCheck size={14}/><span>Pesquisa somente · dados desidentificados</span></div><p className="auth-restricted">Acesso restrito a usuários autorizados</p></div></div>;
+}
 function HomeRoute(){return <><Show when="signed-in"><Redirect to="/worklist"/></Show><Show when="signed-out"><Redirect to="/sign-in"/></Show></>;}
 function AccessDenied({ email }) { const { signOut } = useClerk(); return <div className="auth-shell"><div className="access-denied"><ShieldCheck size={28}/><h1>Acesso restrito</h1><p>Este ambiente está liberado inicialmente apenas para o email autorizado.</p><span className="mono">{email || "Email não identificado"}</span><button className="btn btn-primary" onClick={() => signOut({ redirectUrl: `${basePath}/sign-in` })}>Sair e tentar outro email</button></div></div>; }
 function Protected({children}) {
