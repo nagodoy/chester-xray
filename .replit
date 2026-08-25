@@ -52,7 +52,7 @@ externalPort = 80
 [deployment]
 deploymentTarget = "vm"
 build = ["npm", "run", "build"]
-run = ["sh", "-c", "cd server && alembic upgrade head && python -m uvicorn chester.main:app --host 0.0.0.0 --port 5000"]
+run = ["bash", "server/run_production.sh"]
 
 [userenv]
 
