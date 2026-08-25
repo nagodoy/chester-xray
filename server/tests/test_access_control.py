@@ -1,4 +1,5 @@
 """Administrator-only access management."""
+
 from __future__ import annotations
 
 import pytest
@@ -50,14 +51,17 @@ class TestUsers:
         )
         assert response.status_code == 409
 
-    @pytest.mark.parametrize("payload", [
-        {"email": "not-an-email", "role": "technician"},
-        {"email": "ok@example.com", "role": "superuser"},
-    ])
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {"email": "not-an-email", "role": "technician"},
+            {"email": "ok@example.com", "role": "superuser"},
+        ],
+    )
     def test_invalid_input_is_refused(self, client, admin, payload):
-        assert client.post(
-            "/api/access-control/users", json=payload, headers=admin
-        ).status_code == 400
+        assert (
+            client.post("/api/access-control/users", json=payload, headers=admin).status_code == 400
+        )
 
     def test_updating_role_and_pages(self, client, admin, make_user, session):
         user = make_user("target@example.com", ROLE_TECHNICIAN)
@@ -72,9 +76,7 @@ class TestUsers:
         assert response.json()["role"] == ROLE_RADIOLOGIST
         assert response.json()["allowed_pages"] == ["worklist"]
 
-    def test_an_environment_admin_cannot_be_edited(
-        self, client, admin, make_user, session
-    ):
+    def test_an_environment_admin_cannot_be_edited(self, client, admin, make_user, session):
         """Configuration owns those accounts; the interface must not fight it."""
         managed = make_user("env@example.com", ROLE_ADMIN, is_env_admin=True)
 
@@ -85,9 +87,7 @@ class TestUsers:
         )
         assert response.status_code == 409
 
-    def test_an_administrator_cannot_demote_themselves(
-        self, client, signed_in, make_user, session
-    ):
+    def test_an_administrator_cannot_demote_themselves(self, client, signed_in, make_user, session):
         make_user("boss@example.com", ROLE_ADMIN)
         make_user("second@example.com", ROLE_ADMIN)
         headers, _ = signed_in("boss@example.com")
@@ -98,39 +98,34 @@ class TestUsers:
         )
         assert response.status_code == 409
 
-    def test_the_last_administrator_cannot_be_removed(
-        self, client, signed_in, make_user, session
-    ):
+    def test_the_last_administrator_cannot_be_removed(self, client, signed_in, make_user, session):
         """Otherwise the installation locks itself out of its own administration."""
         make_user("boss@example.com", ROLE_ADMIN)
         other = make_user("other@example.com", ROLE_ADMIN)
         headers, _ = signed_in("boss@example.com")
 
         # Removing one of two is fine.
-        assert client.delete(
-            f"/api/access-control/users/{other.id}", headers=headers
-        ).status_code == 200
+        assert (
+            client.delete(f"/api/access-control/users/{other.id}", headers=headers).status_code
+            == 200
+        )
 
         me = session.query(User).filter_by(email="boss@example.com").one()
-        assert client.delete(
-            f"/api/access-control/users/{me.id}", headers=headers
-        ).status_code == 409
+        assert (
+            client.delete(f"/api/access-control/users/{me.id}", headers=headers).status_code == 409
+        )
 
-    def test_removal_deactivates_rather_than_deletes(
-        self, client, admin, make_user, session
-    ):
+    def test_removal_deactivates_rather_than_deletes(self, client, admin, make_user, session):
         """Studies reference their owner, so the row has to survive."""
         user = make_user("leaving@example.com", ROLE_TECHNICIAN)
 
-        assert client.delete(
-            f"/api/access-control/users/{user.id}", headers=admin
-        ).status_code == 200
+        assert (
+            client.delete(f"/api/access-control/users/{user.id}", headers=admin).status_code == 200
+        )
 
         assert session.query(User).filter_by(email="leaving@example.com").one().active is False
 
-    def test_another_organizations_user_is_not_found(
-        self, client, admin, make_user, session
-    ):
+    def test_another_organizations_user_is_not_found(self, client, admin, make_user, session):
         from chester.models import Organization
 
         rival = Organization(name="Rival", slug="rival")
@@ -184,9 +179,10 @@ class TestDomains:
         session.add(rule)
         session.flush()
 
-        assert client.delete(
-            f"/api/access-control/domains/{rule.id}", headers=admin
-        ).status_code == 200
+        assert (
+            client.delete(f"/api/access-control/domains/{rule.id}", headers=admin).status_code
+            == 200
+        )
         assert session.query(AllowedDomain).count() == 0
 
 

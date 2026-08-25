@@ -14,7 +14,7 @@ from starlette.concurrency import run_in_threadpool
 from chester.api.deps import SESSION_HEADER, get_current_access
 from chester.config import settings
 from chester.db import get_session
-from chester.emailer import EmailNotConfigured, send_otp_email
+from chester.emailer import email_delivery_configured, send_otp_email
 from chester.models import AuthChallenge, AuthSession, utcnow
 from chester.security.access import AccessContext, materialize_user, resolve_grant
 from chester.security.roles import normalize_email
@@ -100,6 +100,13 @@ async def request_code(
     email = normalize_email(body.email)
     request_ip = _client_ip(request)
 
+    # Checked before the address is resolved. Answering 503 only for an authorized
+    # address would reopen the enumeration hole this endpoint exists to avoid: with
+    # delivery broken, a known address returned 503 and an unknown one 200.
+    if not email_delivery_configured():
+        logger.error("Access code requested but SMTP is not configured")
+        raise HTTPException(status_code=503, detail="Envio de email não está configurado.")
+
     if _cooldown_remaining(db, email):
         raise HTTPException(
             status_code=429,
@@ -115,12 +122,14 @@ async def request_code(
         code = new_otp_code()
         try:
             await run_in_threadpool(send_otp_email, email, code)
-        except EmailNotConfigured:
-            logger.error("Access code requested but SMTP is not configured")
-            raise HTTPException(
-                status_code=503, detail="Envio de email não está configurado."
-            ) from None
-        code_hash = hash_otp_code(email, code)
+        except Exception:
+            # A delivery failure must not distinguish an authorized address either.
+            # Operators see the traceback; the caller sees the same generic reply
+            # and can request another code.
+            logger.exception("Failed to deliver an access code")
+            code_hash = unmatchable_code_hash()
+        else:
+            code_hash = hash_otp_code(email, code)
 
     # Retire any live challenge for this address. Without this, requesting a new
     # code leaves the previous one usable and hands the caller a fresh attempt

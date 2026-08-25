@@ -206,6 +206,9 @@ def capture_otp(monkeypatch):
     from chester.api import auth
 
     sent: list[tuple[str, str]] = []
+    # Delivery is treated as configured; the endpoint refuses outright when it is
+    # not, so tests exercising the sign-in flow have to stand in for a working SMTP.
+    monkeypatch.setattr(auth, "email_delivery_configured", lambda: True)
     monkeypatch.setattr(
         auth, "send_otp_email", lambda recipient, code: sent.append((recipient, code))
     )

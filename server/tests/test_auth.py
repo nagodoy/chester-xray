@@ -168,3 +168,39 @@ def test_environment_admin_signs_in_as_admin(client, signed_in, session, monkeyp
     assert access["role"] == ROLE_ADMIN
     assert access["source"] == "environment"
     assert session.query(User).filter_by(email="boss@example.com").one().is_env_admin
+
+
+def test_broken_email_delivery_does_not_reveal_authorization(
+    client, capture_otp, authorized_user, monkeypatch
+):
+    """A delivery failure must look the same for known and unknown addresses.
+
+    Found by running the stack end to end: with SMTP unconfigured, an authorized
+    address returned 503 while an unknown one returned 200, which reopened the
+    enumeration hole the generic response exists to close.
+    """
+    from chester.api import auth
+
+    def _explode(_recipient, _code):
+        raise RuntimeError("smtp is down")
+
+    monkeypatch.setattr(auth, "send_otp_email", _explode)
+
+    known = client.post("/api/auth/request-code", json={"email": "reader@example.com"})
+    unknown = client.post("/api/auth/request-code", json={"email": "nobody@elsewhere.test"})
+
+    assert known.status_code == unknown.status_code == 200
+    assert known.json() == unknown.json()
+
+
+def test_unconfigured_email_is_refused_before_the_address_is_resolved(
+    client, capture_otp, authorized_user, monkeypatch
+):
+    from chester.api import auth
+
+    monkeypatch.setattr(auth, "email_delivery_configured", lambda: False)
+
+    known = client.post("/api/auth/request-code", json={"email": "reader@example.com"})
+    unknown = client.post("/api/auth/request-code", json={"email": "nobody@elsewhere.test"})
+
+    assert known.status_code == unknown.status_code == 503

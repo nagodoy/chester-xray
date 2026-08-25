@@ -18,9 +18,14 @@ class EmailNotConfigured(RuntimeError):
     """Raised when SMTP delivery has not been configured."""
 
 
+def email_delivery_configured() -> bool:
+    """Whether SMTP is set up well enough to attempt a send."""
+    return all((settings.smtp_from, settings.smtp_host, settings.smtp_password))
+
+
 def send_otp_email(recipient: str, code: str) -> None:
     """Send a code. The code is never logged or returned."""
-    if not all((settings.smtp_from, settings.smtp_host, settings.smtp_password)):
+    if not email_delivery_configured():
         raise EmailNotConfigured("SMTP email delivery is not configured")
 
     message = EmailMessage()
