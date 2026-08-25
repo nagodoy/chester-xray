@@ -6,7 +6,8 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, MetaData, create_engine
+from sqlalchemy import JSON, DateTime, MetaData, create_engine
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.types import TypeDecorator
 
@@ -39,6 +40,25 @@ class UtcDateTime(TypeDecorator):
         if value.tzinfo is None:
             return value.replace(tzinfo=UTC)
         return value.astimezone(UTC)
+
+
+class JsonDocument(TypeDecorator):
+    """A JSON document stored as ``JSONB`` on PostgreSQL and ``JSON`` on SQLite.
+
+    Plain ``JSON`` keeps the document as text, so every read reparses it and no
+    index can be built over its keys. ``JSONB`` is the type these columns want and
+    the one the pre-Alembic schema already used; mapping them to ``sa.JSON`` was an
+    unintended downgrade carried in by the rewrite. SQLite has only one JSON
+    representation, so the variant matters solely on PostgreSQL.
+    """
+
+    impl = JSON
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(JSONB())
+        return dialect.type_descriptor(JSON())
 
 
 def _engine_kwargs(url: str) -> tuple[str, dict]:
