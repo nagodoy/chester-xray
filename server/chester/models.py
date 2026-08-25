@@ -19,7 +19,6 @@ from datetime import UTC, datetime
 from sqlalchemy import (
     JSON,
     Boolean,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -30,7 +29,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from chester.db import Base
+from chester.db import Base, UtcDateTime
 from chester.security.roles import ROLE_TECHNICIAN
 
 
@@ -44,11 +43,9 @@ def _uuid() -> uuid.UUID:
 
 
 class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
+        UtcDateTime, nullable=False, default=utcnow, onupdate=utcnow
     )
 
 
@@ -123,14 +120,12 @@ class AuthChallenge(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
     email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
     code_hash: Mapped[str] = mapped_column(String(128), nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
-    )
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, index=True)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
-    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    consumed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     requested_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utcnow, index=True
+        UtcDateTime, nullable=False, default=utcnow, index=True
     )
     request_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
@@ -147,16 +142,10 @@ class AuthSession(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utcnow
-    )
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
-    )
-    last_seen_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utcnow
-    )
-    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, index=True)
+    last_seen_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+    revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
     request_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
@@ -240,9 +229,7 @@ class Instance(Base):
     content_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     audit_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
 
     study: Mapped[Study] = relationship(back_populates="instances")
     stored_objects: Mapped[list[StoredObject]] = relationship(
@@ -265,9 +252,7 @@ class StoredObject(Base):
     sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
     inline_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
 
     instance: Mapped[Instance | None] = relationship(back_populates="stored_objects")
 
@@ -285,17 +270,15 @@ class AnalysisJob(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     lease_owner: Mapped[str | None] = mapped_column(String(128), nullable=True)
     lease_expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, index=True
+        UtcDateTime, nullable=True, index=True
     )
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
+        UtcDateTime, nullable=False, default=utcnow, onupdate=utcnow
     )
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
 
     study: Mapped[Study] = relationship(back_populates="jobs")
     result: Mapped[AnalysisResult | None] = relationship(back_populates="job", uselist=False)
@@ -321,9 +304,7 @@ class AnalysisResult(Base):
     above_threshold: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     above_threshold_findings: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
 
     study: Mapped[Study] = relationship(back_populates="results")
     job: Mapped[AnalysisJob | None] = relationship(back_populates="result")
@@ -342,9 +323,7 @@ class AuditEvent(Base):
     actor: Mapped[str | None] = mapped_column(String(320), nullable=True, index=True)
     event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     detail: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
 
     study: Mapped[Study | None] = relationship(back_populates="audit_events")
 
@@ -363,5 +342,5 @@ class AccessControlAuditLog(Base):
     target_role: Mapped[str | None] = mapped_column(String(64), nullable=True)
     details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=utcnow, index=True
+        UtcDateTime, nullable=False, default=utcnow, index=True
     )

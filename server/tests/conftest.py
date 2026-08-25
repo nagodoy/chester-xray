@@ -8,47 +8,48 @@ breaks the tests here, instead of only in the environment that applies it.
 from __future__ import annotations
 
 import os
+import tempfile
 from collections.abc import Generator
 from pathlib import Path
 
 import pytest
 
+SERVER_ROOT = Path(__file__).resolve().parent.parent
+
+# Configure the environment before anything imports chester. chester.config reads
+# these once at import time and chester.db builds its engine from them, so the
+# application, the migrations and the tests must agree on one database from the
+# outset -- including the engine the application's own lifespan uses.
+_TEST_DB_DIR = tempfile.mkdtemp(prefix="chester-tests-")
+DATABASE_URL = f"sqlite+pysqlite:///{Path(_TEST_DB_DIR) / 'test.db'}"
+
+os.environ["DATABASE_URL"] = DATABASE_URL
 os.environ.setdefault("TESTING", "1")
 os.environ.setdefault("DEBUG", "1")
 os.environ.setdefault("SESSION_SECRET", "test-session-secret")
 os.environ.setdefault("PSEUDONYM_SECRET", "test-pseudonym-secret")
 os.environ.setdefault("DICOM_INGEST_TOKEN", "test-dicom-ingest-token")
-
-SERVER_ROOT = Path(__file__).resolve().parent.parent
+os.environ.setdefault("ADMIN_USERS", "")
 
 
 @pytest.fixture(scope="session")
-def database_url(tmp_path_factory: pytest.TempPathFactory) -> str:
-    return f"sqlite+pysqlite:///{tmp_path_factory.mktemp('db') / 'test.db'}"
+def database_url() -> str:
+    return DATABASE_URL
 
 
 @pytest.fixture(scope="session")
 def migrated_engine(database_url: str):
-    """A database whose schema was produced by ``alembic upgrade head``."""
+    """The application's own engine, with its schema built by the migrations."""
     from alembic import command
     from alembic.config import Config
-    from sqlalchemy import create_engine
+
+    from chester.db import engine
 
     config = Config(str(SERVER_ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(SERVER_ROOT / "migrations"))
     config.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(config, "head")
 
-    previous = os.environ.get("DATABASE_URL")
-    os.environ["DATABASE_URL"] = database_url
-    try:
-        command.upgrade(config, "head")
-    finally:
-        if previous is None:
-            os.environ.pop("DATABASE_URL", None)
-        else:
-            os.environ["DATABASE_URL"] = previous
-
-    engine = create_engine(database_url, connect_args={"check_same_thread": False})
     yield engine
     engine.dispose()
 
@@ -183,3 +184,46 @@ def make_dicom():
         return buffer.getvalue()
 
     return _make
+
+
+@pytest.fixture
+def client(session):
+    """Test client wired to the transactional test session."""
+    from fastapi.testclient import TestClient
+
+    from chester.db import get_session
+    from chester.main import app
+
+    app.dependency_overrides[get_session] = lambda: session
+    with TestClient(app, raise_server_exceptions=True) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def capture_otp(monkeypatch):
+    """Capture codes instead of sending mail. Returns the list of (email, code)."""
+    from chester.api import auth
+
+    sent: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        auth, "send_otp_email", lambda recipient, code: sent.append((recipient, code))
+    )
+    return sent
+
+
+@pytest.fixture
+def signed_in(client, capture_otp):
+    """Sign an address in and return (headers, access payload)."""
+
+    def _sign_in(email: str):
+        requested = client.post("/api/auth/request-code", json={"email": email})
+        assert requested.status_code == 200, requested.text
+        assert capture_otp, f"no code was sent to {email}"
+        code = capture_otp[-1][1]
+        verified = client.post("/api/auth/verify-code", json={"email": email, "code": code})
+        assert verified.status_code == 200, verified.text
+        payload = verified.json()
+        return {"X-Session-Token": payload["session_token"]}, payload["access"]
+
+    return _sign_in
