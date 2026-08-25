@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Server (lint, migrations, tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: chester
+          POSTGRES_PASSWORD: chester
+          POSTGRES_DB: chester_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[dev,gateway]"
+
+      - name: Lint
+        run: ruff check . && ruff format --check .
+
+      - name: Migrations apply to an empty database
+        env:
+          DATABASE_URL: postgresql://chester:chester@localhost:5432/chester_test
+        run: alembic upgrade head
+
+      - name: Migrations match the models
+        env:
+          DATABASE_URL: postgresql://chester:chester@localhost:5432/chester_test
+        # A non-empty autogenerate diff means a model change shipped without a
+        # migration, which is exactly the drift the previous schema.sql allowed.
+        run: alembic check
+
+      - name: Tests
+        env:
+          TESTING: "1"
+        run: pytest
