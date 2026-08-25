@@ -49,6 +49,10 @@ args = "cd server && python -m chester.worker"
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 5011
+externalPort = 3000
+
 [deployment]
 deploymentTarget = "vm"
 build = ["npm", "run", "build"]
