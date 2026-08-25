@@ -29,6 +29,7 @@ os.environ.setdefault("DEBUG", "1")
 os.environ.setdefault("SESSION_SECRET", "test-session-secret")
 os.environ.setdefault("PSEUDONYM_SECRET", "test-pseudonym-secret")
 os.environ.setdefault("DICOM_INGEST_TOKEN", "test-dicom-ingest-token")
+os.environ["DICOM_WADO_ANONYMOUS_INGEST"] = "false"
 os.environ.setdefault("ADMIN_USERS", "")
 
 
