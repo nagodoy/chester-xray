@@ -17,7 +17,6 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import (
-    JSON,
     Boolean,
     ForeignKey,
     Index,
@@ -30,7 +29,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from chester.db import Base, UtcDateTime
+from chester.db import Base, JsonDocument, UtcDateTime
 from chester.security.roles import ROLE_TECHNICIAN
 
 
@@ -77,7 +76,7 @@ class User(TimestampMixin, Base):
     )
     role: Mapped[str] = mapped_column(String(64), nullable=False, default=ROLE_TECHNICIAN)
     # None means every page; a list restricts to its members.
-    allowed_pages: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    allowed_pages: Mapped[list | None] = mapped_column(JsonDocument, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     # Managed by ADMIN_USERS; immutable through the API and reconciled at startup.
     is_env_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -102,7 +101,7 @@ class AllowedDomain(TimestampMixin, Base):
         ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
     )
     role: Mapped[str] = mapped_column(String(64), nullable=False, default=ROLE_TECHNICIAN)
-    allowed_pages: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    allowed_pages: Mapped[list | None] = mapped_column(JsonDocument, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
 
@@ -322,11 +321,11 @@ class AnalysisResult(Base):
     model_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
     preprocessing_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
-    raw_scores: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    op_normalized_scores: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    thresholds: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    above_threshold: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    above_threshold_findings: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    raw_scores: Mapped[dict | None] = mapped_column(JsonDocument, nullable=True)
+    op_normalized_scores: Mapped[dict | None] = mapped_column(JsonDocument, nullable=True)
+    thresholds: Mapped[dict | None] = mapped_column(JsonDocument, nullable=True)
+    above_threshold: Mapped[dict | None] = mapped_column(JsonDocument, nullable=True)
+    above_threshold_findings: Mapped[list | None] = mapped_column(JsonDocument, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
 
@@ -346,7 +345,7 @@ class AuditEvent(Base):
     # Free text: a user email, or a service identifier for machine ingestion.
     actor: Mapped[str | None] = mapped_column(String(320), nullable=True, index=True)
     event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    detail: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    detail: Mapped[dict | None] = mapped_column(JsonDocument, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
 
     study: Mapped[Study | None] = relationship(back_populates="audit_events")
@@ -364,7 +363,7 @@ class AccessControlAuditLog(Base):
     target_type: Mapped[str] = mapped_column(String(64), nullable=False)
     target_key: Mapped[str] = mapped_column(String(320), nullable=False)
     target_role: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    details: Mapped[dict | None] = mapped_column(JsonDocument, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         UtcDateTime, nullable=False, default=utcnow, index=True
     )

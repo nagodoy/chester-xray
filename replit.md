@@ -45,6 +45,20 @@ alembic upgrade head
 
 CI runs `alembic check`, which fails when the models and migrations disagree.
 
+### The Publish database step stays off
+
+Publish offers to migrate the database by diffing this schema against production
+and generating DDL. **Leave that step disabled.** It is a second migration system
+competing with Alembic, and it loses: it rewrites the legacy tables in place,
+which needs `USING` casts it does not emit, truncates tables to add `NOT NULL`
+columns, and leaves `alembic_version` empty so the next start tries to run the
+initial migration again.
+
+Alembic already migrates production -- `run_production.sh` runs `alembic upgrade
+head` before the app starts, and `_archive_legacy_schema()` in the initial
+migration moves any pre-Alembic tables to the `chester_legacy_archive` schema
+instead of rewriting them.
+
 ## Validation
 
 ```bash
