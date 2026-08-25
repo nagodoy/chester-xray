@@ -20,7 +20,13 @@ target_metadata = Base.metadata
 
 
 def _database_url() -> str:
-    url = settings.database_url
+    """Prefer an explicitly configured URL over the settings singleton.
+
+    ``chester.config.settings`` reads the environment once at import time, so a
+    caller that imports the package before choosing a database -- the test suite
+    does exactly this -- would otherwise migrate the wrong one.
+    """
+    url = config.get_main_option("sqlalchemy.url", "") or settings.database_url
     if url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
     return url

@@ -97,3 +97,89 @@ def make_user(session, organization):
         return user
 
     return _make
+
+
+@pytest.fixture
+def make_dicom():
+    """Build a minimal but valid PS3.10 file in memory."""
+
+    def _make(
+        *,
+        rows: int = 64,
+        columns: int = 64,
+        modality: str = "DX",
+        body_part: str = "CHEST",
+        view_position: str = "PA",
+        patient_id: str = "TEST001",
+        bits_allocated: int = 16,
+        photometric: str = "MONOCHROME2",
+        frame_count: int = 1,
+        window_center: str | None = "512",
+        window_width: str | None = "1024",
+        rescale_slope: str = "1.0",
+        rescale_intercept: str = "0.0",
+        sop_uid: str | None = None,
+        study_uid: str | None = None,
+        pixels=None,
+        study_description: str = "CHEST PA",
+    ) -> bytes:
+        import io
+
+        import numpy as np
+        from pydicom.dataset import FileDataset, FileMetaDataset
+        from pydicom.uid import (
+            DigitalXRayImageStorageForPresentation,
+            ExplicitVRLittleEndian,
+            generate_uid,
+        )
+
+        sop_uid = sop_uid or generate_uid()
+        study_uid = study_uid or generate_uid()
+
+        file_meta = FileMetaDataset()
+        file_meta.MediaStorageSOPClassUID = DigitalXRayImageStorageForPresentation
+        file_meta.MediaStorageSOPInstanceUID = sop_uid
+        file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
+
+        ds = FileDataset("", {}, file_meta=file_meta, preamble=b"\x00" * 128)
+        ds.PatientID = patient_id
+        ds.PatientName = "DEIDENTIFIED"
+        ds.PatientAge = "045Y"
+        ds.PatientSex = "M"
+        ds.StudyInstanceUID = study_uid
+        ds.SeriesInstanceUID = generate_uid()
+        ds.SOPInstanceUID = sop_uid
+        ds.SOPClassUID = DigitalXRayImageStorageForPresentation
+        ds.StudyDate = "20240101"
+        ds.Modality = modality
+        ds.BodyPartExamined = body_part
+        ds.ViewPosition = view_position
+        ds.StudyDescription = study_description
+        ds.Rows = rows
+        ds.Columns = columns
+        ds.BitsAllocated = bits_allocated
+        ds.BitsStored = bits_allocated
+        ds.HighBit = bits_allocated - 1
+        ds.PixelRepresentation = 0
+        ds.SamplesPerPixel = 1
+        ds.PhotometricInterpretation = photometric
+        ds.NumberOfFrames = frame_count
+        ds.RescaleSlope = rescale_slope
+        ds.RescaleIntercept = rescale_intercept
+        if window_center is not None:
+            ds.WindowCenter = window_center
+        if window_width is not None:
+            ds.WindowWidth = window_width
+
+        dtype = np.uint8 if bits_allocated == 8 else np.uint16
+        if pixels is None:
+            rng = np.random.default_rng(42)
+            shape = (frame_count, rows, columns) if frame_count > 1 else (rows, columns)
+            pixels = rng.integers(0, 255, shape, dtype=dtype)
+        ds.PixelData = np.asarray(pixels, dtype=dtype).tobytes()
+
+        buffer = io.BytesIO()
+        ds.save_as(buffer, enforce_file_format=True)
+        return buffer.getvalue()
+
+    return _make
