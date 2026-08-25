@@ -1,5 +1,5 @@
 export const ptBR = {
-  brand: { name: "chester", tagline: "console de pesquisa · rx tórax" },
+  brand: { name: "Torax AI", tagline: "radiografia torácica" },
 
   common: {
     retry: "Tentar novamente",
@@ -29,7 +29,7 @@ export const ptBR = {
   },
 
   auth: {
-    title: "Entrar no Chester AI",
+    title: "Entrar no Torax AI",
     subtitle: "Informe seu email para receber o código de acesso.",
     emailLabel: "Seu e-mail",
     emailPlaceholder: "Digite o endereço de e-mail",
@@ -41,6 +41,10 @@ export const ptBR = {
     confirm: "Confirmar acesso",
     validating: "Validando…",
     resend: "Reenviar código",
+    resendIn: "Reenviar em {sec}s",
+    resending: "Reenviando…",
+    codeResent: "Código reenviado.",
+    digitLabel: "Dígito {n} de {total}",
     useAnotherEmail: "Usar outro email",
     researchOnly: "Pesquisa somente · dados desidentificados",
     restricted: "Acesso restrito a usuários autorizados",
@@ -61,7 +65,7 @@ export const ptBR = {
 
   worklist: {
     eyebrow: "RX tórax / controle de qualidade",
-    title: "Worklist Chester AI",
+    title: "Worklist Torax AI",
     subtitle: "Pipeline de triagem e análise para estudos torácicos desidentificados.",
     analyse: "Analisar estudo",
     closeUpload: "Fechar envio",

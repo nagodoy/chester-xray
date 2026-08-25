@@ -1,4 +1,5 @@
 import {
+  Activity,
   AlertTriangle,
   ClipboardList,
   Globe,
@@ -13,12 +14,12 @@ import { useAuth } from "../auth/AuthProvider";
 import { useI18n } from "../i18n";
 import type { Locale } from "../i18n";
 
-function Brand({ light = false }: { light?: boolean }) {
+function Brand() {
   const { t } = useI18n();
   return (
-    <div className={light ? "brand light" : "brand"}>
+    <div className="brand">
       <span className="brand-mark" aria-hidden>
-        ⌁
+        <Activity size={17} strokeWidth={2.25} />
       </span>
       <div>
         {t.brand.name}

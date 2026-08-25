@@ -11,7 +11,7 @@ from chester.config import settings
 
 logger = logging.getLogger(__name__)
 
-SUBJECT = "Código de acesso — Chester AI"
+SUBJECT = "Código de acesso — Torax AI"
 
 
 class EmailNotConfigured(RuntimeError):
@@ -33,7 +33,7 @@ def send_otp_email(recipient: str, code: str) -> None:
     message["From"] = settings.smtp_from
     message["To"] = recipient
     message.set_content(
-        "Seu código de acesso ao Chester AI é:\n\n"
+        "Seu código de acesso ao Torax AI é:\n\n"
         f"{code}\n\n"
         "O código expira em poucos minutos e só pode ser usado uma vez. "
         "Se você não solicitou este acesso, ignore esta mensagem."

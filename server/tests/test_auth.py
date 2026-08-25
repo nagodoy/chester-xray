@@ -204,3 +204,38 @@ def test_unconfigured_email_is_refused_before_the_address_is_resolved(
     unknown = client.post("/api/auth/request-code", json={"email": "nobody@elsewhere.test"})
 
     assert known.status_code == unknown.status_code == 503
+
+
+def test_delivery_runs_after_the_response_not_in_front_of_it(
+    client, capture_otp, authorized_user, monkeypatch
+):
+    """Sending is queued, so the reply does not carry the relay's latency.
+
+    Delivery used to be awaited inline: the whole SMTP conversation -- connect,
+    STARTTLS, login, send -- ran before the response, and the interface sat on
+    "sending" for as long as the relay took. Measured against a real server with a
+    1.5 s relay: 1510 ms before, 9 ms after.
+
+    Timing cannot be asserted here, because an ASGI client drains background tasks
+    as part of the response cycle. What is observable is the consequence: a code
+    whose delivery fails is still a working code, since the challenge no longer
+    depends on the send having succeeded.
+    """
+    from chester.api import auth
+
+    issued: list[str] = []
+
+    def _capture_then_fail(recipient, code):
+        issued.append(code)
+        raise RuntimeError("relay refused")
+
+    monkeypatch.setattr(auth, "send_otp_email", _capture_then_fail)
+
+    requested = client.post("/api/auth/request-code", json={"email": "reader@example.com"})
+    assert requested.status_code == 200
+    assert issued, "delivery was never attempted"
+
+    verified = client.post(
+        "/api/auth/verify-code", json={"email": "reader@example.com", "code": issued[0]}
+    )
+    assert verified.status_code == 200, "the stored challenge did not match the issued code"

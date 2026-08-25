@@ -7,7 +7,7 @@ import type { Dictionary } from "./pt-BR";
  * in English while everything around it was in Portuguese.
  */
 export const en: Dictionary = {
-  brand: { name: "chester", tagline: "research console · chest x-ray" },
+  brand: { name: "Torax AI", tagline: "chest radiography" },
 
   common: {
     retry: "Try again",
@@ -37,7 +37,7 @@ export const en: Dictionary = {
   },
 
   auth: {
-    title: "Sign in to Chester AI",
+    title: "Sign in to Torax AI",
     subtitle: "Enter your email to receive an access code.",
     emailLabel: "Your email",
     emailPlaceholder: "Enter your email address",
@@ -49,6 +49,10 @@ export const en: Dictionary = {
     confirm: "Confirm access",
     validating: "Verifying…",
     resend: "Resend code",
+    resendIn: "Resend in {sec}s",
+    resending: "Resending…",
+    codeResent: "Code resent.",
+    digitLabel: "Digit {n} of {total}",
     useAnotherEmail: "Use a different email",
     researchOnly: "Research only · de-identified data",
     restricted: "Restricted to authorized users",
@@ -69,7 +73,7 @@ export const en: Dictionary = {
 
   worklist: {
     eyebrow: "Chest X-ray / quality control",
-    title: "Chester AI worklist",
+    title: "Torax AI worklist",
     subtitle: "Triage and analysis pipeline for de-identified chest studies.",
     analyse: "Analyse study",
     closeUpload: "Close upload",
