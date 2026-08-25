@@ -204,21 +204,16 @@ class TestConcurrency:
 
     @pytest.fixture
     def pg_sessions(self):
-        from alembic import command
-        from alembic.config import Config
         from sqlalchemy import create_engine, text
         from sqlalchemy.orm import sessionmaker
 
-        from tests.conftest import SERVER_ROOT
+        import chester.models  # noqa: F401  -- registers the mappings
+        from chester.db import Base
 
         engine = create_engine(POSTGRES_URL)
         with engine.begin() as connection:
             connection.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public;"))
-
-        config = Config(str(SERVER_ROOT / "alembic.ini"))
-        config.set_main_option("script_location", str(SERVER_ROOT / "migrations"))
-        config.set_main_option("sqlalchemy.url", POSTGRES_URL)
-        command.upgrade(config, "head")
+        Base.metadata.create_all(engine)
 
         factory = sessionmaker(bind=engine)
         yield engine, factory

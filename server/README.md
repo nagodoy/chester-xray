@@ -10,8 +10,8 @@ chester/
   db.py            engine, session factory, declarative base
   models.py        ORM models -- the single source of schema truth
   security/        roles, page permissions, normalization
-migrations/        Alembic; every schema change ships as a revision
-tests/             schema is built by running the migrations, not create_all
+  schema.py        creates the schema from the models, and reports drift
+tests/             schema is built the same way the application builds it
 ```
 
 ## Setup
@@ -21,7 +21,7 @@ cd server
 python -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"
 export DATABASE_URL=postgresql://user:pass@localhost:5432/chester
-alembic upgrade head
+python -m chester.schema
 ```
 
 SQLite works for local development and tests; PostgreSQL is the production target.
@@ -31,12 +31,14 @@ SQLite works for local development and tests; PostgreSQL is the production targe
 The ORM is authoritative. After editing `chester/models.py`:
 
 ```bash
-alembic revision --autogenerate -m "what changed"
-alembic upgrade head
+python -m chester.schema
 ```
 
-CI runs `alembic check`, which fails when the models and the migrations disagree.
-There is no hand-maintained schema file to keep in sync.
+There is no migration tool. `create_all` creates whole tables only -- it never adds
+a column to a table that already exists -- so changing a model on a live database
+means dropping the affected tables and recreating them. `chester.schema.drift()`
+reports the mismatch instead of leaving it to surface as a query error: the command
+exits non-zero, CI runs it, and the API logs it at startup.
 
 ## Running
 

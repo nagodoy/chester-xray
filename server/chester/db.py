@@ -46,9 +46,9 @@ class JsonDocument(TypeDecorator):
     """A JSON document stored as ``JSONB`` on PostgreSQL and ``JSON`` on SQLite.
 
     Plain ``JSON`` keeps the document as text, so every read reparses it and no
-    index can be built over its keys. ``JSONB`` is the type these columns want and
-    the one the pre-Alembic schema already used; mapping them to ``sa.JSON`` was an
-    unintended downgrade carried in by the rewrite. SQLite has only one JSON
+    index can be built over its keys. ``JSONB`` is the type these columns want, and
+    the one the project's earlier schema already used; mapping them to ``sa.JSON``
+    was an unintended downgrade carried in by the rewrite. SQLite has only one JSON
     representation, so the variant matters solely on PostgreSQL.
     """
 
@@ -77,10 +77,11 @@ engine = create_engine(_url, **_kwargs)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
-# Deterministic constraint names on every backend. Without this, a constraint
-# declared inline (unique=True on a column) is created anonymously, and a later
-# migration cannot reference it by name -- which SQLite in particular needs,
-# because it rebuilds the table rather than altering the constraint in place.
+# Deterministic constraint names on every backend, so a constraint declared inline
+# (unique=True on a column) is not created anonymously. Names that differ between
+# PostgreSQL and SQLite would make a violation surface as a different error string
+# in tests than in production, and an anonymous constraint cannot be referenced at
+# all when a table has to be rebuilt.
 NAMING_CONVENTION = {
     "ix": "ix_%(table_name)s_%(column_0_N_name)s",
     "uq": "uq_%(table_name)s_%(column_0_N_name)s",

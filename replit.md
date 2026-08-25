@@ -33,31 +33,32 @@ silently discarded.
 
 ## Schema
 
-Alembic owns the schema, with the ORM in `server/chester/models.py` as the single
-source of truth. Deployment runs `alembic upgrade head` before starting. There is
-no startup DDL and no hand-maintained SQL file.
+The ORM in `server/chester/models.py` is the schema. There is no migration tool:
+`python -m chester.schema` creates every table from the models, and both the
+deployment and the dev workflow run it once before starting the API and worker.
 
 ```bash
-cd server
-alembic revision --autogenerate -m "what changed"
-alembic upgrade head
+cd server && python -m chester.schema
 ```
 
-CI runs `alembic check`, which fails when the models and migrations disagree.
+**`create_all` only creates whole tables. It never adds a column to a table that
+already exists.** So a model change made against a live database applies to
+nothing, and there is no in-place upgrade path -- the fix is to drop the affected
+tables and let the schema step recreate them. Because that gap is invisible on its
+own, `chester.schema.drift()` reports it: the schema command exits non-zero, CI
+runs it, and the API logs an error at startup rather than serving a stale database
+quietly.
+
+The database is expected to start empty. `bootstrap_env_admins` creates the default
+organization and the `ADMIN_USERS` accounts on first start.
 
 ### The Publish database step stays off
 
 Publish offers to migrate the database by diffing this schema against production
-and generating DDL. **Leave that step disabled.** It is a second migration system
-competing with Alembic, and it loses: it rewrites the legacy tables in place,
-which needs `USING` casts it does not emit, truncates tables to add `NOT NULL`
-columns, and leaves `alembic_version` empty so the next start tries to run the
-initial migration again.
-
-Alembic already migrates production -- `run_production.sh` runs `alembic upgrade
-head` before the app starts, and `_archive_legacy_schema()` in the initial
-migration moves any pre-Alembic tables to the `chester_legacy_archive` schema
-instead of rewriting them.
+and generating DDL. **Leave that step disabled.** It rewrites tables in place with
+casts it does not emit, and truncates tables to add `NOT NULL` columns. This
+project has no migration story by choice: production starts from an empty database
+and the schema step builds it.
 
 ## Validation
 

@@ -83,7 +83,7 @@ On-premises DICOM gateway (python -m chester.gateway):
   the `X-Session-Token` request header
 - **Database**: PostgreSQL via psycopg3 (or SQLite for local development/tests)
 - **Storage**: any S3-compatible bucket, or database-backed bytes as a fallback
-- **Schema**: Alembic migrations, with the ORM as the single source of truth; no startup DDL
+- **Schema**: created from the ORM by `python -m chester.schema` before the processes start; no migration tool and no startup DDL
 
 ### 2. Ingestion Pipeline
 
