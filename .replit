@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web", "python-3.12", "postgresql-16"]
+modules = ["nodejs-22", "web", "python-3.12", "postgresql-16"]
 
 [nix]
 channel = "stable-25_05"
@@ -17,10 +17,14 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Start application"
+args = "API"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Worker"
 
 [[workflows.workflow]]
-name = "Start application"
+name = "API"
 author = "agent"
 
 [[workflows.workflow.tasks]]
@@ -31,22 +35,24 @@ waitForPort = 5000
 [workflows.workflow.metadata]
 outputType = "webview"
 
+# Inference runs in its own process. Running it inside the web server loaded the
+# model into every worker and made analysis compete with request handling.
+[[workflows.workflow]]
+name = "Worker"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd server && python -m chester.worker"
+
 [[ports]]
 localPort = 5000
 externalPort = 80
 
-[[ports]]
-localPort = 5001
-externalPort = 3002
-
-[postMerge]
-path = "scripts/post-merge.sh"
-timeoutMs = 120000
-
 [deployment]
 deploymentTarget = "vm"
-run = ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5000"]
 build = ["npm", "run", "build"]
+run = ["sh", "-c", "cd server && alembic upgrade head && python -m uvicorn chester.main:app --host 0.0.0.0 --port 5000"]
 
 [userenv]
 
@@ -54,4 +60,5 @@ build = ["npm", "run", "build"]
 PUBLIC_APP_URL = "https://rx.nelsongodoy.com.br"
 STOW_URL = "https://rx.nelsongodoy.com.br"
 DICOM_WADO_ANONYMOUS_INGEST = "true"
-DICOM_INGEST_OWNER_ID = "nelsonagodoy@gmail.com"
+DICOM_INGEST_OWNER_EMAIL = "nelsonagodoy@gmail.com"
+ADMIN_USERS = "nelsonagodoy@gmail.com"

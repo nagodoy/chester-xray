@@ -1,98 +1,139 @@
-# Chester AI Radiology Assistant
+# Chester AI radiology assistant
 
-An authenticated research worklist for chest radiographs, built with FastAPI,
-React, PostgreSQL, pydicom and the local CHESTER TensorFlow.js model.
+An authenticated research worklist for chest radiographs: FastAPI, React,
+PostgreSQL, pydicom and the CHESTER classifier running locally through ONNX
+Runtime.
 
 ## Safety boundary
 
-**Use test or de-identified data only.** This Replit MVP is not a medical
-device, is not represented as HIPAA-compliant, and must not be used for
-diagnosis, treatment or management of real patients. Model values are research
-outputs. Operating-point normalized scores are not calibrated clinical
-probabilities.
+**Use test or de-identified data only.** This is not a medical device, is not
+represented as HIPAA-compliant, and must not be used for the diagnosis, treatment
+or management of real patients. Model values are research outputs.
+Operating-point normalized scores are not calibrated clinical probabilities.
 
 See [`docs/production-architecture.md`](docs/production-architecture.md) before
 considering any clinical deployment.
 
 ## What it does
 
-- Authenticated worklist and study detail views with email OTP and internal sessions
+- Authenticated worklist and study detail, with email one-time-code sign-in
 - Manual DICOM, PNG and JPEG upload
 - DICOMweb STOW-RS ingestion with a service token
-- External/on-premises DICOM C-STORE gateway using pynetdicom
-- Conservative chest-radiograph validation with manual review for uncertain data
-- Persistent PostgreSQL studies, jobs, results and audit events
-- Replit App Storage support with an explicit database-backed development fallback
-- Background inference with the local CHESTER `xrv-all-45rot15trans15scale` GraphModel
-- Raw scores, operating-point normalization, thresholds and model/preprocessing versions
+- On-premises DICOM C-STORE gateway that forwards to STOW-RS
+- Conservative chest-radiograph validation, holding anything uncertain for review
+- Studies, jobs, results and audit trails in PostgreSQL
+- Background inference in a separate worker process
+- Raw scores, operating-point normalization, thresholds and recorded versions
 
-## Run
+## Layout
 
-```bash
-npm start
+```
+server/   FastAPI application, worker, migrations, tests
+web/      React single-page application
+models/   chester-all-224.onnx, the model the server runs
+tools/    ONNX export and the parity check against the retired runtime
+docs/     architecture, model parity, comparison notes
+examples/ sample radiographs
 ```
 
-The command builds the Vite frontend and starts FastAPI on port 5000. The
-configured Replit workflow already uses this command.
+## Running
 
-## Validate
+The API and the worker are separate processes.
 
 ```bash
-npm run check
+# Backend
+cd server
+python -m venv .venv && . .venv/bin/activate
+pip install -e ".[dev]"
+export DATABASE_URL=postgresql://user:pass@localhost:5432/chester
+export SESSION_SECRET=... PSEUDONYM_SECRET=... DICOM_INGEST_TOKEN=...
+export ADMIN_USERS=you@example.com
+alembic upgrade head
+uvicorn chester.main:app --port 5000     # in one shell
+python -m chester.worker                 # in another
+
+# Frontend
+cd web && npm install && npm run dev
 ```
 
-This compiles the Python modules, builds the frontend and runs the backend test
-suite.
+`npm start` at the repository root builds the frontend and serves everything from
+the API process, which is what the deployment does.
 
-## Main endpoints
+## Checks
+
+```bash
+cd server && ruff check . && ruff format --check . && pytest
+cd web && npm run typecheck && npm run build
+```
+
+## Endpoints
 
 | Endpoint | Purpose | Authentication |
 |---|---|---|
-| `GET /api/health` | Runtime/database/storage health | Public |
+| `GET /api/health` | Runtime, database and storage health | Public |
+| `POST /api/auth/request-code` | Send a one-time code | Public |
+| `POST /api/auth/verify-code` | Exchange a code for a session | Public |
 | `GET /api/studies` | Worklist | Session token |
 | `POST /api/uploads` | Manual multipart upload | Session token |
 | `GET /api/studies/{id}` | Study, instances and results | Session token |
-| `POST /api/studies/{id}/review` | Approve/reject uncertain study | Session token |
-| `POST /api/studies/{id}/retry` | Retry failed inference | Session token |
+| `POST /api/studies/{id}/review` | Approve or reject a held study | Session token, reviewer role |
+| `POST /api/studies/{id}/retry` | Requeue a failed or stuck study | Session token |
+| `GET /api/access-control/*` | Manage who may sign in | Session token, administrator |
 | `POST /dicomweb/studies` | STOW-RS ingestion | Service token |
 
-The canonical STOW-RS URL is `/dicomweb/studies`. For compatibility with
-OsiriX configurations that use a WADO base path, `/wado/studies` is also
-accepted for POST uploads, including the duplicate `/wado/studies/studies`
-path emitted by some configurations. Do not configure the server root; posting
-to `/` returns HTTP 405.
+The canonical STOW-RS URL is `/dicomweb/studies`. For OsiriX configurations that
+use a WADO base path, `/wado/studies` also accepts uploads, including the
+duplicated `/wado/studies/studies` path some of them emit. Posting to the server
+root is not an upload path and returns 405.
 
-OsiriX can authenticate with its HTTP username/password fields: use `dicom` as
-the username and the configured `DICOM_INGEST_TOKEN` as the password. The
-connection must use HTTPS.
+OsiriX can authenticate with its HTTP username and password fields: any username,
+with the configured `DICOM_INGEST_TOKEN` as the password, over HTTPS.
 
-For a controlled OsiriX setup that cannot send a service credential, set
-`DICOM_WADO_ANONYMOUS_INGEST=true`. In this mode only the WADO compatibility
-paths accept uploads without authentication; `/dicomweb/studies` and the
-external gateway remain protected. `DICOM_INGEST_OWNER_ID` is still required
-to assign received studies to the authorized worklist owner.
+`DICOM_WADO_ANONYMOUS_INGEST=true` lets the WADO compatibility paths accept
+uploads with no credential, for a controlled OsiriX setup that cannot send one.
+`/dicomweb/studies` and the external gateway stay protected either way. Anonymous
+ingestion means any host that can reach the endpoint can file studies into the
+configured owner's worklist; use it only on a trusted network.
+`DICOM_INGEST_OWNER_EMAIL` must name an authorized user who will own what arrives.
 
-Configure a dedicated `DICOM_INGEST_TOKEN` before connecting the external
-gateway. The MVP can fall back to `SESSION_SECRET`, but token separation and
-rotation are required for a production design.
+## Access model
 
-STOW-RS also requires `X-Worklist-Owner` (or `DICOM_INGEST_OWNER_ID`) containing
-an authorized email that may view and manage the received studies. Browser
-uploads and every study/thumbnail action are isolated to the authenticated
-email. Historical non-email identifiers can only be mapped by an administrator
-through an explicit, audited legacy-owner alias.
+Studies belong to a user and an organization. Visibility is: same organization,
+and either your own study or a role that reads the whole organization
+(administrator, radiologist, consultant, radiology validator). Sign-in is by email
+one-time code; who may sign in comes from environment-configured administrators,
+then explicit users, then domain rules.
 
 ## DICOM gateway
 
-The DIMSE listener is intentionally not exposed from Replit. Run
-[`gateway/dicom_scp.py`](gateway/dicom_scp.py) inside the protected network and
-follow [`gateway/README.md`](gateway/README.md).
+The DIMSE listener is deliberately not exposed from the web deployment. Run it
+inside the protected network:
+
+```bash
+pip install -e "server[gateway]"
+python -m chester.gateway --stow-url https://your-host --token ... --owner you@example.com
+```
+
+## The model
+
+`models/chester-all-224.onnx` is the torchxrayvision `densenet121-res224-all`
+classifier. It reports 12 of the model's 18 outputs; the other six are suppressed,
+carried over from the original CHESTER configuration.
+
+Regenerate and re-verify it with:
+
+```bash
+python tools/export_onnx.py --out models/chester-all-224.onnx
+python tools/parity_check.py --with-tfjs examples/*.png
+```
+
+[`docs/onnx-parity.md`](docs/onnx-parity.md) records the check that this
+reproduces the previously deployed TensorFlow.js runtime to within float32 noise.
+`models/xrv-all-45rot15trans15scale` and `scripts/chester_runtime.cjs` are kept
+only so that comparison can be re-run.
 
 ## Background
 
-Chester originated as the browser-delivered research prototype described in
+Chester began as the browser-delivered research prototype described in
 [Chester: A Web Delivered Locally Computed Chest X-Ray Disease Prediction
-System](https://arxiv.org/abs/1901.11210). This repository now runs the original
-local GraphModel through a persistent server-side TensorFlow.js runtime. The
-legacy static interface remains historical reference and is not served by the
-active application.
+System](https://arxiv.org/abs/1901.11210).

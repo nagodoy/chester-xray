@@ -1,41 +1,56 @@
 # Chester on Replit
 
-## Active architecture
+## Architecture
 
-The active application is a React/Vite single-page app served by FastAPI. The
-backend uses PostgreSQL for worklist metadata, jobs, results and audit events,
-and runs TorchXRayVision inference in a single background worker.
+A React single-page application served by FastAPI, with PostgreSQL for worklist
+metadata, jobs, results and audit trails, and a separate worker process running
+ONNX inference.
 
-`npm start` builds the frontend and starts Uvicorn on port 5000. Do not switch
-the workflow back to the legacy `server.js` static server.
+Two processes. `npm start` builds the frontend and serves the API; the worker runs
+as its own workflow. Do not move inference back into the web process: it loads the
+model into every web worker and makes analysis compete with request handling.
 
 ## Safety
 
-Only test or de-identified data may be uploaded. Do not use PHI or present this
-MVP as HIPAA-compliant or clinically validated. Research scores, including
+Only test or de-identified data. Do not upload PHI, and do not present this as
+HIPAA-compliant or clinically validated. Research scores, including
 operating-point normalized values, are not calibrated clinical probabilities.
 
 ## Ingestion
 
 - Browser uploads: DICOM, PNG and JPEG through authenticated `/api/uploads`
 - DICOMweb: STOW-RS at `/dicomweb/studies` using `DICOM_INGEST_TOKEN`
-- DIMSE: run the external `gateway/dicom_scp.py`; never expose C-STORE directly
-  from the Replit web workflow
+- DIMSE: run `python -m chester.gateway` inside the protected network; never
+  expose C-STORE from the web workflow
 
-Uncertain studies enter `needs_review`. Non-chest studies are rejected rather
-than silently discarded.
+`DICOM_WADO_ANONYMOUS_INGEST` is enabled for OsiriX. It is a deliberate choice:
+any host that can reach `/wado/studies` can file studies into the configured
+owner's worklist. Requests are size-capped and read in chunks, but the endpoint
+itself is unauthenticated.
 
-## Schema and validation
+Uncertain studies enter `needs_review`. Non-chest studies are rejected rather than
+silently discarded.
 
-The development schema is in `db/schema.sql`. Replit Publish handles the
-development-to-production schema diff; production startup must not create or
-migrate tables.
+## Schema
 
-Run the complete local validation with:
+Alembic owns the schema, with the ORM in `server/chester/models.py` as the single
+source of truth. Deployment runs `alembic upgrade head` before starting. There is
+no startup DDL and no hand-maintained SQL file.
 
 ```bash
-npm run check
+cd server
+alembic revision --autogenerate -m "what changed"
+alembic upgrade head
 ```
 
-Clinical infrastructure and compliance requirements are documented in
+CI runs `alembic check`, which fails when the models and migrations disagree.
+
+## Validation
+
+```bash
+cd server && ruff check . && pytest
+cd web && npm run typecheck && npm run build
+```
+
+Clinical infrastructure and compliance requirements are in
 `docs/production-architecture.md`.
