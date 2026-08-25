@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from chester.api import (
+    access_control,
     auth,
     dicomweb,
     health,
@@ -54,6 +55,7 @@ def create_app() -> FastAPI:
     application.include_router(thumbnails.router)
     application.include_router(uploads.router)
     application.include_router(settings_routes.router)
+    application.include_router(access_control.router)
     application.include_router(dicomweb.router)
     return application
 
