@@ -38,11 +38,28 @@ alembic upgrade head
 CI runs `alembic check`, which fails when the models and the migrations disagree.
 There is no hand-maintained schema file to keep in sync.
 
+## Running
+
+The API and the worker are separate processes:
+
+```bash
+uvicorn chester.main:app --host 0.0.0.0 --port 5000
+python -m chester.worker
+```
+
+The worker is not started by the web application. Running inference inside uvicorn
+loaded the model into every web process and made analysis compete with request
+handling; as its own process the queue scales independently, and several workers
+can run against one database because jobs are claimed with SKIP LOCKED.
+
 ## Checks
 
 ```bash
 ruff check . && ruff format --check .
 pytest
+
+# Also exercise the concurrency tests, which need a real database:
+CHESTER_TEST_POSTGRES_URL=postgresql+psycopg://user:pass@localhost/chester_test pytest
 ```
 
 ## Configuration

@@ -60,4 +60,6 @@ jobs:
       - name: Tests
         env:
           TESTING: "1"
+          # Enables the SKIP LOCKED concurrency tests, which SQLite cannot exercise.
+          CHESTER_TEST_POSTGRES_URL: postgresql+psycopg://chester:chester@localhost:5432/chester_test
         run: pytest
