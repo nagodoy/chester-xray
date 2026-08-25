@@ -22,6 +22,7 @@ from chester.api import (
 )
 from chester.config import settings
 from chester.db import session_scope
+from chester.schema import drift as schema_drift
 from chester.security.access import bootstrap_env_admins
 
 logging.basicConfig(
@@ -35,11 +36,21 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Refuse to start on development defaults, then reconcile administrators.
 
-    Schema is applied by `alembic upgrade head` before the process starts. There is
-    deliberately no DDL here: creating tables at startup is how an application and
-    its migrations drift apart.
+    Schema is created by `python -m chester.schema` before the process starts. No
+    DDL is issued here on purpose: the API and the worker come up in parallel, so
+    two processes creating tables would race each other. What happens here is the
+    read-only half -- reporting a database that no longer matches the models, which
+    would otherwise only surface as a query error deep in a request.
     """
     settings.require_production_secrets()
+    problems = schema_drift()
+    if problems:
+        logger.error(
+            "The database does not match the models. Run `python -m chester.schema`; "
+            "if it still reports this, the affected tables must be dropped and "
+            "recreated. Found: %s",
+            "; ".join(problems),
+        )
     with session_scope() as session:
         bootstrap_env_admins(session)
     yield

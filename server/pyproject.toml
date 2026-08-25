@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "Authenticated chest radiograph research worklist."
 requires-python = ">=3.11"
 dependencies = [
-    "alembic>=1.14",
     "boto3>=1.35",
     "fastapi>=0.115",
     "numpy>=1.26",

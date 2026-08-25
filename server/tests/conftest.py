@@ -1,8 +1,8 @@
 """Shared test fixtures.
 
-The schema under test is built by running the real migrations rather than
-``Base.metadata.create_all``. That way a migration that fails to reproduce the models
-breaks the tests here, instead of only in the environment that applies it.
+The schema under test is built exactly the way the application builds it, through
+``chester.schema.create``. There is no migration tool to diverge from, so the ORM
+is the only definition and the tests exercise the same path production runs.
 """
 
 from __future__ import annotations
@@ -14,11 +14,9 @@ from pathlib import Path
 
 import pytest
 
-SERVER_ROOT = Path(__file__).resolve().parent.parent
-
 # Configure the environment before anything imports chester. chester.config reads
 # these once at import time and chester.db builds its engine from them, so the
-# application, the migrations and the tests must agree on one database from the
+# application, the schema step and the tests must agree on one database from the
 # outset -- including the engine the application's own lifespan uses.
 _TEST_DB_DIR = tempfile.mkdtemp(prefix="chester-tests-")
 DATABASE_URL = f"sqlite+pysqlite:///{Path(_TEST_DB_DIR) / 'test.db'}"
@@ -39,28 +37,23 @@ def database_url() -> str:
 
 
 @pytest.fixture(scope="session")
-def migrated_engine(database_url: str):
-    """The application's own engine, with its schema built by the migrations."""
-    from alembic import command
-    from alembic.config import Config
-
+def schema_engine(database_url: str):
+    """The application's own engine, with the schema created from the models."""
     from chester.db import engine
+    from chester.schema import create
 
-    config = Config(str(SERVER_ROOT / "alembic.ini"))
-    config.set_main_option("script_location", str(SERVER_ROOT / "migrations"))
-    config.set_main_option("sqlalchemy.url", database_url)
-    command.upgrade(config, "head")
+    create()
 
     yield engine
     engine.dispose()
 
 
 @pytest.fixture
-def session(migrated_engine) -> Generator:
+def session(schema_engine) -> Generator:
     """A session wrapped in a transaction that is rolled back after each test."""
     from sqlalchemy.orm import sessionmaker
 
-    connection = migrated_engine.connect()
+    connection = schema_engine.connect()
     transaction = connection.begin()
     factory = sessionmaker(bind=connection, autoflush=False, autocommit=False)
     db = factory()

@@ -28,7 +28,7 @@ considering any clinical deployment.
 ## Layout
 
 ```
-server/   FastAPI application, worker, migrations, tests
+server/   FastAPI application, worker, tests
 web/      React single-page application
 models/   chester-all-224.onnx, the model the server runs
 tools/    ONNX export and the parity check against the retired runtime
@@ -48,7 +48,7 @@ pip install -e ".[dev]"
 export DATABASE_URL=postgresql://user:pass@localhost:5432/chester
 export SESSION_SECRET=... PSEUDONYM_SECRET=... DICOM_INGEST_TOKEN=...
 export ADMIN_USERS=you@example.com
-alembic upgrade head
+python -m chester.schema
 uvicorn chester.main:app --port 5000     # in one shell
 python -m chester.worker                 # in another
 

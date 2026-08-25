@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 cd "$(dirname "$0")"
 
-alembic upgrade head
+python -m chester.schema
 
 python -m chester.worker &
 worker_pid=$!
