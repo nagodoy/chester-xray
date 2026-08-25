@@ -72,6 +72,7 @@ def outcome(state: str, code: str, **params: str) -> Validation:
     """Build a result, rendering the English prose from the code."""
     return Validation(state, code, ENGLISH_REASONS[code].format(**params))
 
+
 CHEST_MODALITIES = frozenset({"DX", "CR", "RG"})
 NON_CHEST_MODALITIES = frozenset({"CT", "MR", "US", "NM", "PT", "MG", "OT", "XA", "RF", "SC"})
 
