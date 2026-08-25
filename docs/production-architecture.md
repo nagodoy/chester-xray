@@ -27,43 +27,47 @@ used for clinical diagnosis, treatment decisions, or patient management.**
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     Client (Browser)                         │
-│  React/Vite SPA     ←→  Email OTP + internal sessions      │
+│  React SPA (web/)   ←→  Email one-time code + sessions      │
 └─────────────────────┬───────────────────────────────────────┘
                       │ HTTPS
                       ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   FastAPI Backend (app/)                      │
+│              FastAPI backend (server/chester/)                │
 │                                                              │
-│  /api/health          — Public health check                  │
-│  /api/studies/*       — Protected CRUD (session token)       │
-│  /api/uploads         — Protected multipart upload           │
-│  /dicomweb/studies*   — STOW-RS (service token)              │
+│  /api/health              — Public health check              │
+│  /api/auth/*              — Sign-in and session lifecycle    │
+│  /api/studies/*           — Worklist (session token)         │
+│  /api/uploads             — Multipart upload (session token) │
+│  /api/access-control/*    — Access management (admin)        │
+│  /dicomweb/studies*       — STOW-RS (service token)          │
 └──────┬──────────────────────────┬───────────────────────────┘
        │                          │
        ▼                          ▼
 ┌──────────────┐         ┌────────────────────────┐
-│  PostgreSQL   │         │  Object Storage         │
-│  (Replit DB)  │         │  (Replit Object Store   │
-│               │         │   or DB-backed fallback)│
-│  studies      │         │  originals/{id}/*.dcm   │
-│  instances    │         │  thumbnails/{id}.png    │
-│  analysis_*   │         └────────────────────────┘
+│  PostgreSQL   │         │  Object storage         │
+│               │         │  (S3-compatible, or     │
+│  organizations│         │   database fallback)    │
+│  users        │         │  originals/{id}/*.dcm   │
+│  studies      │         │  thumbnails/{id}.png    │
+│  instances    │         └────────────────────────┘
+│  analysis_*   │
 │  audit_events │
-└──────────────┘
-
-Background Worker Thread:
+└──────┬───────┘
+       │
+       ▼
+Inference worker (separate process: python -m chester.worker):
   ┌─────────────────────────────────────────┐
-  │  Single-threaded inference worker        │
-  │  - Polls analysis_jobs (queued)          │
-  │  - Uses persistent local CHESTER runtime │
-  │  - Stores AnalysisResult in DB          │
+  │  - Claims jobs with FOR UPDATE SKIP     │
+  │    LOCKED, so several may run           │
+  │  - Leases work, recovers expired leases │
+  │  - ONNX Runtime, in-process             │
   └─────────────────────────────────────────┘
 
-On-Premises DICOM Gateway (gateway/):
+On-premises DICOM gateway (python -m chester.gateway):
   ┌─────────────────────────────────────────┐
   │  pynetdicom Storage SCP                  │
   │  - C-STORE receiver (port 11112)         │
-  │  - Forwards to STOW-RS via HTTPS         │
+  │  - Forwards to STOW-RS over HTTPS        │
   │  - Service token authentication          │
   └─────────────────────────────────────────┘
 ```
@@ -78,15 +82,15 @@ On-Premises DICOM Gateway (gateway/):
 - **Auth**: email OTP challenges and hashed database sessions, verified through
   the `X-Session-Token` request header
 - **Database**: PostgreSQL via psycopg3 (or SQLite for local development/tests)
-- **Storage**: Replit Object Storage (primary) or database-backed bytes (fallback)
-- **Schema**: `db/schema.sql` — no startup DDL in production
+- **Storage**: any S3-compatible bucket, or database-backed bytes as a fallback
+- **Schema**: Alembic migrations, with the ORM as the single source of truth; no startup DDL
 
 ### 2. Ingestion Pipeline
 
 1. Client uploads DICOM or PNG/JPEG with `confirm_deidentified=true`
-2. Backend computes SHA-256; deduplicates by SHA-256 and SOP Instance UID
+2. Backend computes SHA-256; deduplicates by SHA-256 and SOP Instance UID, scoped to the receiving organization
 3. Parses DICOM with pydicom (all transfer syntaxes via pylibjpeg plugins)
-4. Pseudonymizes patient ID with HMAC-SHA256 (SESSION_SECRET); never stores patient name
+4. Pseudonymizes patient ID with HMAC-SHA256 (`PSEUDONYM_SECRET`); never stores patient name
 5. Validates study: `chest | uncertain | non_chest`
 6. Generates PNG thumbnail with Pillow
 7. Stores original file and thumbnail in object storage
@@ -103,17 +107,20 @@ On-Premises DICOM Gateway (gateway/):
 
 ### 4. AI Inference Worker
 
-- **Model**: local CHESTER TensorFlow.js GraphModel `xrv-all-45rot15trans15scale`
-- **Runtime**: persistent local Node process; model and seven weight shards load
-  once, with no external model download and no TorchXRayVision fallback
+- **Model**: `models/chester-all-224.onnx`, the torchxrayvision
+  `densenet121-res224-all` classifier; 12 of its 18 outputs are reported
+- **Runtime**: ONNX Runtime in the worker process. See `docs/onnx-parity.md` for
+  the check that this reproduces the previously deployed TensorFlow.js runtime
 - **Preprocessing**: grayscale/windowed pixels → resize shorter side to 224 →
   center crop → CHESTER-compatible `[-1024, 1024]` scaling
 - **Output**: Raw sigmoid scores + op-normalized scores + above-threshold flags
 - **⚠️ Note**: Op-normalized scores are NOT calibrated probabilities; they remap the
   operational threshold to 0.5 and apply the original CHESTER upper-range display
   emphasis; they are for research presentation only
-- **Concurrency**: 1 worker thread; no parallel inference
-- **Failure**: Sets job + study to `error`; retry supported via `POST /api/studies/{id}/retry`
+- **Concurrency**: one job at a time per worker process; several workers may run
+  against one database, since jobs are claimed with `FOR UPDATE SKIP LOCKED`
+- **Failure**: sets job and study to `error`; `POST /api/studies/{id}/retry`
+  requeues a failed study, or one stuck in `processing` behind a dead worker
 
 ### 5. STOW-RS Gateway
 
@@ -122,24 +129,25 @@ On-Premises DICOM Gateway (gateway/):
   `POST /wado/studies/{study_uid}` are accepted aliases, including the
   duplicated `/wado/studies/studies` path; the server root is not a STOW
   endpoint
-- Auth: `X-DICOM-Ingest-Key` header or `Authorization: Bearer` compared in constant time
-- OsiriX authentication: HTTPS Basic auth is supported with username `dicom`
-  and `DICOM_INGEST_TOKEN` as the password
+- Auth: `X-DICOM-Ingest-Key`, `Authorization: Bearer`, or Basic, all compared in constant time
+- OsiriX authentication: HTTPS Basic auth, any username, with
+  `DICOM_INGEST_TOKEN` as the password
 - Optional anonymous OsiriX mode: `DICOM_WADO_ANONYMOUS_INGEST=true` removes
   authentication only from the WADO compatibility aliases; the canonical
   DICOMweb endpoint and external gateway remain protected
-- Token: `DICOM_INGEST_TOKEN` (falls back to `SESSION_SECRET`)
-- Ownership: `X-Worklist-Owner` or `DICOM_INGEST_OWNER_ID` must identify an
-  authorized email; all study API queries enforce the authenticated email as
-  owner. Historical non-email owners require an explicit audited alias.
+- Token: `DICOM_INGEST_TOKEN`, with no fallback
+- Size: bodies are read in chunks and capped at `DICOM_MAX_UPLOAD_BYTES`
+- Ownership: `X-Worklist-Owner` or `DICOM_INGEST_OWNER_EMAIL` must name an
+  active user. An unrecognized owner is refused rather than guessed.
 - Response: DICOM JSON-style success/failure sequences
 - Status codes: 200 (all success), 202 (partial), 409 (all duplicate), 400 (all failure)
 
 ### 6. On-Premises DICOM SCP Gateway
 
-- See `gateway/README.md` and `gateway/DICOM_CONFORMANCE.md`
-- Receives C-STORE from PACS/modalities; forwards to STOW-RS via HTTPS
-- **Must be deployed on-premises behind a firewall — not on Replit**
+- `python -m chester.gateway`; install with `pip install -e "server[gateway]"`
+- Receives C-STORE from PACS or modalities and forwards to STOW-RS over HTTPS
+- Refuses to start against a plaintext URL, since the token travels per request
+- **Must be deployed on-premises behind a firewall**
 
 ---
 
@@ -159,7 +167,8 @@ If this system were to be used with real patient data, it would require:
 ### Security & Compliance
 
 - **BAA** with cloud provider, database vendor, and all subprocessors
-- **RBAC** (Role-Based Access Control): radiologist, technologist, admin roles
+- **RBAC**: roles are enforced per endpoint, and studies are scoped to an
+  organization; extend rather than replace for clinical use
 - **Full audit logging** to immutable, tamper-evident log store
 - **Data retention policy** with automated purge per institutional policy
 - **Access logging** for all PHI access (HIPAA §164.312(b))
@@ -196,12 +205,17 @@ If this system were to be used with real patient data, it would require:
 | Variable | Description | Required |
 |---|---|---|
 | `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `SESSION_SECRET` | HMAC key for patient ID pseudonymization; fallback service token | Yes |
-| `DICOM_INGEST_TOKEN` | Service token for STOW-RS; defaults to SESSION_SECRET | Recommended |
-| `DICOM_INGEST_OWNER_ID` | Authorized email that owns STOW/C-STORE studies | Required for gateway |
-| `REPLIT_OBJECT_STORAGE_BUCKET_ID` | Replit Object Storage bucket ID | Optional |
-| `DEBUG` | Enable debug mode (dev-user passthrough) | Dev only |
-| `TESTING` | Suppress worker startup during tests | Test only |
+| `SESSION_SECRET` | HMAC key for session tokens and one-time codes | Yes |
+| `PSEUDONYM_SECRET` | HMAC key for patient pseudonyms; rotating it remaps every future pseudonym | Yes |
+| `ADMIN_USERS` | Comma-separated environment-managed administrators | Yes |
+| `DICOM_INGEST_TOKEN` | Service token for STOW-RS; no fallback | Yes |
+| `DICOM_INGEST_OWNER_EMAIL` | Active user who owns STOW and C-STORE studies | Required for ingestion |
+| `DICOM_WADO_ANONYMOUS_INGEST` | Drops authentication from the WADO aliases only | Optional |
+| `DICOM_MAX_UPLOAD_BYTES` | Per-request upload cap (default 100 MB) | Optional |
+| `STORAGE_BUCKET` | S3-compatible bucket; unset selects database storage | Optional |
+| `SMTP_HOST`, `SMTP_FROM`, `SMTP_PASSWORD` | One-time-code delivery | Yes |
+| `DEBUG` | Relax the production secret checks | Dev only |
+| `TESTING` | Relax the production secret checks | Test only |
 
 ---
 
@@ -219,16 +233,16 @@ Browser → POST /api/uploads (multipart, confirm_deidentified=true)
   → Create Study + Instance + AnalysisJob records
   → Return {studies, errors}
 
-Background worker (separate thread):
-  → Poll analysis_jobs WHERE status='queued'
-  → Retrieve original file from storage
-  → Decode + preprocess (pydicom/PIL + CHESTER transforms)
-  → Run local CHESTER GraphModel inference (persistent TensorFlow.js runtime)
+Worker process:
+  → Claim a queued job (FOR UPDATE SKIP LOCKED) and take a lease
+  → Retrieve the study's oldest instance from storage
+  → Decode and preprocess (pydicom/Pillow, then resize, crop, scale)
+  → Run ONNX Runtime inference outside any transaction
   → Store AnalysisResult (raw_scores, op_normalized_scores, thresholds, above_threshold)
-  → Update Study.status → completed
+  → Update Study.status → completed, and release the lease
 ```
 
 ---
 
-*Last updated: 2026-08-23*
-*Version: 1.1.0 MVP*
+*Last updated: 2026-08-25*
+*Version: 2.0.0*
