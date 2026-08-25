@@ -1,0 +1,206 @@
+"""Worklist and study detail."""
+
+from __future__ import annotations
+
+import logging
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from chester.api.deps import require_page
+from chester.db import get_session
+from chester.models import AnalysisJob, AuditEvent, Study
+from chester.schemas import (
+    AnalysisResultSchema,
+    InstanceSchema,
+    ReviewRequest,
+    StudyDetailSchema,
+    StudyListResponse,
+    StudySchema,
+)
+from chester.security.access import AccessContext, visible_studies
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api/studies", tags=["studies"])
+
+STATUS_VALUES = frozenset(
+    {
+        "received",
+        "validating",
+        "queued",
+        "processing",
+        "completed",
+        "needs_review",
+        "rejected",
+        "error",
+    }
+)
+RETRYABLE_STATUSES = frozenset({"error", "processing"})
+
+
+def top_findings(study: Study, limit: int = 5) -> list[dict]:
+    """Summarize the most recent completed result."""
+    completed = [result for result in study.results if result.above_threshold_findings]
+    if not completed:
+        return []
+    latest = max(completed, key=lambda result: result.created_at)
+    return [
+        {
+            "pathology": pathology,
+            "raw_score": (latest.raw_scores or {}).get(pathology),
+            "normalized_score": (latest.op_normalized_scores or {}).get(pathology),
+            "threshold": (latest.thresholds or {}).get(pathology),
+            "above_threshold": (latest.above_threshold or {}).get(pathology, False),
+        }
+        for pathology in (latest.above_threshold_findings or [])[:limit]
+    ]
+
+
+def _to_summary(study: Study) -> StudySchema:
+    schema = StudySchema.model_validate(study)
+    schema.top_findings = top_findings(study)
+    schema.owner_email = study.owner.email if study.owner else None
+    return schema
+
+
+def _to_detail(study: Study) -> StudyDetailSchema:
+    detail = StudyDetailSchema.model_validate(study)
+    detail.top_findings = top_findings(study)
+    detail.owner_email = study.owner.email if study.owner else None
+    detail.instances = [InstanceSchema.model_validate(item) for item in study.instances]
+    detail.results = [AnalysisResultSchema.model_validate(item) for item in study.results]
+    return detail
+
+
+def _load(db: Session, access: AccessContext, study_id: uuid.UUID) -> Study:
+    study = visible_studies(db.query(Study), access).filter(Study.id == study_id).first()
+    if study is None:
+        # Deliberately 404 rather than 403: whether a study exists in another
+        # organization is not this caller's business.
+        raise HTTPException(status_code=404, detail="Study not found")
+    return study
+
+
+@router.get("", response_model=StudyListResponse)
+def list_studies(
+    search: str | None = Query(None),
+    study_status: str | None = Query(None, alias="status"),
+    limit: int = Query(20, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    access: AccessContext = Depends(require_page("worklist")),
+    db: Session = Depends(get_session),
+):
+    """List studies this caller may see."""
+    query = visible_studies(db.query(Study), access)
+
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            Study.description.ilike(pattern)
+            | Study.patient_id.ilike(pattern)
+            | Study.modality.ilike(pattern)
+        )
+
+    if study_status:
+        if study_status not in STATUS_VALUES:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {study_status}")
+        if study_status == "needs_review" and not access.can_access_page("review"):
+            raise HTTPException(status_code=403, detail="Review queue access denied")
+        query = query.filter(Study.status == study_status)
+
+    total = query.count()
+    items = query.order_by(Study.created_at.desc()).offset(offset).limit(limit).all()
+
+    counts = dict(
+        visible_studies(db.query(Study.status, func.count(Study.id)), access)
+        .group_by(Study.status)
+        .all()
+    )
+
+    return StudyListResponse(
+        items=[_to_summary(study) for study in items], total=total, counts=counts
+    )
+
+
+@router.get("/{study_id}", response_model=StudyDetailSchema)
+def get_study(
+    study_id: uuid.UUID,
+    access: AccessContext = Depends(require_page("study-detail")),
+    db: Session = Depends(get_session),
+):
+    return _to_detail(_load(db, access, study_id))
+
+
+@router.post("/{study_id}/retry", response_model=StudyDetailSchema)
+def retry_study(
+    study_id: uuid.UUID,
+    access: AccessContext = Depends(require_page("study-detail")),
+    db: Session = Depends(get_session),
+):
+    """Queue a fresh analysis for a study that failed or is stuck.
+
+    'processing' is retryable because a worker can die holding a lease; the
+    previous implementation accepted only 'error', so such a study had no way out
+    through the interface.
+    """
+    study = _load(db, access, study_id)
+    if study.status not in RETRYABLE_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Study in status '{study.status}' cannot be retried",
+        )
+
+    previous_status = study.status
+    db.add(AnalysisJob(study_id=study.id, status="queued"))
+    study.status = "queued"
+    study.error_message = None
+    db.add(
+        AuditEvent(
+            study_id=study.id,
+            actor=access.email,
+            event_type="retry",
+            detail={"previous_status": previous_status},
+        )
+    )
+    db.commit()
+    db.refresh(study)
+    return _to_detail(study)
+
+
+@router.post("/{study_id}/review", response_model=StudyDetailSchema)
+def review_study(
+    study_id: uuid.UUID,
+    body: ReviewRequest,
+    access: AccessContext = Depends(require_page("review")),
+    db: Session = Depends(get_session),
+):
+    """Approve a held study for analysis, or reject it."""
+    if not access.may_review:
+        raise HTTPException(status_code=403, detail="Este papel não pode revisar estudos.")
+
+    study = _load(db, access, study_id)
+    if study.status != "needs_review":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Study in status '{study.status}' cannot be reviewed",
+        )
+
+    db.add(
+        AuditEvent(
+            study_id=study.id,
+            actor=access.email,
+            event_type="review",
+            detail={"decision": body.decision},
+        )
+    )
+    if body.decision == "approve":
+        study.status = "queued"
+        db.add(AnalysisJob(study_id=study.id, status="queued"))
+    else:
+        study.status = "rejected"
+
+    db.commit()
+    db.refresh(study)
+    return _to_detail(study)

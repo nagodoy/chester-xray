@@ -25,6 +25,7 @@ from sqlalchemy import (
     LargeBinary,
     String,
     Text,
+    UniqueConstraint,
     Uuid,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -207,14 +208,26 @@ class Study(TimestampMixin, Base):
 
 
 class Instance(Base):
+    """One stored image.
+
+    organization_id is denormalized from the parent study so identity and content
+    uniqueness can be scoped per organization. A globally unique sop_instance_uid
+    would let one tenant's upload refuse another's, which breaks a legitimate case
+    -- two organizations may hold the same instance -- and answers whether a given
+    UID exists somewhere else in the system.
+    """
+
     __tablename__ = "instances"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
     study_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("studies.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
 
-    sop_instance_uid: Mapped[str | None] = mapped_column(String(128), nullable=True, unique=True)
+    sop_instance_uid: Mapped[str | None] = mapped_column(String(128), nullable=True)
     sop_class_uid: Mapped[str | None] = mapped_column(String(128), nullable=True)
     series_instance_uid: Mapped[str | None] = mapped_column(String(128), nullable=True)
     transfer_syntax_uid: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -232,8 +245,14 @@ class Instance(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
 
     study: Mapped[Study] = relationship(back_populates="instances")
+    organization: Mapped[Organization] = relationship()
     stored_objects: Mapped[list[StoredObject]] = relationship(
         back_populates="instance", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("organization_id", "sop_instance_uid", name="uq_instances_org_sop_uid"),
+        Index("ix_instances_org_sha256", "organization_id", "sha256"),
     )
 
 

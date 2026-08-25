@@ -7,7 +7,15 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from chester.api import auth
+from chester.api import (
+    auth,
+    dicomweb,
+    health,
+    settings_routes,
+    studies,
+    thumbnails,
+    uploads,
+)
 from chester.config import settings
 from chester.db import session_scope
 from chester.security.access import bootstrap_env_admins
@@ -40,7 +48,13 @@ def create_app() -> FastAPI:
         version="2.0.0",
         lifespan=lifespan,
     )
+    application.include_router(health.router)
     application.include_router(auth.router)
+    application.include_router(studies.router)
+    application.include_router(thumbnails.router)
+    application.include_router(uploads.router)
+    application.include_router(settings_routes.router)
+    application.include_router(dicomweb.router)
     return application
 
 

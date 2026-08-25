@@ -227,3 +227,41 @@ def signed_in(client, capture_otp):
         return {"X-Session-Token": payload["session_token"]}, payload["access"]
 
     return _sign_in
+
+
+@pytest.fixture
+def make_png():
+    """A small grayscale PNG."""
+
+    def _make(rows: int = 64, columns: int = 64, seed: int = 7) -> bytes:
+        import io
+
+        import numpy as np
+        from PIL import Image
+
+        rng = np.random.default_rng(seed)
+        array = rng.integers(0, 255, (rows, columns), dtype=np.uint8)
+        buffer = io.BytesIO()
+        Image.fromarray(array, mode="L").save(buffer, format="PNG")
+        return buffer.getvalue()
+
+    return _make
+
+
+@pytest.fixture
+def make_stow_body():
+    """Build a multipart/related body carrying one or more DICOM parts."""
+
+    def _make(parts: list[bytes], boundary: str = "STOW-BOUNDARY-001") -> tuple[bytes, str]:
+        chunks = []
+        for payload in parts:
+            chunks.append(
+                f"--{boundary}\r\nContent-Type: application/dicom\r\n\r\n".encode()
+                + payload
+                + b"\r\n"
+            )
+        body = b"".join(chunks) + f"--{boundary}--\r\n".encode()
+        content_type = f'multipart/related; type="application/dicom"; boundary={boundary}'
+        return body, content_type
+
+    return _make
