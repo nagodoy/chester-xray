@@ -169,6 +169,7 @@ class Study(TimestampMixin, Base):
     patient_sex: Mapped[str | None] = mapped_column(String(8), nullable=True)
     study_date: Mapped[str | None] = mapped_column(String(16), nullable=True)
     modality: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    body_part: Mapped[str | None] = mapped_column(String(64), nullable=True)
     view_position: Mapped[str | None] = mapped_column(String(16), nullable=True)
     description: Mapped[str | None] = mapped_column(String(256), nullable=True)
     source: Mapped[str] = mapped_column(String(32), nullable=False, default="upload")
@@ -178,6 +179,10 @@ class Study(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="received", index=True)
     # chest | uncertain | non_chest
     validation_state: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # A stable identifier the interface translates. The prose beside it is the
+    # English rendering, kept for logs and for consumers without a translation
+    # table; it is derived from the code, so the two cannot disagree.
+    validation_reason_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     validation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     thumbnail_url: Mapped[str | None] = mapped_column(String(512), nullable=True)

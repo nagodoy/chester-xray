@@ -52,6 +52,24 @@ export const ptBR = {
     accessDeniedBody: "Seu perfil não tem acesso a esta página.",
   },
 
+  /** Justificativas de validação, por código estável vindo do backend. */
+  validation: {
+    non_chest_modality: "Modalidade {modality} não é compatível com análise de tórax",
+    non_chest_body_part: "Região {body_part} não é o tórax",
+    chest_modality: "Modalidade torácica com metadados de apoio",
+    chest_frontal: "Região torácica em incidência frontal",
+    inconclusive_indicators: "Alguns indícios de tórax, mas não conclusivos",
+    no_metadata: "Sem metadados; revisão manual necessária",
+    insufficient_metadata: "Metadados insuficientes para confirmar radiografia de tórax",
+    unusual_aspect_ratio: "Proporção incomum para radiografia de tórax",
+    image_too_small: "Imagem pequena demais para uma radiografia diagnóstica",
+    low_entropy: "Baixa entropia; pode estar em branco ou ser artefato",
+    high_entropy: "Alta entropia; pode não ser uma imagem médica",
+    image_checks_passed: "Imagem passa nas checagens básicas; metadados insuficientes",
+    image_validation_error: "Erro ao validar a imagem",
+    image_only_upload: "Envio somente de imagem; revisão manual antes da análise",
+  },
+
   status: {
     received: "recebido",
     validating: "validando",

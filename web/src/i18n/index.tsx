@@ -2,11 +2,19 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 import type { ReactNode } from "react";
 
 import { en } from "./locales/en";
+import { es } from "./locales/es";
 import { ptBR } from "./locales/pt-BR";
 import type { Dictionary } from "./locales/pt-BR";
 
-export const LOCALES = { "pt-BR": ptBR, en } as const;
+export const LOCALES = { "pt-BR": ptBR, en, es } as const;
 export type Locale = keyof typeof LOCALES;
+
+/** Flag and name per locale, for the switcher. */
+export const LOCALE_META: Record<Locale, { flag: string; name: string }> = {
+  "pt-BR": { flag: "🇧🇷", name: "Português" },
+  en: { flag: "🇺🇸", name: "English" },
+  es: { flag: "🇪🇸", name: "Español" },
+};
 
 const STORAGE_KEY = "chester.locale";
 const DEFAULT_LOCALE: Locale = "pt-BR";
@@ -18,8 +26,14 @@ const readStoredLocale = (): Locale => {
   } catch {
     /* Blocked storage falls back to the default. */
   }
-  const preferred = typeof navigator !== "undefined" ? navigator.language : "";
-  return preferred.startsWith("en") ? "en" : DEFAULT_LOCALE;
+  // Match on the language subtag only: "es-AR" and "en-GB" should still land on
+  // Spanish and English rather than falling through to the default.
+  const preferred = (typeof navigator !== "undefined" ? navigator.language : "")
+    .toLowerCase()
+    .split("-")[0];
+  if (preferred === "en") return "en";
+  if (preferred === "es") return "es";
+  return DEFAULT_LOCALE;
 };
 
 /** Substitute {name} placeholders. Keeps interpolation out of every call site. */

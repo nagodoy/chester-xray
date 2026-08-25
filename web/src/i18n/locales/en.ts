@@ -60,6 +60,23 @@ export const en: Dictionary = {
     accessDeniedBody: "Your profile does not have access to this page.",
   },
 
+  validation: {
+    non_chest_modality: "Modality {modality} is not compatible with chest X-ray analysis",
+    non_chest_body_part: "Body part {body_part} is not the chest",
+    chest_modality: "Chest modality with supporting metadata",
+    chest_frontal: "Chest body part with frontal view",
+    inconclusive_indicators: "Some chest indicators present but not conclusive",
+    no_metadata: "No metadata available; manual review required",
+    insufficient_metadata: "Insufficient metadata to confirm chest X-ray",
+    unusual_aspect_ratio: "Unusual aspect ratio for chest X-ray",
+    image_too_small: "Image too small to be a diagnostic chest X-ray",
+    low_entropy: "Low image entropy; may be blank or artifact",
+    high_entropy: "High entropy; may not be a medical image",
+    image_checks_passed: "Image passes basic quality checks; metadata insufficient",
+    image_validation_error: "Image validation error",
+    image_only_upload: "Image-only upload; manual review required before analysis",
+  },
+
   status: {
     received: "received",
     validating: "validating",

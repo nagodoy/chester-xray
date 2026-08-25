@@ -2,28 +2,7 @@ import { Activity, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useI18n } from "../i18n";
-import type { Locale } from "../i18n";
-
-const LOCALE_LABELS: Record<Locale, string> = { "pt-BR": "PT", en: "EN" };
-
-function LocaleSwitch() {
-  const { locale, setLocale } = useI18n();
-  return (
-    <div className="auth-locales" role="group" aria-label="Language">
-      {(Object.keys(LOCALE_LABELS) as Locale[]).map((code) => (
-        <button
-          key={code}
-          type="button"
-          className={code === locale ? "auth-locale is-active" : "auth-locale"}
-          aria-pressed={code === locale}
-          onClick={() => setLocale(code)}
-        >
-          {LOCALE_LABELS[code]}
-        </button>
-      ))}
-    </div>
-  );
-}
+import { LocaleSwitch } from "./LocaleSwitch";
 
 /**
  * The shell both sign-in steps share: brand mark, card, footer note.
