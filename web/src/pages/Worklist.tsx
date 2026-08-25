@@ -18,6 +18,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { AppShell, PageHeading } from "../components/AppShell";
 import { ErrorBox, Skeleton, StatusPill, Thumbnail } from "../components/common";
 import { useI18n } from "../i18n";
+import { validationReason } from "../i18n/validation";
 import { UploadPanel } from "./UploadPanel";
 
 const ACTIVE_STATUSES: StudyStatus[] = ["received", "validating", "queued", "processing"];
@@ -60,7 +61,7 @@ function StudyRow({ study }: { study: Study }) {
       </div>
       <div className="study-cell">
         <b>{study.source ?? t.worklist.manualUpload}</b>
-        <span>{study.validation_reason ?? t.worklist.pendingValidation}</span>
+        <span>{validationReason(study, t) || t.worklist.pendingValidation}</span>
       </div>
       <div className="findings">
         {study.top_findings.length > 0 ? (

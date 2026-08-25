@@ -1,30 +1,49 @@
-/* One stylesheet with design tokens, replacing the two competing files the
-   previous interface carried (styles.css and a 1052-line worklist-redesign.css). */
+/* One stylesheet with design tokens.
+
+   Palette and typography follow the Telemetry MR MSK console (RM QC v4) so the
+   two applications read as one family: slate surfaces, teal and emerald accents,
+   Plus Jakarta Sans throughout. */
+
+@import "./fonts.css";
 
 :root {
-  --bg: #f4f7f6;
-  --surface: #ffffff;
-  --surface-alt: #f8faf9;
-  --ink: #16302f;
-  --ink-soft: #5b7370;
-  --ink-faint: #8ba09d;
-  --line: #dfe7e4;
-  --grid: #e1e6df;
+  /* Surfaces, darkest to lightest */
+  --bg: #020617;
+  --surface: #0f172a;
+  --surface-alt: #1e293b;
+  --surface-raised: #334155;
 
-  --teal: #28796d;
-  --teal-soft: #d6f2e7;
-  --teal-deep: #10252b;
-  --amber: #d99326;
-  --amber-soft: #fdf1dc;
-  --red: #b5443c;
-  --red-soft: #fbe6e4;
-  --blue: #3a6ea5;
-  --purple: #6b5b95;
-  --ring-rest: #263552;
+  /* Text */
+  --ink: #f8fafc;
+  --ink-soft: #94a3b8;
+  --ink-faint: #64748b;
 
-  --radius: 10px;
-  --radius-sm: 7px;
-  --shadow: 0 1px 2px rgb(22 48 47 / 6%), 0 6px 18px rgb(22 48 47 / 5%);
+  --line: #334155;
+  --line-soft: #1e293b;
+  --grid: #334155;
+
+  /* Accents */
+  --teal: #14b8a6;
+  --teal-bright: #2dd4bf;
+  --teal-soft: rgb(20 184 166 / 14%);
+  --teal-deep: #0f172a;
+  --emerald: #10b981;
+  --emerald-bright: #34d399;
+  --emerald-soft: rgb(16 185 129 / 14%);
+  --amber: #fbbf24;
+  --amber-soft: rgb(251 191 36 / 14%);
+  --red: #f87171;
+  --red-soft: rgb(248 113 113 / 14%);
+  --blue: #60a5fa;
+  --blue-soft: rgb(96 165 250 / 14%);
+  --purple: #a78bfa;
+  --ring-rest: #334155;
+
+  --radius: 16px;
+  --radius-sm: 12px;
+  --radius-xs: 8px;
+  --shadow: 0 1px 2px rgb(2 6 23 / 40%), 0 8px 24px rgb(2 6 23 / 30%);
+  --shadow-lg: 0 20px 48px rgb(2 6 23 / 55%);
   --sidebar-width: 246px;
 }
 
@@ -41,9 +60,10 @@ body {
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.5;
+  letter-spacing: 0.015em;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -103,8 +123,9 @@ a {
   flex-direction: column;
   gap: 8px;
   padding: 22px 16px;
-  background: var(--teal-deep);
-  color: #cfe3df;
+  border-right: 1px solid var(--line-soft);
+  background: var(--surface);
+  color: var(--ink-soft);
 }
 
 .brand {
@@ -123,17 +144,17 @@ a {
   font-weight: 400;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #7fa8a1;
+  color: var(--ink-faint);
 }
 
 .brand-mark {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: var(--teal);
-  font-size: 17px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: linear-gradient(140deg, var(--teal) 0%, var(--emerald) 100%);
+  color: #04211d;
 }
 
 .sidebar-label {
@@ -142,7 +163,7 @@ a {
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #6f918b;
+  color: var(--ink-faint);
 }
 
 .nav {
@@ -180,7 +201,7 @@ a {
   background: rgb(255 255 255 / 6%);
   font-size: 11px;
   line-height: 1.45;
-  color: #a9c6c1;
+  color: var(--ink-soft);
 }
 
 .sidebar-note strong {
@@ -331,7 +352,7 @@ a {
 .sidebar .btn-subtle {
   border-color: rgb(255 255 255 / 14%);
   background: transparent;
-  color: #cfe3df;
+  color: var(--ink-soft);
 }
 
 .input,
@@ -504,26 +525,31 @@ th {
 .status-ring {
   display: grid;
   place-items: center;
-  width: 78px;
-  height: 78px;
+  width: 92px;
+  height: 92px;
   border-radius: 50%;
 }
 
+/* The inner disc has to clear the label, or the caption spills onto the ring. */
 .status-ring span {
   display: grid;
   place-items: center;
-  width: 58px;
-  height: 58px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   background: var(--surface);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.1;
 }
 
 .status-ring small {
+  display: block;
+  max-width: 62px;
   color: var(--ink-faint);
   font-size: 9px;
-  font-weight: 400;
+  font-weight: 500;
+  line-height: 1.2;
 }
 
 .summary-legend {
@@ -771,7 +797,7 @@ th {
 .pill-queued,
 .pill-processing,
 .pill-received {
-  background: #e7eef5;
+  background: var(--blue-soft);
   color: var(--blue);
 }
 
@@ -810,7 +836,7 @@ th {
   place-items: center;
   min-height: 300px;
   border-radius: var(--radius-sm);
-  background: #263b40;
+  background: var(--surface-alt);
 }
 
 .detail-image .thumb {
@@ -1104,7 +1130,7 @@ th {
 }
 
 .error-box {
-  border-color: #efd2cf;
+  border-color: rgb(248 113 113 / 35%);
   background: var(--red-soft);
   color: var(--red);
 }
@@ -1124,7 +1150,7 @@ th {
 .skeleton {
   height: 74px;
   border-radius: var(--radius);
-  background: linear-gradient(90deg, #edf2f0 25%, #f6f9f8 50%, #edf2f0 75%);
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-alt) 50%, var(--surface) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
 }
@@ -1146,142 +1172,374 @@ th {
   place-items: center;
   min-height: 100vh;
   padding: 24px;
-  background: var(--teal-deep);
+  background: var(--bg);
 }
 
 .auth-wrap {
   width: 100%;
-  max-width: 372px;
+  max-width: 384px;
+  animation: rise 0.4s ease-out both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-wrap {
+    animation: none;
+  }
+
+  .spin {
+    animation-duration: 2s;
+  }
+}
+
+.auth-brand {
+  display: grid;
+  justify-items: center;
+  margin-bottom: 34px;
   text-align: center;
 }
 
-.auth-mark {
+.auth-logo {
   display: grid;
   place-items: center;
-  gap: 9px;
-  margin-bottom: 22px;
-  color: #a9c6c1;
+  width: 60px;
+  height: 60px;
+  margin-bottom: 16px;
+  border-radius: 18px;
+  background: linear-gradient(140deg, var(--teal) 0%, var(--emerald) 100%);
+  color: #04211d;
+  box-shadow: 0 12px 28px rgb(20 184 166 / 22%);
 }
 
-.auth-mark p {
-  margin: 0;
-  font-size: 11px;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+.auth-brand h1 {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.auth-brand p {
+  margin: 5px 0 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+/* ---------- Locale switcher ---------- */
+
+.locale-switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.auth-brand .locale-switch {
+  margin-top: 16px;
+}
+
+/* Flags stay in colour even when inactive. Desaturating them defeats the point:
+   a grey flag at this size is an unidentifiable rectangle, and recognition is
+   the only reason to use a flag instead of a label. */
+.locale-option {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s, background 0.15s, transform 0.15s;
+}
+
+.locale-option:hover {
+  opacity: 1;
+  transform: scale(1.08);
+}
+
+.locale-option.is-active {
+  background: var(--teal-soft);
+  box-shadow: inset 0 0 0 1px rgb(20 184 166 / 45%);
+  opacity: 1;
+}
+
+.locale-switch.is-compact .locale-option {
+  width: 32px;
+  height: 28px;
+  font-size: 17px;
 }
 
 .auth-card {
-  padding: 28px 24px;
-  border-radius: 14px;
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   background: var(--surface);
   text-align: left;
-  box-shadow: 0 18px 44px rgb(0 0 0 / 24%);
+  box-shadow: var(--shadow-lg);
+}
+
+.auth-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--emerald-bright);
+}
+
+.auth-card-title h2 {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .auth-subtitle {
-  margin: 7px 0 20px;
+  margin: 7px 0 24px;
   color: var(--ink-soft);
   font-size: 13px;
+  line-height: 1.55;
+}
+
+.auth-subtitle strong {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .auth-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 15px;
-  font-size: 12px;
+  display: block;
+  margin-bottom: 18px;
+}
+
+.auth-field > span {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--ink-soft);
 }
 
-.auth-input {
-  padding: 11px 12px;
+.auth-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+  color: var(--ink-faint);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.auth-input-wrap:focus-within {
+  border-color: var(--emerald);
+  box-shadow: 0 0 0 3px var(--emerald-soft);
+}
+
+.auth-input {
+  flex: 1;
+  min-width: 0;
+  padding: 13px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
   font: inherit;
   font-size: 14px;
 }
 
-.auth-input:focus {
-  outline: 2px solid var(--teal);
-  outline-offset: 1px;
+.auth-input::placeholder {
+  color: var(--ink-faint);
 }
 
-.auth-code {
-  letter-spacing: 0.4em;
+.auth-input:focus {
+  outline: none;
+}
+
+/* Chrome paints its own light ground over autofilled fields. */
+.auth-input:-webkit-autofill,
+.auth-input:-webkit-autofill:hover,
+.auth-input:-webkit-autofill:focus,
+.code-input:-webkit-autofill {
+  -webkit-text-fill-color: var(--ink);
+  -webkit-box-shadow: 0 0 0 1000px var(--surface-alt) inset;
+  caret-color: var(--ink);
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* One box per digit: the code is six separate things, so it reads as six. */
+.code-inputs {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.code-input {
+  width: 100%;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+  color: var(--ink);
+  font: inherit;
+  font-size: 21px;
+  font-weight: 700;
   text-align: center;
-  font-family: ui-monospace, monospace;
+  caret-color: var(--emerald-bright);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.code-input.is-filled {
+  border-color: var(--emerald);
+}
+
+.code-input:focus {
+  border-color: var(--emerald);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--emerald-soft);
+}
+
+.code-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .auth-submit {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 8px;
   width: 100%;
-  padding: 11px;
+  padding: 13px;
   border: 0;
   border-radius: var(--radius-sm);
-  background: var(--teal);
-  color: #fff;
+  background: var(--emerald);
+  color: #04211d;
   font: inherit;
   font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.auth-submit:not(:disabled):hover {
+  background: var(--emerald-bright);
 }
 
 .auth-submit:disabled {
-  opacity: 0.55;
+  background: var(--surface-raised);
+  color: var(--ink-faint);
   cursor: not-allowed;
 }
 
-.auth-back {
-  display: block;
-  width: 100%;
-  margin-top: 10px;
-  padding: 6px;
+.auth-submit:focus-visible,
+.auth-locale:focus-visible,
+.auth-link:focus-visible {
+  outline: 2px solid var(--emerald);
+  outline-offset: 2px;
+}
+
+.auth-actions {
+  display: grid;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.auth-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px;
   border: 0;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--ink-soft);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
-  text-decoration: underline;
+  transition: color 0.15s, background 0.15s;
 }
 
+.auth-link:not(:disabled):hover {
+  background: var(--surface-alt);
+  color: var(--emerald-bright);
+}
+
+.auth-link:disabled {
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+.auth-status,
+.auth-notice,
 .auth-error {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 0 0 12px;
+  justify-content: center;
+  gap: 7px;
+  margin: 0 0 14px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.auth-status,
+.auth-notice {
+  color: var(--emerald-bright);
+}
+
+.auth-error {
   color: var(--red);
+}
+
+.auth-footnote {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 22px 0 0;
+  color: var(--ink-faint);
   font-size: 12px;
 }
 
-.auth-note {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin-top: 18px;
-  color: #7fa8a1;
-  font-size: 11px;
+.spin {
+  animation: spin 0.9s linear infinite;
 }
 
-.auth-restricted {
-  margin: 7px 0 0;
-  color: #5d827c;
-  font-size: 11px;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .auth-loading {
-  color: #cfe3df;
+  color: var(--ink-soft);
 }
 
 .access-denied {
   display: grid;
   place-items: center;
   gap: 10px;
-  max-width: 340px;
-  padding: 32px;
-  border-radius: 14px;
+  max-width: 360px;
+  padding: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   background: var(--surface);
   text-align: center;
 }

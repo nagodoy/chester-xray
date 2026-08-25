@@ -1,7 +1,7 @@
 import {
+  Activity,
   AlertTriangle,
   ClipboardList,
-  Globe,
   LogOut,
   Settings2,
   ShieldCheck,
@@ -11,34 +11,20 @@ import type { ReactNode } from "react";
 
 import { useAuth } from "../auth/AuthProvider";
 import { useI18n } from "../i18n";
-import type { Locale } from "../i18n";
+import { LocaleSwitch } from "./LocaleSwitch";
 
-function Brand({ light = false }: { light?: boolean }) {
+function Brand() {
   const { t } = useI18n();
   return (
-    <div className={light ? "brand light" : "brand"}>
+    <div className="brand">
       <span className="brand-mark" aria-hidden>
-        ⌁
+        <Activity size={17} strokeWidth={2.25} />
       </span>
       <div>
         {t.brand.name}
         <small>{t.brand.tagline}</small>
       </div>
     </div>
-  );
-}
-
-function LocaleSwitch() {
-  const { locale, setLocale } = useI18n();
-  return (
-    <label className="locale-switch">
-      <Globe size={14} aria-hidden />
-      <span className="visually-hidden">Language</span>
-      <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
-        <option value="pt-BR">PT</option>
-        <option value="en">EN</option>
-      </select>
-    </label>
   );
 }
 
@@ -136,7 +122,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {t.nav.readingRoom} / {today}
           </div>
           <div className="topbar-right">
-            <LocaleSwitch />
+            <LocaleSwitch compact />
             <div className="user-chip">
               <span>{access?.email}</span>
               <div className="avatar" aria-hidden>

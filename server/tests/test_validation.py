@@ -10,7 +10,14 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from chester.imaging.validation import CHEST, NON_CHEST, UNCERTAIN, validate_image, validate_study
+from chester.imaging.validation import (
+    CHEST,
+    ENGLISH_REASONS,
+    NON_CHEST,
+    UNCERTAIN,
+    validate_image,
+    validate_study,
+)
 
 
 def meta(**overrides) -> dict:
@@ -28,8 +35,7 @@ def meta(**overrides) -> dict:
     ],
 )
 def test_chest_metadata_is_accepted(fields):
-    state, _ = validate_study(meta(**fields))
-    assert state == CHEST
+    assert validate_study(meta(**fields)).state == CHEST
 
 
 @pytest.mark.parametrize(
@@ -42,53 +48,70 @@ def test_chest_metadata_is_accepted(fields):
     ],
 )
 def test_incompatible_studies_are_rejected(fields):
-    state, reason = validate_study(meta(**fields))
-    assert state == NON_CHEST
-    assert reason
+    result = validate_study(meta(**fields))
+    assert result.state == NON_CHEST
+    assert result.code and result.reason
 
 
 def test_absent_metadata_is_held_for_review():
-    state, _ = validate_study(meta())
-    assert state == UNCERTAIN
+    assert validate_study(meta()).state == UNCERTAIN
 
 
 def test_partial_evidence_is_not_enough_on_its_own():
     """A chest modality with nothing corroborating it is only a hint."""
-    state, _ = validate_study(meta(modality="DX"))
-    assert state == UNCERTAIN
+    assert validate_study(meta(modality="DX")).state == UNCERTAIN
 
 
 def test_chest_body_part_needs_a_frontal_view_without_a_chest_modality():
-    assert validate_study(meta(body_part="CHEST"))[0] == UNCERTAIN
-    assert validate_study(meta(body_part="CHEST", view_position="PA"))[0] == CHEST
+    assert validate_study(meta(body_part="CHEST")).state == UNCERTAIN
+    assert validate_study(meta(body_part="CHEST", view_position="PA")).state == CHEST
 
 
 def test_image_alone_never_confirms_chest():
     """Pixel heuristics can rule an image out, but must never rule one in."""
     rng = np.random.default_rng(0)
     image = rng.integers(0, 200, (256, 256), dtype=np.uint8).astype(np.float32)
-    assert validate_study(meta(), image)[0] == UNCERTAIN
-    assert validate_image(image)[0] == UNCERTAIN
+    assert validate_study(meta(), image).state == UNCERTAIN
+    assert validate_image(image).state == UNCERTAIN
 
 
 def test_tiny_images_are_rejected():
-    state, reason = validate_image(np.full((10, 10), 128, dtype=np.float32))
-    assert state == NON_CHEST
-    assert "too small" in reason.lower()
+    result = validate_image(np.full((10, 10), 128, dtype=np.float32))
+    assert result.state == NON_CHEST
+    assert result.code == "image_too_small"
 
 
 def test_extreme_aspect_ratio_is_held_for_review():
     rng = np.random.default_rng(1)
     panorama = rng.integers(0, 200, (64, 1024), dtype=np.uint8).astype(np.float32)
-    assert validate_image(panorama)[0] == UNCERTAIN
+    assert validate_image(panorama).state == UNCERTAIN
 
 
 def test_blank_image_is_held_for_review():
-    state, reason = validate_image(np.zeros((256, 256), dtype=np.float32))
-    assert state == UNCERTAIN
-    assert "entropy" in reason.lower()
+    result = validate_image(np.zeros((256, 256), dtype=np.float32))
+    assert result.state == UNCERTAIN
+    assert result.code == "low_entropy"
 
 
 def test_non_chest_body_part_beats_a_chest_modality():
     """Positive evidence of another body part wins over a suggestive modality."""
-    assert validate_study(meta(modality="DX", body_part="PELVIS"))[0] == NON_CHEST
+    assert validate_study(meta(modality="DX", body_part="PELVIS")).state == NON_CHEST
+
+
+def test_every_code_has_english_prose():
+    """The prose is rendered from the code, so a new code needs an entry."""
+    from chester.imaging import validation
+
+    codes = {
+        value
+        for name, value in vars(validation).items()
+        if name.startswith("CODE_") and isinstance(value, str)
+    }
+    assert codes == set(ENGLISH_REASONS)
+
+
+def test_a_parameterised_reason_carries_its_value():
+    result = validate_study(meta(modality="CT", body_part="HEAD"))
+
+    assert result.code == "non_chest_modality"
+    assert "CT" in result.reason

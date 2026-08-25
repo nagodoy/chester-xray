@@ -24,7 +24,14 @@ from chester.imaging.dicom import (
     parse_dicom_bytes,
     render_frame,
 )
-from chester.imaging.validation import CHEST, NON_CHEST, UNCERTAIN, validate_study
+from chester.imaging.validation import (
+    CHEST,
+    CODE_IMAGE_ONLY,
+    NON_CHEST,
+    UNCERTAIN,
+    outcome,
+    validate_study,
+)
 from chester.models import AnalysisJob, AuditEvent, Instance, Study, User
 from chester.pseudonymize import pseudonymize_patient_id
 from chester.storage import store_bytes
@@ -132,7 +139,7 @@ def _ingest_dicom(
     except Exception as exc:
         logger.warning("Could not render pixel data for %s: %s", filename, exc)
 
-    validation_state, validation_reason = validate_study(meta, pixels)
+    validation = validate_study(meta, pixels)
 
     # Instances sharing a Study Instance UID belong to one worklist study.
     study_uid = meta.get("study_instance_uid") or None
@@ -157,12 +164,14 @@ def _ingest_dicom(
             patient_sex=meta.get("patient_sex") or None,
             study_date=meta.get("study_date") or None,
             modality=meta.get("modality") or None,
+            body_part=meta.get("body_part") or None,
             view_position=meta.get("view_position") or None,
             description=meta.get("description") or None,
             source=source,
             status=STATUS_VALIDATING,
-            validation_state=validation_state,
-            validation_reason=validation_reason,
+            validation_state=validation.state,
+            validation_reason_code=validation.code,
+            validation_reason=validation.reason,
             study_instance_uid=study_uid,
         )
         db.add(study)
@@ -198,12 +207,13 @@ def _ingest_dicom(
     _attach_stored_object(db, object_key, instance)
 
     if is_new_study:
-        _finalize_status(db, study, validation_state)
-    elif study.status == STATUS_NEEDS_REVIEW and validation_state == CHEST:
+        _finalize_status(db, study, validation.state)
+    elif study.status == STATUS_NEEDS_REVIEW and validation.state == CHEST:
         # A later instance supplied the evidence the first one lacked.
-        study.validation_state = validation_state
-        study.validation_reason = validation_reason
-        _finalize_status(db, study, validation_state)
+        study.validation_state = validation.state
+        study.validation_reason_code = validation.code
+        study.validation_reason = validation.reason
+        _finalize_status(db, study, validation.state)
 
     _audit(
         db,
@@ -213,7 +223,8 @@ def _ingest_dicom(
         {
             "filename": filename,
             "sha256": sha256,
-            "validation_state": validation_state,
+            "validation_state": validation.state,
+            "validation_reason_code": validation.code,
             "source": source,
         },
     )
@@ -260,20 +271,20 @@ def _ingest_image(
         "columns": columns,
         **uids,
     }
-    validation_state, validation_reason = validate_study(meta, pixels)
-    if validation_state == CHEST:
+    validation = validate_study(meta, pixels)
+    if validation.state == CHEST:
         # A bare image carries no modality or body part, so nothing here can
         # actually establish it is a chest radiograph. Always ask a human.
-        validation_state = UNCERTAIN
-        validation_reason = "Image-only upload; manual review required before analysis"
+        validation = outcome(UNCERTAIN, CODE_IMAGE_ONLY)
 
     study = Study(
         owner_user_id=owner.id,
         organization_id=owner.organization_id,
         source=source,
         status=STATUS_VALIDATING,
-        validation_state=validation_state,
-        validation_reason=validation_reason,
+        validation_state=validation.state,
+        validation_reason_code=validation.code,
+        validation_reason=validation.reason,
         study_instance_uid=uids["study_instance_uid"],
         description=filename,
     )
@@ -303,7 +314,7 @@ def _ingest_image(
     db.flush()
     _attach_stored_object(db, object_key, instance)
 
-    _finalize_status(db, study, validation_state)
+    _finalize_status(db, study, validation.state)
     _audit(
         db,
         study.id,
@@ -312,7 +323,8 @@ def _ingest_image(
         {
             "filename": filename,
             "sha256": sha256,
-            "validation_state": validation_state,
+            "validation_state": validation.state,
+            "validation_reason_code": validation.code,
             "source": source,
         },
     )

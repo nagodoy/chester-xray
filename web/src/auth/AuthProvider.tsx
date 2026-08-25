@@ -7,6 +7,8 @@ import type { Access, Page } from "../api/types";
 interface AuthValue {
   access: Access | null;
   loading: boolean;
+  /** Whether a stored session exists, so callers can skip gating without one. */
+  hasToken: boolean;
   signIn: (access: Access) => void;
   signOut: () => Promise<void>;
   can: (page: Page) => boolean;
@@ -28,16 +30,14 @@ export const canAccess = (access: Access | null, page: Page): boolean => {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [access, setAccess] = useState<Access | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [hasToken] = useState(() => getSessionToken() !== null);
+  const [loading, setLoading] = useState(hasToken);
 
   useEffect(() => {
     let cancelled = false;
 
     const restore = async () => {
-      if (!getSessionToken()) {
-        if (!cancelled) setLoading(false);
-        return;
-      }
+      if (!hasToken) return;
       try {
         const result = await api.validateSession();
         if (!cancelled) setAccess(result.access);
@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [hasToken]);
 
   const signOut = useCallback(async () => {
     await api.logout();
@@ -63,11 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       access,
       loading,
+      hasToken,
       signIn: setAccess,
       signOut,
       can: (page: Page) => canAccess(access, page),
     }),
-    [access, loading, signOut],
+    [access, loading, hasToken, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

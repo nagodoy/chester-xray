@@ -7,7 +7,7 @@ import type { Dictionary } from "./pt-BR";
  * in English while everything around it was in Portuguese.
  */
 export const en: Dictionary = {
-  brand: { name: "chester", tagline: "research console · chest x-ray" },
+  brand: { name: "Torax AI", tagline: "chest radiography" },
 
   common: {
     retry: "Try again",
@@ -37,7 +37,7 @@ export const en: Dictionary = {
   },
 
   auth: {
-    title: "Sign in to Chester AI",
+    title: "Sign in to Torax AI",
     subtitle: "Enter your email to receive an access code.",
     emailLabel: "Your email",
     emailPlaceholder: "Enter your email address",
@@ -49,11 +49,32 @@ export const en: Dictionary = {
     confirm: "Confirm access",
     validating: "Verifying…",
     resend: "Resend code",
+    resendIn: "Resend in {sec}s",
+    resending: "Resending…",
+    codeResent: "Code resent.",
+    digitLabel: "Digit {n} of {total}",
     useAnotherEmail: "Use a different email",
     researchOnly: "Research only · de-identified data",
     restricted: "Restricted to authorized users",
     accessDenied: "Restricted",
     accessDeniedBody: "Your profile does not have access to this page.",
+  },
+
+  validation: {
+    non_chest_modality: "Modality {modality} is not compatible with chest X-ray analysis",
+    non_chest_body_part: "Body part {body_part} is not the chest",
+    chest_modality: "Chest modality with supporting metadata",
+    chest_frontal: "Chest body part with frontal view",
+    inconclusive_indicators: "Some chest indicators present but not conclusive",
+    no_metadata: "No metadata available; manual review required",
+    insufficient_metadata: "Insufficient metadata to confirm chest X-ray",
+    unusual_aspect_ratio: "Unusual aspect ratio for chest X-ray",
+    image_too_small: "Image too small to be a diagnostic chest X-ray",
+    low_entropy: "Low image entropy; may be blank or artifact",
+    high_entropy: "High entropy; may not be a medical image",
+    image_checks_passed: "Image passes basic quality checks; metadata insufficient",
+    image_validation_error: "Image validation error",
+    image_only_upload: "Image-only upload; manual review required before analysis",
   },
 
   status: {
@@ -69,7 +90,7 @@ export const en: Dictionary = {
 
   worklist: {
     eyebrow: "Chest X-ray / quality control",
-    title: "Chester AI worklist",
+    title: "Torax AI worklist",
     subtitle: "Triage and analysis pipeline for de-identified chest studies.",
     analyse: "Analyse study",
     closeUpload: "Close upload",

@@ -150,3 +150,26 @@ def test_upload_requires_a_session(client, make_dicom):
         files=[("files", ("chest.dcm", make_dicom(), "application/dicom"))],
     )
     assert response.status_code == 401
+
+
+def test_the_api_exposes_a_translatable_reason_code(upload, make_dicom):
+    """The interface translates the code; the prose is only a fallback.
+
+    Validation reasons used to reach the browser as English prose, which no
+    amount of front-end work could localize.
+    """
+    data = make_dicom(modality="CT", body_part="HEAD", study_description="HEAD CT")
+    study = upload([("files", ("head.dcm", data, "application/dicom"))]).json()["studies"][0]
+
+    assert study["validation_reason_code"] == "non_chest_modality"
+    # The parameter the message needs is carried on the study itself.
+    assert study["modality"] == "CT"
+    assert study["validation_reason"]
+
+
+def test_the_body_part_is_recorded(upload, make_dicom):
+    study = upload([("files", ("chest.dcm", make_dicom(), "application/dicom"))]).json()["studies"][
+        0
+    ]
+
+    assert study["body_part"] == "CHEST"

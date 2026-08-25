@@ -51,11 +51,13 @@ class StudySchema(BaseModel):
     patient_sex: str | None
     study_date: str | None
     modality: str | None
+    body_part: str | None
     view_position: str | None
     description: str | None
     source: str | None
     status: str
     validation_state: str | None
+    validation_reason_code: str | None
     validation_reason: str | None
     thumbnail_url: str | None
     created_at: datetime

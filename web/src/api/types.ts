@@ -45,11 +45,14 @@ export interface Study {
   patient_sex: string | null;
   study_date: string | null;
   modality: string | null;
+  body_part: string | null;
   view_position: string | null;
   description: string | null;
   source: string | null;
   status: StudyStatus;
+  validation_reason_code: string | null;
   validation_state: ValidationState | null;
+  /** English prose from the server, used only when a code has no translation. */
   validation_reason: string | null;
   thumbnail_url: string | null;
   created_at: string;

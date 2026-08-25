@@ -1,5 +1,5 @@
 export const ptBR = {
-  brand: { name: "chester", tagline: "console de pesquisa · rx tórax" },
+  brand: { name: "Torax AI", tagline: "radiografia torácica" },
 
   common: {
     retry: "Tentar novamente",
@@ -29,7 +29,7 @@ export const ptBR = {
   },
 
   auth: {
-    title: "Entrar no Chester AI",
+    title: "Entrar no Torax AI",
     subtitle: "Informe seu email para receber o código de acesso.",
     emailLabel: "Seu e-mail",
     emailPlaceholder: "Digite o endereço de e-mail",
@@ -41,11 +41,33 @@ export const ptBR = {
     confirm: "Confirmar acesso",
     validating: "Validando…",
     resend: "Reenviar código",
+    resendIn: "Reenviar em {sec}s",
+    resending: "Reenviando…",
+    codeResent: "Código reenviado.",
+    digitLabel: "Dígito {n} de {total}",
     useAnotherEmail: "Usar outro email",
     researchOnly: "Pesquisa somente · dados desidentificados",
     restricted: "Acesso restrito a usuários autorizados",
     accessDenied: "Acesso restrito",
     accessDeniedBody: "Seu perfil não tem acesso a esta página.",
+  },
+
+  /** Justificativas de validação, por código estável vindo do backend. */
+  validation: {
+    non_chest_modality: "Modalidade {modality} não é compatível com análise de tórax",
+    non_chest_body_part: "Região {body_part} não é o tórax",
+    chest_modality: "Modalidade torácica com metadados de apoio",
+    chest_frontal: "Região torácica em incidência frontal",
+    inconclusive_indicators: "Alguns indícios de tórax, mas não conclusivos",
+    no_metadata: "Sem metadados; revisão manual necessária",
+    insufficient_metadata: "Metadados insuficientes para confirmar radiografia de tórax",
+    unusual_aspect_ratio: "Proporção incomum para radiografia de tórax",
+    image_too_small: "Imagem pequena demais para uma radiografia diagnóstica",
+    low_entropy: "Baixa entropia; pode estar em branco ou ser artefato",
+    high_entropy: "Alta entropia; pode não ser uma imagem médica",
+    image_checks_passed: "Imagem passa nas checagens básicas; metadados insuficientes",
+    image_validation_error: "Erro ao validar a imagem",
+    image_only_upload: "Envio somente de imagem; revisão manual antes da análise",
   },
 
   status: {
@@ -61,7 +83,7 @@ export const ptBR = {
 
   worklist: {
     eyebrow: "RX tórax / controle de qualidade",
-    title: "Worklist Chester AI",
+    title: "Worklist Torax AI",
     subtitle: "Pipeline de triagem e análise para estudos torácicos desidentificados.",
     analyse: "Analisar estudo",
     closeUpload: "Fechar envio",

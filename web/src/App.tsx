@@ -65,8 +65,11 @@ function Protected({ page, children }: { page: Page; children: ReactNode }) {
 }
 
 function Home() {
-  const { access, loading } = useAuth();
-  if (loading) return <Loading />;
+  const { access, loading, hasToken } = useAuth();
+  // Only gate on loading when there is actually a session to validate. Without a
+  // token there is nothing to wait for, and showing a spinner before the sign-in
+  // screen just delays it behind a network round trip that will never happen.
+  if (loading && hasToken) return <Loading />;
   return <Redirect to={access ? "/worklist" : "/sign-in"} />;
 }
 
