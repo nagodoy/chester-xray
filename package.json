@@ -6,7 +6,7 @@
   "license": "ISC",
   "scripts": {
     "build": "npm --prefix web ci && npm --prefix web run build",
-    "start": "npm run build && python -m uvicorn chester.main:app --host 0.0.0.0 --port ${PORT:-5000}",
+    "start": "npm run build && cd server && alembic upgrade head && python -m uvicorn chester.main:app --host 0.0.0.0 --port ${PORT:-5000}",
     "worker": "python -m chester.worker",
     "check": "npm --prefix web run typecheck && npm --prefix web run build"
   }
