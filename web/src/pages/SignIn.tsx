@@ -1,4 +1,4 @@
-import { ChevronRight, Loader2, Mail } from "lucide-react";
+import { Loader2, Mail } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useLocation } from "wouter";
@@ -86,10 +86,7 @@ export function SignIn() {
                   {t.auth.sending}
                 </>
               ) : (
-                <>
-                  {t.auth.continue}
-                  <ChevronRight size={16} aria-hidden />
-                </>
+                t.auth.sendCode
               )}
             </button>
           </form>
