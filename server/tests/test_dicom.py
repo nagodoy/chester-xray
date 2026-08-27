@@ -7,6 +7,8 @@ sequence, and multi-frame frame selection.
 
 from __future__ import annotations
 
+import io
+
 import numpy as np
 import pytest
 
@@ -172,3 +174,35 @@ def test_dicom_detection(make_dicom):
     assert dicom.looks_like_dicom(data, "no-extension", "application/dicom")
     assert dicom.looks_like_dicom(data, "no-extension", "image/png")  # magic wins
     assert not dicom.looks_like_dicom(b"\x89PNG\r\n\x1a\n", "x.png", "image/png")
+
+
+def test_a_thumbnail_keeps_the_shape_of_the_radiograph():
+    """A stretched preview misrepresents the anatomy it is previewing."""
+    from PIL import Image
+
+    tall = np.tile(np.linspace(0, 255, 1000, dtype=np.float32)[:, None], (1, 500))
+
+    data = dicom.generate_thumbnail(tall)
+
+    width, height = Image.open(io.BytesIO(data)).size
+    assert height > width
+    assert abs((width / height) - 0.5) < 0.01
+
+
+def test_a_thumbnail_is_bounded_by_the_requested_box():
+    from PIL import Image
+
+    wide = np.zeros((400, 2000), dtype=np.float32)
+
+    data = dicom.generate_thumbnail(wide, size=(256, 256))
+
+    width, height = Image.open(io.BytesIO(data)).size
+    assert width <= 256 and height <= 256
+
+
+def test_a_source_smaller_than_the_box_is_not_upscaled():
+    from PIL import Image
+
+    data = dicom.generate_thumbnail(np.zeros((64, 64), dtype=np.float32), size=(256, 256))
+
+    assert Image.open(io.BytesIO(data)).size == (64, 64)

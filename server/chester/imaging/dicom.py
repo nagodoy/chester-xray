@@ -226,11 +226,20 @@ def to_pil_image(values: np.ndarray):
     return Image.fromarray(np.clip(normalized, 0, 255).astype(np.uint8), mode="L")
 
 
-def generate_thumbnail(values: np.ndarray, size: tuple[int, int] = (256, 256)) -> bytes:
-    """Render a PNG thumbnail from a 2D float array."""
+def generate_thumbnail(values: np.ndarray, size: tuple[int, int] = (512, 512)) -> bytes:
+    """Render a PNG thumbnail from a 2D float array.
+
+    The image is fitted inside `size` rather than resized onto it. A chest
+    radiograph is almost never square, and the previous unconditional resize
+    stretched every one of them onto a square: the ribcage came out wider or
+    taller than it is, in the only picture of the study the interface shows.
+    Image.thumbnail keeps the ratio, and only ever shrinks, so a small source
+    is left alone rather than upscaled into a sharper-looking lie.
+    """
     from PIL import Image
 
-    image = to_pil_image(values).resize(size, Image.LANCZOS)
+    image = to_pil_image(values)
+    image.thumbnail(size, Image.LANCZOS)
     buffer = io.BytesIO()
     image.save(buffer, format="PNG", optimize=True)
     return buffer.getvalue()
