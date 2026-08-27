@@ -174,17 +174,21 @@ export function Worklist() {
       <div className="stats">
         {(
           [
-            [ClipboardList, total, t.worklist.total],
-            [Activity, inProgress, t.worklist.inProgress],
-            [Check, completed, t.worklist.completed],
-            [Filter, attention, t.worklist.attention],
-            [XCircle, failed, t.worklist.failed],
+            ["total", ClipboardList, total, t.worklist.total],
+            ["progress", Activity, inProgress, t.worklist.inProgress],
+            ["done", Check, completed, t.worklist.completed],
+            ["attention", Filter, attention, t.worklist.attention],
+            ["failed", XCircle, failed, t.worklist.failed],
           ] as const
-        ).map(([Icon, value, label]) => (
-          <div className="stat" key={label}>
-            <Icon size={16} aria-hidden />
-            <b>{data ? value : t.common.none}</b>
-            <span>{label}</span>
+        ).map(([tone, Icon, value, label]) => (
+          <div className={`stat stat-${tone}`} key={label}>
+            <span className="stat-icon" aria-hidden>
+              <Icon size={16} />
+            </span>
+            <div className="stat-body">
+              <b>{data ? value : t.common.none}</b>
+              <span>{label}</span>
+            </div>
           </div>
         ))}
       </div>
