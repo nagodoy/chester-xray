@@ -1586,7 +1586,7 @@ td b {
 .auth-brand {
   display: grid;
   justify-items: center;
-  margin-bottom: 34px;
+  margin-bottom: 40px;
   text-align: center;
 }
 
@@ -1605,12 +1605,12 @@ td b {
 .auth-brand h1 {
   font-size: var(--fs-2xl);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   color: var(--ink);
 }
 
 .auth-brand p {
-  margin: 5px 0 0;
+  margin: 4px 0 0;
   font-size: var(--fs-sm);
   color: var(--ink-muted);
 }
@@ -1620,8 +1620,6 @@ td b {
 .locale-switch {
   display: inline-flex;
   gap: 6px;
-  padding: 4px;
-  border-radius: var(--radius-pill);
 }
 
 .auth-brand .locale-switch {
@@ -1639,7 +1637,7 @@ td b {
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
-  font-size: 22px;
+  font-size: var(--fs-2xl);
   line-height: 1;
   cursor: pointer;
   transition: box-shadow 0.15s, background 0.15s, transform 0.15s;
@@ -1685,7 +1683,7 @@ td b {
 }
 
 .auth-subtitle {
-  margin: 6px 0 24px;
+  margin: 4px 0 24px;
   color: var(--ink-muted);
   font-size: var(--fs-sm);
   line-height: 1.55;
@@ -1698,7 +1696,7 @@ td b {
 
 .auth-field {
   display: block;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .auth-field > span {
@@ -1872,7 +1870,7 @@ td b {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  margin: 0 0 14px;
+  margin: 0 0 16px;
   font-size: var(--fs-sm);
   text-align: center;
 }
@@ -1891,7 +1889,7 @@ td b {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  margin: 22px 0 0;
+  margin: 24px 0 0;
   color: var(--slate-600);
   font-size: var(--fs-sm);
 }
