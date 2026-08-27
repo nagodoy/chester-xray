@@ -163,7 +163,7 @@ export function StudyDetail() {
       )}
 
       <div className="detail-grid">
-        <div>
+        <div className="detail-media">
           <Panel title={t.detail.image} aside={<span>{study.modality ?? "XR"}</span>}>
             <div className="detail-image">
               <Thumbnail url={study.thumbnail_url} alt={t.detail.image} />
