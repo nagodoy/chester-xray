@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   ClipboardList,
   LogOut,
+  Microscope,
   Settings2,
   ShieldCheck,
 } from "lucide-react";
@@ -39,7 +40,7 @@ function Sidebar() {
   const worklistActive = location === "/worklist" && !reviewActive;
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar grid-pattern">
       <Brand />
 
       <div className="sidebar-label">{t.nav.research}</div>
@@ -149,13 +150,18 @@ export function PageHeading({
   actions?: ReactNode;
 }) {
   return (
-    <div className="page-heading">
-      <div>
-        <div className="eyebrow">{eyebrow}</div>
-        <h1>{title}</h1>
-        {subtitle && <p className="page-subtitle">{subtitle}</p>}
+    <div className="page-hero grid-pattern">
+      <div className="page-heading">
+        <div>
+          <div className="eyebrow">
+            <Microscope size={13} aria-hidden />
+            {eyebrow}
+          </div>
+          <h1>{title}</h1>
+          {subtitle && <p className="page-subtitle">{subtitle}</p>}
+        </div>
+        {actions && <div className="heading-actions">{actions}</div>}
       </div>
-      {actions && <div className="heading-actions">{actions}</div>}
     </div>
   );
 }

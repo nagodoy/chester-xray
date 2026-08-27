@@ -104,50 +104,52 @@ export function StudyDetail() {
 
   return (
     <AppShell>
-      <Link href="/worklist" className="eyebrow back-link">
-        <ArrowLeft size={14} aria-hidden /> {t.detail.back}
-      </Link>
+      <div className="page-hero grid-pattern">
+        <Link href="/worklist" className="eyebrow back-link">
+          <ArrowLeft size={14} aria-hidden /> {t.detail.back}
+        </Link>
 
-      <div className="detail-header">
-        <div>
-          <h1>{study.description ?? t.detail.defaultTitle}</h1>
-          <div className="meta-row">
-            <span className="mono">{study.id}</span>
-            <StatusPill value={study.status} />
-            <span>{study.source ?? t.worklist.manualUpload}</span>
+        <div className="detail-header">
+          <div>
+            <h1>{study.description ?? t.detail.defaultTitle}</h1>
+            <div className="meta-row">
+              <span className="mono">{study.id}</span>
+              <StatusPill value={study.status} />
+              <span>{study.source ?? t.worklist.manualUpload}</span>
+            </div>
           </div>
-        </div>
-        <div className="detail-actions">
-          {study.status === "error" && (
-            <button
-              type="button"
-              className="btn btn-subtle"
-              disabled={busy}
-              onClick={() => void act(() => api.retryStudy(id))}
-            >
-              {t.detail.retryAnalysis}
-            </button>
-          )}
-          {canReview && (
-            <>
+          <div className="detail-actions">
+            {study.status === "error" && (
               <button
                 type="button"
-                className="btn btn-accent"
+                className="btn btn-subtle"
                 disabled={busy}
-                onClick={() => void act(() => api.reviewStudy(id, "approve"))}
+                onClick={() => void act(() => api.retryStudy(id))}
               >
-                <Check size={15} aria-hidden /> {t.detail.approve}
+                {t.detail.retryAnalysis}
               </button>
-              <button
-                type="button"
-                className="btn btn-danger"
-                disabled={busy}
-                onClick={() => void act(() => api.reviewStudy(id, "reject"))}
-              >
-                <X size={15} aria-hidden /> {t.detail.reject}
-              </button>
-            </>
-          )}
+            )}
+            {canReview && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-accent"
+                  disabled={busy}
+                  onClick={() => void act(() => api.reviewStudy(id, "approve"))}
+                >
+                  <Check size={15} aria-hidden /> {t.detail.approve}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  disabled={busy}
+                  onClick={() => void act(() => api.reviewStudy(id, "reject"))}
+                >
+                  <X size={15} aria-hidden /> {t.detail.reject}
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
