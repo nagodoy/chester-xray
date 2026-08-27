@@ -171,3 +171,10 @@ export interface AccessMetadata {
   roles: { value: string; label: string }[];
   pages: { value: Page; label: string }[];
 }
+
+/** Per-id outcomes from a batch delete: one bad id must not sink the rest. */
+export interface BulkDeleteOutcome {
+  deleted: string[];
+  not_found: string[];
+  errors: { id: string; error: string }[];
+}

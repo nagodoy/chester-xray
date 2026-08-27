@@ -78,6 +78,8 @@ cd web && npm run typecheck && npm run build
 | `GET /api/studies/{id}` | Study, instances and results | Session token |
 | `POST /api/studies/{id}/review` | Approve or reject a held study | Session token, reviewer role |
 | `POST /api/studies/{id}/retry` | Requeue a failed or stuck study | Session token |
+| `DELETE /api/studies/{id}` | Delete a study, its image and its analysis | Session token, administrator |
+| `POST /api/studies/bulk-delete` | Delete several studies, reporting each | Session token, administrator |
 | `GET /api/access-control/*` | Manage who may sign in | Session token, administrator |
 | `POST /dicomweb/studies` | STOW-RS ingestion | Service token |
 | `GET /dicomweb/studies` | Connectivity probe | Public |
@@ -101,6 +103,11 @@ uploads with no credential, for a controlled OsiriX setup that cannot send one.
 ingestion means any host that can reach the endpoint can file studies into the
 configured owner's worklist; use it only on a trusted network.
 `DICOM_INGEST_OWNER_EMAIL` must name an authorized user who will own what arrives.
+
+Deletion removes the stored bytes as well as the rows, and is restricted to
+administrators within their own organization. The study's own audit events go
+with it; a single `study_deleted` event, holding the study id rather than
+anything identifying a patient, records the deletion permanently.
 
 ## Access model
 

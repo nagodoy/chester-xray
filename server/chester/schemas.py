@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class InstanceSchema(BaseModel):
@@ -93,6 +93,18 @@ class UploadResponse(BaseModel):
 
 class ReviewRequest(BaseModel):
     decision: Literal["approve", "reject"]
+
+
+class BulkDeleteRequest(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+
+
+class BulkDeleteResponse(BaseModel):
+    """Per-id outcomes: one unreachable study must not sink the whole batch."""
+
+    deleted: list[uuid.UUID]
+    not_found: list[uuid.UUID]
+    errors: list[dict]
 
 
 class HealthResponse(BaseModel):

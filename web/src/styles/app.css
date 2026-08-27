@@ -480,6 +480,22 @@ a {
   color: var(--ink);
 }
 
+/* The button that actually commits a deletion, as opposed to one destructive
+   option among several: solid, so it does not read as one more choice. */
+.btn-danger-strong {
+  background: var(--red-strong);
+  color: var(--ink);
+}
+
+.btn-danger-strong:not(:disabled):hover {
+  background: #ef4444;
+}
+
+.btn-danger-strong:disabled {
+  background: var(--slate-700);
+  color: var(--ink-faint);
+}
+
 .btn-subtle {
   border-color: var(--line-strong);
   background: var(--field);
@@ -974,6 +990,114 @@ td b {
   gap: 10px;
 }
 
+/* The checkbox and the bin sit outside the card so the card keeps its own
+   grid, and so neither is a button nested inside the row's link. */
+.study-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.study-row .study-card {
+  flex: 1;
+  min-width: 0;
+}
+
+.study-select,
+.study-delete {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--slate-600);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.study-select[aria-pressed="true"] {
+  color: var(--teal-bright);
+}
+
+.study-select:hover {
+  color: var(--ink);
+  background: var(--surface-inset);
+}
+
+.study-delete:hover {
+  color: var(--red);
+  background: rgb(127 29 29 / 25%);
+}
+
+.study-row .study-card[role="presentation"] {
+  cursor: pointer;
+}
+
+/* Keep the column headers over their columns once a checkbox shifts the row. */
+.worklist-head.is-selecting {
+  padding-left: 60px;
+}
+
+.list-summary-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.list-summary-right .btn {
+  padding: 5px 10px;
+}
+
+.btn-subtle.is-active {
+  border-color: var(--line-hover);
+  color: var(--ink);
+}
+
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+  padding: 10px 16px;
+  border: 1px solid var(--teal-edge);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  font-size: var(--fs-sm);
+}
+
+.selection-bar strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.selection-bar .btn-danger {
+  margin-left: auto;
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--teal-bright);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.link-button:hover {
+  color: var(--ink);
+}
+
+.link-button:disabled {
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
 /* Rows are cards, and they round harder than the panels above them. */
 .study-card {
   padding: 12px 16px;
@@ -1190,6 +1314,12 @@ td b {
 .notice strong {
   font-weight: 600;
   color: var(--amber-bright);
+}
+
+.notice-error {
+  border-color: var(--red-edge);
+  background: rgb(127 29 29 / 25%);
+  color: var(--red);
 }
 
 /* ---------- Settings ---------- */
@@ -1479,6 +1609,65 @@ td b {
 .upload-result .btn {
   align-self: flex-start;
   margin-top: 4px;
+}
+
+/* ---------- Dialog ---------- */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(2 6 23 / 70%);
+}
+
+.dialog {
+  width: 100%;
+  max-width: 420px;
+  padding: 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-row);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.dialog-title h2 {
+  font-size: var(--fs-section);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.dialog-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.dialog-body {
+  margin-bottom: 18px;
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  color: var(--ink-muted);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
 }
 
 /* ---------- States ---------- */
