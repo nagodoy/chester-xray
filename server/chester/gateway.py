@@ -101,6 +101,26 @@ def build_handler(stow_url: str, token: str, owner: str, allowed_aes: list[str])
     return handle_store
 
 
+def build_echo_handler(allowed_aes: list[str]):
+    """Return a pynetdicom C-ECHO handler.
+
+    A sender verifies a node before it will store to it, so refusing
+    verification means the operator never gets as far as an image. The calling
+    AE is held to the same allowed list as C-STORE: a peer this gateway would
+    not accept an image from should not be told the association is good.
+    """
+
+    def handle_echo(event):
+        calling_ae = event.assoc.requestor.ae_title.strip()
+        if allowed_aes and calling_ae not in allowed_aes:
+            logger.warning("Refused C-ECHO from %s: not in the allowed list", calling_ae)
+            return STATUS_SOP_CLASS_NOT_SUPPORTED
+        logger.info("C-ECHO from %s", calling_ae)
+        return STATUS_SUCCESS
+
+    return handle_echo
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default=os.environ.get("SCP_HOST", "0.0.0.0"))
@@ -148,12 +168,14 @@ def main(argv: list[str] | None = None) -> int:
         ComputedRadiographyImageStorage,
         DigitalXRayImageStorageForPresentation,
         SecondaryCaptureImageStorage,
+        Verification,
         XRayAngiographicImageStorage,
     )
 
     allowed = [item.strip() for item in args.allowed_calling_aes.split(",") if item.strip()]
     application_entity = AE(ae_title=args.ae_title)
     for sop_class in (
+        Verification,
         DigitalXRayImageStorageForPresentation,
         ComputedRadiographyImageStorage,
         SecondaryCaptureImageStorage,
@@ -161,7 +183,10 @@ def main(argv: list[str] | None = None) -> int:
     ):
         application_entity.add_supported_context(sop_class)
 
-    handlers = [(evt.EVT_C_STORE, build_handler(args.stow_url, args.token, args.owner, allowed))]
+    handlers = [
+        (evt.EVT_C_STORE, build_handler(args.stow_url, args.token, args.owner, allowed)),
+        (evt.EVT_C_ECHO, build_echo_handler(allowed)),
+    ]
     logger.info(
         "Listening on %s:%d as %s, forwarding to %s",
         args.host,

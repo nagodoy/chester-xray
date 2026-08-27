@@ -6,6 +6,8 @@ import { es } from "./locales/es";
 import { ptBR } from "./locales/pt-BR";
 import type { Dictionary } from "./locales/pt-BR";
 
+export type { Dictionary };
+
 export const LOCALES = { "pt-BR": ptBR, en, es } as const;
 export type Locale = keyof typeof LOCALES;
 

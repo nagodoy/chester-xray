@@ -120,6 +120,8 @@ export const ptBR = {
     unidentified: "Não identificado",
     defaultDescription: "Radiografia de tórax",
     awaitingModel: "Aguardando modelo",
+    noFindings: "Sem achados acima do limiar",
+    notAnalysed: "Não analisado",
     pendingValidation: "Validação pendente",
     manualUpload: "Envio manual",
   },

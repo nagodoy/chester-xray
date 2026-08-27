@@ -78,6 +78,46 @@ def verify_service_token(request: Request) -> bool:
     return False
 
 
+def credentials_presented(request: Request) -> bool:
+    """Whether the caller sent anything that could carry the ingest token."""
+    if request.headers.get(INGEST_KEY_HEADER):
+        return True
+    authorization = request.headers.get("Authorization", "")
+    return authorization.startswith(("Bearer ", "Basic "))
+
+
+def echo_document(request: Request) -> dict:
+    """What a connectivity probe gets back.
+
+    Modality workstations verify a node before they will send to it, and a
+    plain GET is how they do it over HTTP -- OsiriX included. Answering 405
+    reads as a broken endpoint, so the same paths that accept an upload also
+    answer a probe describing what they accept.
+
+    The document is deliberately static: it names the endpoint and what it
+    speaks, and nothing about the deployment behind it. The one conditional
+    field is `authenticated`, which appears only when the caller actually
+    presented a credential -- that turns the probe into a way to tell a wrong
+    token apart from an unreachable host, which is the failure operators
+    actually hit, without telling an anonymous prober anything the upload
+    endpoint would not already tell them.
+    """
+    document = {
+        "service": "Torax AI DICOMweb",
+        "status": "active",
+        "endpoint": "/dicomweb/studies",
+        "aeTitle": settings.dicom_scp_ae_title,
+        "capabilities": ["STOW-RS"],
+        "supportedContentTypes": [
+            'multipart/related; type="application/dicom"',
+            "application/dicom",
+        ],
+    }
+    if credentials_presented(request):
+        document["authenticated"] = verify_service_token(request)
+    return document
+
+
 def require_service_token(request: Request) -> None:
     if not verify_service_token(request):
         raise HTTPException(
@@ -346,3 +386,29 @@ async def stow_wado_study(study_uid: str, request: Request, db: Session = Depend
         study_uid=None if study_uid == "studies" else study_uid,
         require_auth=not settings.dicom_wado_anonymous_ingest,
     )
+
+
+# A probe is a GET on the very path the sender is configured to POST to, so
+# every upload path answers one, including the duplicated /wado/studies/studies
+# that some OsiriX configurations emit.
+# HEAD as well as GET: a probe that only wants to know the node is there sends
+# one, and Starlette does not answer HEAD from a GET route on its own.
+PROBE_METHODS = ["GET", "HEAD"]
+
+
+@router.api_route("/dicomweb/studies", methods=PROBE_METHODS)
+def echo_dicomweb(request: Request) -> dict:
+    """Connectivity probe for the canonical endpoint."""
+    return echo_document(request)
+
+
+@router.api_route("/wado/studies", methods=PROBE_METHODS)
+def echo_wado(request: Request) -> dict:
+    """Connectivity probe for the WADO-style alias."""
+    return echo_document(request)
+
+
+@router.api_route("/wado/studies/{study_uid}", methods=PROBE_METHODS)
+def echo_wado_study(study_uid: str, request: Request) -> dict:
+    """Probe on the scoped alias, including the duplicated path."""
+    return echo_document(request)
