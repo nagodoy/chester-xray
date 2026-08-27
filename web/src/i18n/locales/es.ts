@@ -6,7 +6,7 @@ import type { Dictionary } from "./pt-BR";
  * language at runtime.
  */
 export const es: Dictionary = {
-  brand: { name: "Torax AI", tagline: "radiografía torácica" },
+  brand: { name: "Torax AI", tagline: "Radiografía torácica" },
 
   common: {
     retry: "Reintentar",
@@ -40,7 +40,7 @@ export const es: Dictionary = {
     subtitle: "Introduce tu correo para recibir el código de acceso.",
     emailLabel: "Tu correo",
     emailPlaceholder: "Escribe tu dirección de correo",
-    continue: "Continuar",
+    sendCode: "Enviar código de acceso",
     sending: "Enviando…",
     verifyTitle: "Verifica tu correo",
     verifySubtitle: "Enviamos un código de 6 dígitos a {email}.",

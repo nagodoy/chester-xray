@@ -7,7 +7,7 @@ import type { Dictionary } from "./pt-BR";
  * in English while everything around it was in Portuguese.
  */
 export const en: Dictionary = {
-  brand: { name: "Torax AI", tagline: "chest radiography" },
+  brand: { name: "Torax AI", tagline: "Chest radiography" },
 
   common: {
     retry: "Try again",
@@ -41,7 +41,7 @@ export const en: Dictionary = {
     subtitle: "Enter your email to receive an access code.",
     emailLabel: "Your email",
     emailPlaceholder: "Enter your email address",
-    continue: "Continue",
+    sendCode: "Send access code",
     sending: "Sending…",
     verifyTitle: "Check your email",
     verifySubtitle: "We sent a 6-digit code to {email}.",

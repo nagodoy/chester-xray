@@ -1,5 +1,5 @@
 export const ptBR = {
-  brand: { name: "Torax AI", tagline: "radiografia torácica" },
+  brand: { name: "Torax AI", tagline: "Radiografia torácica" },
 
   common: {
     retry: "Tentar novamente",
@@ -33,7 +33,7 @@ export const ptBR = {
     subtitle: "Informe seu email para receber o código de acesso.",
     emailLabel: "Seu e-mail",
     emailPlaceholder: "Digite o endereço de e-mail",
-    continue: "Continuar",
+    sendCode: "Enviar código de acesso",
     sending: "Enviando…",
     verifyTitle: "Verifique seu email",
     verifySubtitle: "Enviamos um código de 6 dígitos para {email}.",

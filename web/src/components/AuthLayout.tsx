@@ -1,4 +1,4 @@
-import { Activity, ShieldCheck } from "lucide-react";
+import { Activity } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useI18n } from "../i18n";
@@ -26,10 +26,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
 
         <section className="auth-card">{children}</section>
 
-        <p className="auth-footnote">
-          <ShieldCheck size={14} aria-hidden />
-          {t.auth.researchOnly}
-        </p>
+        <p className="auth-footnote">{t.auth.researchOnly}</p>
       </div>
     </div>
   );
