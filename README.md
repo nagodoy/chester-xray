@@ -59,6 +59,23 @@ cd web && npm install && npm run dev
 `npm start` at the repository root builds the frontend and serves everything from
 the API process, which is what the deployment does.
 
+## Maintenance
+
+Thumbnails are written once, at ingestion. Studies filed before the generator
+was fixed still carry a thumbnail that was stretched onto a square, and
+re-running analysis will not replace it. Rebuild them from the instances
+already in storage:
+
+```bash
+cd server
+python -m chester.rethumbnail --dry-run   # report, change nothing
+python -m chester.rethumbnail             # write
+```
+
+Each study is committed on its own, so the run is safe to interrupt, and one
+already carrying the current thumbnail is skipped, so it is safe to repeat.
+Studies whose bytes are gone are reported and passed over.
+
 ## Checks
 
 ```bash
