@@ -126,6 +126,8 @@ export const es: Dictionary = {
     unidentified: "No identificado",
     defaultDescription: "Radiografía de tórax",
     awaitingModel: "Esperando al modelo",
+    noFindings: "Sin hallazgos sobre el umbral",
+    notAnalysed: "No analizado",
     pendingValidation: "Validación pendiente",
     manualUpload: "Envío manual",
   },

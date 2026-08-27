@@ -18,6 +18,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { AppShell, PageHeading } from "../components/AppShell";
 import { ErrorBox, Skeleton, StatusPill, Thumbnail } from "../components/common";
 import { useI18n } from "../i18n";
+import type { Dictionary } from "../i18n";
 import { validationReason } from "../i18n/validation";
 import { UploadPanel } from "./UploadPanel";
 
@@ -39,6 +40,21 @@ const displayAge = (value: string | null, fallback: string): string => {
   const trimmed = value.trim().toUpperCase();
   // DICOM ages are like "045Y"; anything else is passed through as years.
   return /^\d{3}[DWMY]$/.test(trimmed) ? trimmed : `${value}y`;
+};
+
+/**
+ * What to say when a study has no findings to show.
+ *
+ * An empty list is three different situations, and calling all of them
+ * "awaiting model" makes a finished study look stuck: it is what a study
+ * still in the queue looks like, what a completed study whose scores all sat
+ * under their thresholds looks like, and what one that never reached the
+ * model looks like. Only the first is actually waiting.
+ */
+const emptyFindings = (status: StudyStatus, t: Dictionary): string => {
+  if (ACTIVE_STATUSES.includes(status)) return t.worklist.awaitingModel;
+  if (status === "completed") return t.worklist.noFindings;
+  return t.worklist.notAnalysed;
 };
 
 function StudyRow({ study }: { study: Study }) {
@@ -71,7 +87,7 @@ function StudyRow({ study }: { study: Study }) {
             </span>
           ))
         ) : (
-          <span className="finding muted">{t.worklist.awaitingModel}</span>
+          <span className="finding muted">{emptyFindings(study.status, t)}</span>
         )}
       </div>
       <StatusPill value={study.status} />

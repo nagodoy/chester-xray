@@ -218,3 +218,64 @@ class TestLimits:
         response = stow([make_dicom()])
 
         assert response.status_code == 413
+
+
+class TestConnectivityProbe:
+    """A GET on an upload path answers a probe instead of 405.
+
+    Modality workstations verify a node before they will send to it, so a
+    405 on the configured URL reads as a broken endpoint.
+    """
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/dicomweb/studies",
+            "/wado/studies",
+            # The duplicated path some OsiriX configurations emit.
+            "/wado/studies/studies",
+            "/wado/studies/1.2.840.10008.1.2.3",
+        ],
+    )
+    @pytest.mark.parametrize("method", ["GET", "HEAD"])
+    def test_every_upload_path_answers_a_probe(self, client, path, method):
+        response = client.request(method, path)
+
+        assert response.status_code == 200
+
+    def test_the_probe_names_the_canonical_endpoint_and_what_it_speaks(self, client):
+        body = client.get("/wado/studies").json()
+
+        assert body["status"] == "active"
+        assert body["endpoint"] == "/dicomweb/studies"
+        assert "STOW-RS" in body["capabilities"]
+        assert any("application/dicom" in item for item in body["supportedContentTypes"])
+
+    def test_an_anonymous_probe_is_told_nothing_about_credentials(self, client):
+        """The field only appears for a caller that presented one."""
+        assert "authenticated" not in client.get("/dicomweb/studies").json()
+
+    def test_a_probe_carrying_a_credential_is_told_whether_it_works(self, client):
+        """This is what separates a wrong token from an unreachable host."""
+        good = client.get("/dicomweb/studies", headers={"X-DICOM-Ingest-Key": TOKEN})
+        bad = client.get("/dicomweb/studies", headers={"X-DICOM-Ingest-Key": "wrong"})
+
+        assert good.json()["authenticated"] is True
+        assert bad.json()["authenticated"] is False
+
+    def test_osirix_basic_credentials_are_checked_by_the_probe(self, client):
+        encoded = base64.b64encode(f"osirix:{TOKEN}".encode()).decode()
+
+        body = client.get("/wado/studies", headers={"Authorization": f"Basic {encoded}"}).json()
+
+        assert body["authenticated"] is True
+
+    def test_the_probe_does_not_open_a_way_in(self, client, make_stow_body):
+        """Answering GET must not have relaxed what POST demands."""
+        body, content_type = make_stow_body([b"not-a-dicom"])
+
+        response = client.post(
+            "/dicomweb/studies", content=body, headers={"Content-Type": content_type}
+        )
+
+        assert response.status_code == 401

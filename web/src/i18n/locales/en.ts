@@ -127,6 +127,8 @@ export const en: Dictionary = {
     unidentified: "Unidentified",
     defaultDescription: "Chest radiograph",
     awaitingModel: "Awaiting model",
+    noFindings: "No findings above threshold",
+    notAnalysed: "Not analysed",
     pendingValidation: "Validation pending",
     manualUpload: "Manual upload",
   },

@@ -80,6 +80,12 @@ cd web && npm run typecheck && npm run build
 | `POST /api/studies/{id}/retry` | Requeue a failed or stuck study | Session token |
 | `GET /api/access-control/*` | Manage who may sign in | Session token, administrator |
 | `POST /dicomweb/studies` | STOW-RS ingestion | Service token |
+| `GET /dicomweb/studies` | Connectivity probe | Public |
+
+A `GET` or `HEAD` on any upload path answers a probe describing the endpoint
+rather than 405, so a modality can verify the node before it will send to it.
+Present the ingest token with the probe and the reply also says whether that
+token works, which is what separates a wrong password from an unreachable host.
 
 The canonical STOW-RS URL is `/dicomweb/studies`. For OsiriX configurations that
 use a WADO base path, `/wado/studies` also accepts uploads, including the
@@ -105,6 +111,9 @@ one-time code; who may sign in comes from environment-configured administrators,
 then explicit users, then domain rules.
 
 ## DICOM gateway
+
+The listener answers C-ECHO as well as C-STORE, so a sender can verify it. A
+calling AE outside `--allowed-calling-aes` is refused both.
 
 The DIMSE listener is deliberately not exposed from the web deployment. Run it
 inside the protected network:
