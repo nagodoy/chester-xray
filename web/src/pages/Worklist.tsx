@@ -1,12 +1,16 @@
 import {
   Activity,
   Check,
+  CheckSquare,
   ChevronRight,
   ClipboardList,
   CloudUpload,
   Filter,
   RotateCcw,
   Search,
+  Square,
+  Trash2,
+  X,
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -16,6 +20,7 @@ import { api } from "../api/client";
 import type { Study, StudyList, StudyStatus } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { AppShell, PageHeading } from "../components/AppShell";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ErrorBox, Skeleton, StatusPill, Thumbnail } from "../components/common";
 import { useI18n } from "../i18n";
 import type { Dictionary } from "../i18n";
@@ -57,13 +62,27 @@ const emptyFindings = (status: StudyStatus, t: Dictionary): string => {
   return t.worklist.notAnalysed;
 };
 
-function StudyRow({ study }: { study: Study }) {
+function StudyRow({
+  study,
+  selectable,
+  selected,
+  onToggle,
+  onDelete,
+}: {
+  study: Study;
+  selectable: boolean;
+  selected: boolean;
+  onToggle: () => void;
+  onDelete: (() => void) | null;
+}) {
   const { t } = useI18n();
-  return (
-    <Link href={`/studies/${study.id}`} className="study-card">
+  const label = study.patient_id ?? t.worklist.unidentified;
+
+  const card = (
+    <>
       <Thumbnail url={study.thumbnail_url} alt={t.worklist.headers.image} />
       <div className="study-primary">
-        <strong>{study.patient_id ?? t.worklist.unidentified}</strong>
+        <strong>{label}</strong>
         <div className="meta-row">
           {study.description ?? t.worklist.defaultDescription} · {study.modality ?? "XR"}
           {study.view_position ? ` · ${study.view_position}` : ""}
@@ -92,12 +111,48 @@ function StudyRow({ study }: { study: Study }) {
       </div>
       <StatusPill value={study.status} />
       <ChevronRight size={15} aria-hidden />
-    </Link>
+    </>
+  );
+
+  return (
+    <div className="study-row">
+      {selectable && (
+        <button
+          type="button"
+          className="study-select"
+          aria-pressed={selected}
+          aria-label={`${t.worklist.selectStudy}: ${label}`}
+          onClick={onToggle}
+        >
+          {selected ? <CheckSquare size={18} /> : <Square size={18} />}
+        </button>
+      )}
+      {selectable ? (
+        <div className="study-card" role="presentation" onClick={onToggle}>
+          {card}
+        </div>
+      ) : (
+        <Link href={`/studies/${study.id}`} className="study-card">
+          {card}
+        </Link>
+      )}
+      {onDelete && (
+        <button
+          type="button"
+          className="study-delete"
+          aria-label={`${t.worklist.deleteStudy}: ${label}`}
+          title={t.worklist.deleteStudy}
+          onClick={onDelete}
+        >
+          <Trash2 size={15} />
+        </button>
+      )}
+    </div>
   );
 }
 
 export function Worklist() {
-  const { can } = useAuth();
+  const { access, can } = useAuth();
   const { t, format } = useI18n();
   const search = useSearch();
 
@@ -107,6 +162,12 @@ export function Worklist() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [data, setData] = useState<StudyList | null>(null);
   const [error, setError] = useState("");
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Either one study, or the whole selection.
+  const [pending, setPending] = useState<Study | "selection" | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     setStatus(new URLSearchParams(search).get("status") ?? "");
@@ -147,6 +208,53 @@ export function Worklist() {
   const completedRate = total > 0 ? Math.round((completed / total) * 100) : 0;
   const attentionRate = total > 0 ? Math.round((attention / total) * 100) : 0;
   const hasFilters = Boolean(query || status);
+  const canDelete = Boolean(access?.is_admin);
+
+  const toggle = (id: string) =>
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const leaveSelectMode = () => {
+    setSelectMode(false);
+    setSelected(new Set());
+  };
+
+  const runDelete = async () => {
+    if (pending === null) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      if (pending === "selection") {
+        const outcome = await api.bulkDeleteStudies([...selected]);
+        const failed = outcome.errors.length + outcome.not_found.length;
+        // A batch reports per id, so a partial failure has to be said out loud
+        // rather than left to look like a clean sweep.
+        if (failed > 0) {
+          setDeleteError(
+            format(t.worklist.deletePartial, { deleted: outcome.deleted.length, failed }),
+          );
+        }
+        leaveSelectMode();
+      } else {
+        await api.deleteStudy(pending.id);
+      }
+      setPending(null);
+      await load();
+    } catch (caught) {
+      setDeleteError(
+        format(t.worklist.deleteFailed, {
+          error: caught instanceof Error ? caught.message : String(caught),
+        }),
+      );
+      setPending(null);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const ring = `conic-gradient(var(--teal) 0 ${completedRate}%, var(--amber) ${completedRate}% ${Math.min(
     100,
@@ -310,8 +418,55 @@ export function Worklist() {
         <span>
           {format(t.worklist.selection, { shown: items.length, total: data?.total ?? 0 })}
         </span>
-        {hasFilters && <small>{t.worklist.globalNote}</small>}
+        <span className="list-summary-right">
+          {hasFilters && <small>{t.worklist.globalNote}</small>}
+          {canDelete && items.length > 0 && (
+            <button
+              type="button"
+              className={selectMode ? "btn btn-subtle is-active" : "btn btn-subtle"}
+              onClick={() => (selectMode ? leaveSelectMode() : setSelectMode(true))}
+            >
+              {selectMode ? <X size={14} aria-hidden /> : <CheckSquare size={14} aria-hidden />}
+              {selectMode ? t.worklist.cancelSelection : t.worklist.select}
+            </button>
+          )}
+        </span>
       </div>
+
+      {selectMode && (
+        <div className="selection-bar">
+          <strong>{format(t.worklist.selectedCount, { count: selected.size })}</strong>
+          <button
+            type="button"
+            className="link-button"
+            onClick={() => setSelected(new Set(items.map((study) => study.id)))}
+          >
+            {t.worklist.selectAll}
+          </button>
+          <button
+            type="button"
+            className="link-button"
+            onClick={() => setSelected(new Set())}
+          >
+            {t.worklist.clearSelection}
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger-strong"
+            disabled={selected.size === 0}
+            onClick={() => setPending("selection")}
+          >
+            <Trash2 size={14} aria-hidden />
+            {format(t.worklist.deleteSelected, { count: selected.size })}
+          </button>
+        </div>
+      )}
+
+      {deleteError && (
+        <div className="notice notice-error" role="alert">
+          {deleteError}
+        </div>
+      )}
 
       {error ? (
         <ErrorBox title={t.worklist.unavailable} message={error} onRetry={() => void load()} />
@@ -319,7 +474,10 @@ export function Worklist() {
         <Skeleton />
       ) : items.length > 0 ? (
         <>
-          <div className="worklist-head" aria-hidden>
+          <div
+            className={selectMode ? "worklist-head is-selecting" : "worklist-head"}
+            aria-hidden
+          >
             <span>{t.worklist.headers.image}</span>
             <span>{t.worklist.headers.study}</span>
             <span>{t.worklist.headers.demographics}</span>
@@ -330,7 +488,14 @@ export function Worklist() {
           </div>
           <div className="study-list">
             {items.map((study) => (
-              <StudyRow key={study.id} study={study} />
+              <StudyRow
+                key={study.id}
+                study={study}
+                selectable={selectMode}
+                selected={selected.has(study.id)}
+                onToggle={() => toggle(study.id)}
+                onDelete={canDelete && !selectMode ? () => setPending(study) : null}
+              />
             ))}
           </div>
         </>
@@ -340,6 +505,27 @@ export function Worklist() {
           <h3>{t.worklist.emptyTitle}</h3>
           <p>{t.worklist.emptyBody}</p>
         </div>
+      )}
+
+      {pending !== null && (
+        <ConfirmDialog
+          title={t.worklist.deleteTitle}
+          body={
+            pending === "selection"
+              ? format(t.worklist.deleteManyBody, { count: selected.size })
+              : format(t.worklist.deleteOneBody, {
+                  label: pending.patient_id ?? t.worklist.unidentified,
+                })
+          }
+          confirmLabel={
+            pending === "selection"
+              ? format(t.worklist.deleteSelected, { count: selected.size })
+              : t.worklist.deleteStudy
+          }
+          busy={deleting}
+          onConfirm={() => void runDelete()}
+          onCancel={() => setPending(null)}
+        />
       )}
     </AppShell>
   );

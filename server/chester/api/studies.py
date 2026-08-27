@@ -9,11 +9,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from chester.api.deps import require_page
+from chester.api.deps import require_admin, require_page
 from chester.db import get_session
 from chester.models import AnalysisJob, AuditEvent, Study
 from chester.schemas import (
     AnalysisResultSchema,
+    BulkDeleteRequest,
+    BulkDeleteResponse,
     InstanceSchema,
     ReviewRequest,
     StudyDetailSchema,
@@ -21,6 +23,7 @@ from chester.schemas import (
     StudySchema,
 )
 from chester.security.access import AccessContext, visible_studies
+from chester.storage import ObjectNotFound, delete_object
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/studies", tags=["studies"])
@@ -204,3 +207,93 @@ def review_study(
     db.commit()
     db.refresh(study)
     return _to_detail(study)
+
+
+def _purge_objects(db: Session, study: Study) -> None:
+    """Remove the stored bytes for a study, before its rows go.
+
+    Deleting the rows first would leave the pixel data behind with nothing left
+    pointing at it -- unreachable through the interface but still on disk, which
+    is the opposite of what a delete is for here. An object that is already gone
+    is not a failure; anything else is raised so the caller can roll the
+    transaction back and the study stays deletable rather than half-deleted.
+    """
+    keys = [instance.object_key for instance in study.instances if instance.object_key]
+    # Derived from the study rather than an instance, so it has no row of its own.
+    keys.append(f"thumbnails/{study.id}.png")
+    for key in keys:
+        try:
+            delete_object(key, session=db)
+        except ObjectNotFound:
+            logger.info("Object %s was already gone while deleting study %s", key, study.id)
+
+
+def _delete_study(db: Session, access: AccessContext, study: Study) -> None:
+    """Delete one study, its instances, jobs and results, and its bytes.
+
+    The study's own audit events go with it -- the schema cascades them -- so a
+    single study-less event is written in their place. It records who deleted
+    what and when, by study id rather than by anything identifying a patient,
+    and it outlives the study it describes.
+    """
+    _purge_objects(db, study)
+    db.add(
+        AuditEvent(
+            study_id=None,
+            actor=access.email,
+            event_type="study_deleted",
+            detail={
+                "study_id": str(study.id),
+                "status": study.status,
+                "instances": len(study.instances),
+                "organization_id": str(study.organization_id),
+            },
+        )
+    )
+    db.delete(study)
+
+
+@router.delete("/{study_id}", status_code=204)
+def delete_study(
+    study_id: uuid.UUID,
+    access: AccessContext = Depends(require_admin),
+    db: Session = Depends(get_session),
+) -> None:
+    """Delete a study and everything it carries. Administrators only."""
+    study = _load(db, access, study_id)
+    _delete_study(db, access, study)
+    db.commit()
+
+
+@router.post("/bulk-delete", response_model=BulkDeleteResponse)
+def bulk_delete_studies(
+    body: BulkDeleteRequest,
+    access: AccessContext = Depends(require_admin),
+    db: Session = Depends(get_session),
+) -> BulkDeleteResponse:
+    """Delete several studies, reporting each one's outcome.
+
+    Each study is committed on its own. A batch that failed as a unit would give
+    the operator no way to tell which of a hundred selected studies actually
+    went, and one unreadable object would strand the other ninety-nine.
+    """
+    deleted: list[uuid.UUID] = []
+    not_found: list[uuid.UUID] = []
+    errors: list[dict] = []
+
+    for study_id in dict.fromkeys(body.ids):
+        study = visible_studies(db.query(Study), access).filter(Study.id == study_id).first()
+        if study is None:
+            not_found.append(study_id)
+            continue
+        try:
+            _delete_study(db, access, study)
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.exception("Could not delete study %s", study_id)
+            errors.append({"id": str(study_id), "error": str(exc)})
+        else:
+            deleted.append(study_id)
+
+    return BulkDeleteResponse(deleted=deleted, not_found=not_found, errors=errors)

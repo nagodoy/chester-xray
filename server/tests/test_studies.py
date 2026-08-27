@@ -226,3 +226,189 @@ class TestRetry:
 
 def test_the_worklist_requires_a_session(client):
     assert client.get("/api/studies").status_code == 401
+
+
+class TestDeletion:
+    """Deleting a study, one at a time and in a batch."""
+
+    def test_an_administrator_deletes_a_study_in_their_organization(
+        self, client, signed_in, worklist, session
+    ):
+        headers, _ = signed_in("boss@example.com")
+        study_id = str(worklist["mine"].id)
+
+        response = client.delete(f"/api/studies/{study_id}", headers=headers)
+
+        assert response.status_code == 204
+        assert session.query(Study).filter(Study.id == worklist["mine"].id).first() is None
+
+    def test_deletion_takes_the_instances_jobs_and_results_with_it(
+        self, client, signed_in, worklist, session
+    ):
+        from chester.models import AnalysisResult, Instance
+
+        study = worklist["mine"]
+        session.add(Instance(study_id=study.id, organization_id=study.organization_id))
+        job = AnalysisJob(study_id=study.id, status="completed")
+        session.add(job)
+        session.flush()
+        session.add(AnalysisResult(study_id=study.id, job_id=job.id))
+        session.flush()
+        headers, _ = signed_in("boss@example.com")
+
+        client.delete(f"/api/studies/{study.id}", headers=headers)
+
+        assert session.query(Instance).filter_by(study_id=study.id).count() == 0
+        assert session.query(AnalysisJob).filter_by(study_id=study.id).count() == 0
+        assert session.query(AnalysisResult).filter_by(study_id=study.id).count() == 0
+
+    def test_the_deletion_outlives_the_study_in_the_audit_trail(
+        self, client, signed_in, worklist, session
+    ):
+        """The study's own events cascade away, so one study-less event replaces them."""
+        from chester.models import AuditEvent
+
+        study_id = str(worklist["mine"].id)
+        headers, _ = signed_in("boss@example.com")
+
+        client.delete(f"/api/studies/{study_id}", headers=headers)
+
+        event = session.query(AuditEvent).filter_by(event_type="study_deleted").one()
+        assert event.study_id is None
+        assert event.actor == "boss@example.com"
+        assert event.detail["study_id"] == study_id
+
+    def test_a_technician_may_not_delete_even_their_own_study(
+        self, client, signed_in, worklist, session
+    ):
+        headers, _ = signed_in("owner@example.com")
+
+        response = client.delete(f"/api/studies/{worklist['mine'].id}", headers=headers)
+
+        assert response.status_code == 403
+        assert session.query(Study).filter(Study.id == worklist["mine"].id).first() is not None
+
+    def test_an_administrator_cannot_reach_another_organizations_study(
+        self, client, signed_in, worklist, session
+    ):
+        """404 rather than 403: its existence is not this caller's business."""
+        headers, _ = signed_in("boss@example.com")
+
+        response = client.delete(f"/api/studies/{worklist['elsewhere'].id}", headers=headers)
+
+        assert response.status_code == 404
+        assert session.query(Study).filter(Study.id == worklist["elsewhere"].id).first() is not None
+
+    def test_a_batch_deletes_every_study_named(self, client, signed_in, worklist, session):
+        headers, _ = signed_in("boss@example.com")
+        ids = [str(worklist["mine"].id), str(worklist["theirs"].id)]
+
+        body = client.post("/api/studies/bulk-delete", json={"ids": ids}, headers=headers).json()
+
+        assert sorted(body["deleted"]) == sorted(ids)
+        assert body["not_found"] == []
+        assert body["errors"] == []
+        assert session.query(Study).count() == 1  # only the rival organization's
+
+    def test_a_batch_reports_what_it_could_not_reach_and_still_deletes_the_rest(
+        self, client, signed_in, worklist, session
+    ):
+        """One unreachable id must not strand the others."""
+        import uuid as uuid_module
+
+        headers, _ = signed_in("boss@example.com")
+        missing = str(uuid_module.uuid4())
+        outside = str(worklist["elsewhere"].id)
+
+        body = client.post(
+            "/api/studies/bulk-delete",
+            json={"ids": [str(worklist["mine"].id), missing, outside]},
+            headers=headers,
+        ).json()
+
+        assert body["deleted"] == [str(worklist["mine"].id)]
+        assert sorted(body["not_found"]) == sorted([missing, outside])
+        assert session.query(Study).filter(Study.id == worklist["elsewhere"].id).first() is not None
+
+    def test_a_batch_names_a_study_once_however_often_it_is_listed(
+        self, client, signed_in, worklist
+    ):
+        headers, _ = signed_in("boss@example.com")
+        study_id = str(worklist["mine"].id)
+
+        body = client.post(
+            "/api/studies/bulk-delete",
+            json={"ids": [study_id, study_id]},
+            headers=headers,
+        ).json()
+
+        assert body["deleted"] == [study_id]
+        assert body["not_found"] == []
+
+    def test_a_technician_may_not_delete_a_batch(self, client, signed_in, worklist, session):
+        headers, _ = signed_in("owner@example.com")
+
+        response = client.post(
+            "/api/studies/bulk-delete",
+            json={"ids": [str(worklist["mine"].id)]},
+            headers=headers,
+        )
+
+        assert response.status_code == 403
+        assert session.query(Study).filter(Study.id == worklist["mine"].id).first() is not None
+
+    def test_an_empty_batch_is_refused_rather_than_silently_doing_nothing(
+        self, client, signed_in, worklist
+    ):
+        headers, _ = signed_in("boss@example.com")
+
+        response = client.post("/api/studies/bulk-delete", json={"ids": []}, headers=headers)
+
+        assert response.status_code == 422
+
+    def test_the_pixel_data_and_thumbnail_go_with_the_study(
+        self, client, signed_in, worklist, session
+    ):
+        """The point of the delete: the bytes leave, not just the rows.
+
+        Rows alone would leave the images on disk with nothing pointing at
+        them -- gone from the interface, still there on the volume.
+        """
+        import pytest as pytest_module
+
+        from chester.models import Instance
+        from chester.storage import ObjectNotFound, retrieve_bytes, store_bytes
+
+        study = worklist["mine"]
+        pixels = b"\x00DICM-pixels"
+        thumbnail = b"\x89PNG-thumbnail"
+        store_bytes(f"instances/{study.id}.dcm", pixels, session=session)
+        store_bytes(f"thumbnails/{study.id}.png", thumbnail, session=session)
+        session.add(
+            Instance(
+                study_id=study.id,
+                organization_id=study.organization_id,
+                object_key=f"instances/{study.id}.dcm",
+            )
+        )
+        session.flush()
+        # Both are readable before the delete, or the assertions below prove nothing.
+        assert retrieve_bytes(f"instances/{study.id}.dcm", session=session) == pixels
+        assert retrieve_bytes(f"thumbnails/{study.id}.png", session=session) == thumbnail
+
+        headers, _ = signed_in("boss@example.com")
+        response = client.delete(f"/api/studies/{study.id}", headers=headers)
+
+        assert response.status_code == 204
+        with pytest_module.raises(ObjectNotFound):
+            retrieve_bytes(f"instances/{study.id}.dcm", session=session)
+        with pytest_module.raises(ObjectNotFound):
+            retrieve_bytes(f"thumbnails/{study.id}.png", session=session)
+
+    def test_a_study_with_no_thumbnail_yet_still_deletes(self, client, signed_in, worklist):
+        """An object that was never written is not a failure."""
+        headers, _ = signed_in("boss@example.com")
+
+        response = client.delete(f"/api/studies/{worklist['theirs'].id}", headers=headers)
+
+        assert response.status_code == 204

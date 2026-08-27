@@ -2,6 +2,7 @@ import type {
   Access,
   AccessMetadata,
   AuditEntry,
+  BulkDeleteOutcome,
   DicomwebSettings,
   ManagedDomain,
   ManagedUser,
@@ -126,6 +127,15 @@ export const api = {
 
   retryStudy: (id: string) =>
     request<StudyDetail>(`/api/studies/${encodeURIComponent(id)}/retry`, { method: "POST" }),
+
+  deleteStudy: (id: string) =>
+    request<void>(`/api/studies/${encodeURIComponent(id)}`, { method: "DELETE" }),
+
+  bulkDeleteStudies: (ids: string[]) =>
+    request<BulkDeleteOutcome>("/api/studies/bulk-delete", {
+      method: "POST",
+      ...json({ ids }),
+    }),
 
   reviewStudy: (id: string, decision: "approve" | "reject") =>
     request<StudyDetail>(`/api/studies/${encodeURIComponent(id)}/review`, {
