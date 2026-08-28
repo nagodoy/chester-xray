@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from chester.api.deps import SESSION_HEADER, get_current_access
+from chester.api.deps import SESSION_HEADER, client_ip, get_current_access
 from chester.config import settings
 from chester.db import get_session
 from chester.emailer import email_delivery_configured, send_otp_email
@@ -40,11 +40,6 @@ class RequestCodeBody(BaseModel):
 class VerifyCodeBody(BaseModel):
     email: str = Field(min_length=3, max_length=320)
     code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
-
-
-def _client_ip(request: Request) -> str | None:
-    forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-    return forwarded or (request.client.host if request.client else None)
 
 
 def _access_payload(access: AccessContext) -> dict:
@@ -111,7 +106,7 @@ def request_code(
     it and no mail is sent.
     """
     email = normalize_email(body.email)
-    request_ip = _client_ip(request)
+    request_ip = client_ip(request)
 
     # Checked before the address is resolved. Answering 503 only for an authorized
     # address would reopen the enumeration hole this endpoint exists to avoid: with
@@ -212,7 +207,7 @@ def verify_code(
             expires_at=now + timedelta(hours=settings.auth_session_hours),
             last_seen_at=now,
             user_agent=request.headers.get("user-agent"),
-            request_ip=_client_ip(request),
+            request_ip=client_ip(request),
         )
     )
     db.commit()

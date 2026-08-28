@@ -112,3 +112,24 @@ class HealthResponse(BaseModel):
     storage_backend: str
     db_ok: bool
     model_version: str | None
+
+
+class NetworkLogSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    study_id: uuid.UUID | None
+    direction: str
+    channel: str
+    peer: str | None
+    status: str
+    actor: str | None
+    reference: str | None
+    message: str | None
+    detail: dict[str, Any] | None
+    created_at: datetime
+
+
+class NetworkLogListResponse(BaseModel):
+    items: list[NetworkLogSchema]
+    total: int

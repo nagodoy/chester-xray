@@ -21,6 +21,7 @@ considering any clinical deployment.
 - DICOMweb STOW-RS ingestion with a service token
 - On-premises DICOM C-STORE gateway that forwards to STOW-RS
 - Conservative chest-radiograph validation, holding anything uncertain for review
+- Network log of every exam received and every report sent, with its outcome
 - Studies, jobs, results and audit trails in PostgreSQL
 - Background inference in a separate worker process
 - Raw scores, operating-point normalization, thresholds and recorded versions
@@ -112,6 +113,12 @@ in a private sequence, and a private tag is in no receiver's data dictionary,
 so under Implicit VR the wire carries no VR either and the far end decodes
 the sequence as raw bytes -- the image arrives and the findings do not.
 
+Every attempt is recorded, from the command line and from the interface alike:
+the **Network logs** page lists what this node received and where it came from,
+and what it sent and whether the destination took it. A refused delivery is a row
+with the reason the far end gave, not a line in the log of whichever process
+happened to run the send.
+
 The destination defaults to `superpaccs.com.br:11112`, AE title `medfusion`,
 calling as `TORAX_AI`; override with `DICOM_SEND_HOST`, `DICOM_SEND_PORT`,
 `DICOM_SEND_AE_TITLE` and `DICOM_SEND_CALLING_AE_TITLE`. Nothing leaves the
@@ -145,6 +152,8 @@ cd web && npm run typecheck && npm run build
 | `POST /api/studies/{id}/retry` | Requeue a failed or stuck study | Session token |
 | `DELETE /api/studies/{id}` | Delete a study, its image and its analysis | Session token, administrator |
 | `POST /api/studies/bulk-delete` | Delete several studies, reporting each | Session token, administrator |
+| `POST /api/studies/{id}/send-report` | Build the TORAX IA report and store it on the destination | Session token |
+| `GET /api/network-logs` | Exams received and reports sent | Session token, `network-logs` page |
 | `GET /api/access-control/*` | Manage who may sign in | Session token, administrator |
 | `POST /dicomweb/studies` | STOW-RS ingestion | Service token |
 | `GET /dicomweb/studies` | Connectivity probe | Public |

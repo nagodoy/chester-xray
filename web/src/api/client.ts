@@ -6,6 +6,7 @@ import type {
   DicomwebSettings,
   ManagedDomain,
   ManagedUser,
+  NetworkLogList,
   StudyDetail,
   StudyList,
   UploadOutcome,
@@ -137,6 +138,11 @@ export const api = {
       ...json({ ids }),
     }),
 
+  sendReport: (id: string) =>
+    request<StudyDetail>(`/api/studies/${encodeURIComponent(id)}/send-report`, {
+      method: "POST",
+    }),
+
   reviewStudy: (id: string, decision: "approve" | "reject") =>
     request<StudyDetail>(`/api/studies/${encodeURIComponent(id)}/review`, {
       method: "POST",
@@ -185,4 +191,9 @@ export const api = {
     }),
 
   listAudit: () => request<AuditEntry[]>("/api/access-control/audit"),
+
+  listNetworkLogs: (direction: "received" | "sent", limit = 100) => {
+    const query = new URLSearchParams({ direction, limit: String(limit) });
+    return request<NetworkLogList>(`/api/network-logs?${query.toString()}`);
+  },
 };

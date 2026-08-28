@@ -367,3 +367,45 @@ class AccessControlAuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(
         UtcDateTime, nullable=False, default=utcnow, index=True
     )
+
+
+class NetworkLog(Base):
+    """One exchange with another system: an exam that arrived, or a report sent.
+
+    ``study_id`` is a plain identifier rather than a foreign key, deliberately.
+    A network log answers "what did this node exchange, and with whom", which is a
+    question about the connection and not about the study: deleting the study must
+    not erase the record that something was received from a modality or delivered
+    to a viewer. It is the same reasoning that keeps a ``study_deleted`` audit event
+    after its study is gone.
+    """
+
+    __tablename__ = "network_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    study_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
+
+    # received | sent
+    direction: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    # upload | stow-rs | c-store | wado on the way in; c-store on the way out.
+    channel: Mapped[str] = mapped_column(String(32), nullable=False)
+    # Where it came from or went to: an address on the way in, AE@host:port out.
+    peer: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    # success | failure | duplicate
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    actor: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    reference: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    detail: Mapped[dict | None] = mapped_column(JsonDocument, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, nullable=False, default=utcnow, index=True
+    )
+
+    __table_args__ = (
+        Index("ix_network_logs_org_created", "organization_id", "created_at"),
+        Index("ix_network_logs_direction_created", "direction", "created_at"),
+    )

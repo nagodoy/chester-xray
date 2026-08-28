@@ -18,7 +18,8 @@ export type Page =
   | "study-detail"
   | "upload"
   | "settings"
-  | "access-control";
+  | "access-control"
+  | "network-logs";
 
 export interface Access {
   email: string;
@@ -177,4 +178,24 @@ export interface BulkDeleteOutcome {
   deleted: string[];
   not_found: string[];
   errors: { id: string; error: string }[];
+}
+
+/** One exchange with another system: an exam received, or a report sent. */
+export interface NetworkLogEntry {
+  id: string;
+  study_id: string | null;
+  direction: "received" | "sent";
+  channel: string;
+  peer: string | null;
+  status: "success" | "failure" | "duplicate";
+  actor: string | null;
+  reference: string | null;
+  message: string | null;
+  detail: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface NetworkLogList {
+  items: NetworkLogEntry[];
+  total: number;
 }

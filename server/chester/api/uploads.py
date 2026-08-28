@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 
-from chester.api.deps import require_page
+from chester.api.deps import client_ip, require_page
 from chester.api.studies import _to_summary
 from chester.config import settings
 from chester.db import get_session
@@ -39,6 +39,7 @@ def _normalized_content_type(filename: str, declared: str) -> str:
 
 @router.post("", response_model=UploadResponse)
 async def upload_files(
+    request: Request,
     files: list[UploadFile],
     confirm_deidentified: bool = Form(...),
     access: AccessContext = Depends(require_page("upload")),
@@ -86,6 +87,7 @@ async def upload_files(
             actor=access.email,
             db=db,
             source="upload",
+            origin=client_ip(request),
         )
 
         if not result.ok:

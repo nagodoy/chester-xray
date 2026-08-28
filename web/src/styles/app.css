@@ -632,6 +632,15 @@ td b {
   font-weight: 600;
 }
 
+/* A UID, an address and a sentence from the far end are all long, and cells
+   never wrap: three of them together drag a table off the panel. Clip them and
+   keep the whole value in the title, which is where a reader looks for it. */
+.cell-clip {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .row-actions {
   display: flex;
   gap: 6px;
