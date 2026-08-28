@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     dicom_scp_port: int = 11112
     dicom_scp_ae_title: str = "WORKLIST_SCP"
     dicom_stow_url: str = ""
+
+    # Where a generated TORAX IA series is sent, e.g. an OsiriX listener.
+    dicom_send_host: str = ""
+    dicom_send_port: int = 11112
+    dicom_send_ae_title: str = "OSIRIX"
+    dicom_send_calling_ae_title: str = "TORAX_AI"
     public_app_url: str = ""
 
     # Object storage
