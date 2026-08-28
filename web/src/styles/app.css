@@ -1290,6 +1290,16 @@ td b {
   align-items: start;
 }
 
+/* A grid item's automatic minimum is its own content, so the widest thing in
+   either column set the width of both. Stacked on a narrow screen that was the
+   findings table: it pushed the shared column past the viewport, and the
+   radiograph -- sized to that column and held to the panel's height -- was
+   clipped by the panel it overflowed. The table has its own scroller for
+   exactly this; letting the columns shrink is what puts it to work. */
+.detail-grid > * {
+  min-width: 0;
+}
+
 /* The left column splits its height: the radiograph takes seven parts and the
    metadata three, which puts the picture where the reading happens and keeps
    the record under it. minmax(0, ...) so a long metadata list scrolls in its
@@ -1331,10 +1341,18 @@ td b {
 }
 
 /* Fill the panel rather than sit in a fixed square, and contain rather than
-   cover: cropping a radiograph to a box hides anatomy at the edges. */
+   cover: cropping a radiograph to a box hides anatomy at the edges.
+   The tracks are pinned to the box because they would otherwise be sized by
+   the picture: a portrait radiograph asked for the height its own ratio wanted,
+   the row grew past the panel, and `overflow: hidden` took the difference off
+   the top and bottom of the chest. */
 .detail-image .thumb {
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   border: 0;
   background: transparent;
 }
