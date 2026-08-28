@@ -29,7 +29,6 @@ from chester.models import (
     AnalysisResult,
     AuditEvent,
     DeliveryJob,
-    Instance,
     Study,
     utcnow,
 )
@@ -76,11 +75,12 @@ def claim_job(db: Session, job_id: uuid.UUID | None = None) -> uuid.UUID | None:
 
 
 def load_pixels(db: Session, study: Study):
-    """Decode the study's first instance into a 0..255 grayscale raster.
+    """Decode the instance that represents the study into a 0..255 grayscale raster.
 
-    Ordered by creation so a multi-instance study always analyses the same image.
-    The previous implementation took an arbitrary row, so which image was scored
-    was not determined.
+    That is the frontal projection where the study holds one, and otherwise the
+    oldest instance -- deterministic either way, so a multi-instance study always
+    analyses the same image. The model reads frontal films, so a study that also
+    carries a lateral must not be scored from it.
     """
     import io
 
@@ -88,14 +88,10 @@ def load_pixels(db: Session, study: Study):
     from PIL import Image
 
     from chester.imaging.dicom import render_frame_for_model
+    from chester.instances import representative_instance
     from chester.storage import retrieve_bytes
 
-    instance = (
-        db.query(Instance)
-        .filter(Instance.study_id == study.id)
-        .order_by(Instance.created_at.asc(), Instance.id.asc())
-        .first()
-    )
+    instance = representative_instance(db, study)
     if instance is None or not instance.object_key:
         raise ValueError("study has no stored instance to analyse")
 

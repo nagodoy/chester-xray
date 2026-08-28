@@ -1,13 +1,21 @@
 """Conservative chest-radiograph validation.
 
 The rule that matters: anything not confidently chest is held for human review
-rather than silently analysed or silently dropped. Only positive evidence of a
-different body part or an incompatible modality produces a rejection.
+rather than silently analysed or silently dropped. Only positive evidence --
+a different body part, an incompatible modality, or a lateral projection --
+produces a rejection.
+
+The model reads frontal chest radiographs. A lateral film is a different
+picture of the same anatomy, and scoring one produces numbers that look like
+findings and are not, so a projection recognised as lateral is refused rather
+than analysed. Where the projection cannot be established the study is held for
+a human, as everything else uncertain is.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from typing import NamedTuple
 
 import numpy as np
@@ -39,6 +47,8 @@ CODE_NON_CHEST_MODALITY = "non_chest_modality"
 CODE_NON_CHEST_BODY_PART = "non_chest_body_part"
 CODE_CHEST_MODALITY = "chest_modality"
 CODE_CHEST_FRONTAL = "chest_frontal"
+CODE_LATERAL_VIEW = "lateral_view"
+CODE_PROJECTION_AMBIGUOUS = "projection_ambiguous"
 CODE_INCONCLUSIVE = "inconclusive_indicators"
 CODE_NO_METADATA = "no_metadata"
 CODE_INSUFFICIENT_METADATA = "insufficient_metadata"
@@ -55,6 +65,11 @@ ENGLISH_REASONS: dict[str, str] = {
     CODE_NON_CHEST_BODY_PART: "Body part {body_part} is not the chest",
     CODE_CHEST_MODALITY: "Chest modality with supporting metadata",
     CODE_CHEST_FRONTAL: "Chest body part with frontal view",
+    CODE_LATERAL_VIEW: "Lateral projection; only frontal (PA/AP) chest views are analysed",
+    CODE_PROJECTION_AMBIGUOUS: (
+        "Both a frontal and a lateral projection are named and neither is confirmed; "
+        "manual review required"
+    ),
     CODE_INCONCLUSIVE: "Some chest indicators present but not conclusive",
     CODE_NO_METADATA: "No metadata available; manual review required",
     CODE_INSUFFICIENT_METADATA: "Insufficient metadata to confirm chest X-ray",
@@ -108,14 +123,74 @@ NON_CHEST_BODY_PARTS = frozenset(
     }
 )
 
-FRONTAL_VIEWS = frozenset({"PA", "AP", "PA/AP"})
+# What a study is a picture of, as far as the metadata says.
+FRONTAL = "frontal"
+LATERAL = "lateral"
+UNKNOWN_PROJECTION = "unknown"
+AMBIGUOUS_PROJECTION = "ambiguous"
+
+FRONTAL_VIEWS = frozenset({"PA", "AP", "PA/AP", "AP/PA", "FRONTAL"})
+# ViewPosition (0018,5101) as the modalities actually write it. LL and RL are the
+# defined terms; the rest are the non-standard strings vendors emit for the same
+# film. "L" is included: as a view position it means lateral, laterality having
+# its own tag.
+LATERAL_VIEWS = frozenset(
+    {"LL", "RL", "L", "LAT", "LATERAL", "LLAT", "RLAT", "XTABLE LATERAL", "LATERAL DECUBITUS"}
+)
+
 CHEST_DESCRIPTION_HINTS = ("CHEST", "THORAX", "CXR", "LUNG", "PA", "AP VIEW")
+
+# Words that name a projection when no ViewPosition does. Matched as whole words
+# against the study, series and protocol descriptions, never as substrings: "LL"
+# inside another word is not a lateral film, and a report that discards a frontal
+# exam by accident is worse than one that holds it for review.
+FRONTAL_WORDS = frozenset({"PA", "AP", "FRONTAL", "FRENTE"})
+LATERAL_WORDS = frozenset({"LAT", "LATERAL", "PERFIL", "LL", "RL", "LLAT", "RLAT"})
+
+DESCRIPTION_FIELDS = ("description", "series_description", "protocol_name")
+_WORDS = re.compile(r"[^A-Z0-9]+")
 
 MIN_DIMENSION = 64
 MIN_ASPECT_RATIO = 0.5
 MAX_ASPECT_RATIO = 2.5
 MIN_ENTROPY = 0.5
 MAX_ENTROPY = 7.5
+
+
+def _words(meta: dict) -> set[str]:
+    """Every whole word the descriptive fields of a study carry, upper-cased."""
+    found: set[str] = set()
+    for field in DESCRIPTION_FIELDS:
+        text = (meta.get(field) or "").upper()
+        found.update(token for token in _WORDS.split(text) if token)
+    return found
+
+
+def projection(meta: dict) -> str:
+    """Say whether a study is frontal, lateral, ambiguous or simply unknown.
+
+    ViewPosition decides when it says anything this recognises: it describes the
+    instance, while a description is often written for the whole exam. Only when
+    it is absent or unrecognised do the words get a say, and a description naming
+    both projections -- "TORAX PA E PERFIL", one string covering two films --
+    settles nothing, so it is reported as ambiguous rather than guessed.
+    """
+    view_position = (meta.get("view_position") or "").upper().strip()
+    if view_position in FRONTAL_VIEWS:
+        return FRONTAL
+    if view_position in LATERAL_VIEWS:
+        return LATERAL
+
+    words = _words(meta)
+    frontal = bool(words & FRONTAL_WORDS)
+    lateral = bool(words & LATERAL_WORDS)
+    if frontal and lateral:
+        return AMBIGUOUS_PROJECTION
+    if lateral:
+        return LATERAL
+    if frontal:
+        return FRONTAL
+    return UNKNOWN_PROJECTION
 
 
 def validate_study(meta: dict, image: np.ndarray | None = None) -> Validation:
@@ -131,8 +206,19 @@ def validate_study(meta: dict, image: np.ndarray | None = None) -> Validation:
     if body_part and body_part in NON_CHEST_BODY_PARTS:
         return outcome(NON_CHEST, CODE_NON_CHEST_BODY_PART, body_part=body_part)
 
+    # The projection is decided before anything else about the chest, so that a
+    # lateral film is refused whatever else its metadata would have established.
+    view = projection(meta)
+    if view == LATERAL:
+        return outcome(NON_CHEST, CODE_LATERAL_VIEW)
+    if view == AMBIGUOUS_PROJECTION:
+        return outcome(UNCERTAIN, CODE_PROJECTION_AMBIGUOUS)
+
     is_chest_modality = modality in CHEST_MODALITIES
     is_chest_body = body_part in CHEST_BODY_PARTS
+    # Ruling a study in still needs the tag. A word in a description can say a
+    # film is lateral, which refuses it, but "PA" written in an exam description
+    # is not evidence that this instance is the frontal one.
     is_frontal = view_position in FRONTAL_VIEWS
     described_as_chest = any(hint in description for hint in CHEST_DESCRIPTION_HINTS)
 

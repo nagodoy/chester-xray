@@ -102,6 +102,44 @@ class TestInstanceSelection:
             assert chosen.id == first.id
         assert retrieve_bytes(first.object_key, session=session)
 
+    def test_the_frontal_film_is_the_one_analysed(self, session, queued_study, make_dicom):
+        """A lateral filed under the same study must never be what gets scored.
+
+        The two are told apart by shape here, which is all the pixels have to
+        say; what matters is that the raster comes from the frontal instance.
+        """
+        from chester.storage import store_bytes
+
+        study, _ = queued_study
+        lateral = session.query(Instance).filter_by(study_id=study.id).one()
+        lateral.content_type = "application/dicom"
+        store_bytes(
+            lateral.object_key,
+            make_dicom(view_position="LL", rows=96, columns=96),
+            "application/dicom",
+            session=session,
+        )
+
+        key = f"originals/{study.id}/frontal.dcm"
+        store_bytes(
+            key,
+            make_dicom(view_position="PA", rows=64, columns=80),
+            "application/dicom",
+            session=session,
+        )
+        session.add(
+            Instance(
+                study_id=study.id,
+                organization_id=study.organization_id,
+                sop_instance_uid="2.25.998",
+                object_key=key,
+                content_type="application/dicom",
+            )
+        )
+        session.flush()
+
+        assert worker.load_pixels(session, study).shape == (64, 80)
+
     def test_a_study_without_an_instance_fails_cleanly(self, session, queued_study):
         study, _ = queued_study
         session.query(Instance).filter_by(study_id=study.id).delete()

@@ -102,8 +102,21 @@ On-premises DICOM gateway (python -m chester.gateway):
 | State | Condition | Next Action |
 |---|---|---|
 | `chest` | DX/CR/RG + CHEST/THORAX body part + frontal view | Auto-queue for inference |
-| `uncertain` | Some chest evidence, or image-only upload | Route to `needs_review` |
-| `non_chest` | Incompatible modality (CT/MR/US) or non-chest body part | Reject |
+| `uncertain` | Some chest evidence, image-only upload, or a projection named both ways | Route to `needs_review` |
+| `non_chest` | Incompatible modality (CT/MR/US), non-chest body part, or a lateral projection | Reject |
+
+Only the frontal projection is analysed. A lateral film -- ViewPosition `LL`,
+`RL` and the non-standard strings vendors write for the same view, or a series,
+study or protocol description naming one -- is refused rather than scored, since
+the model reads frontal radiographs and a lateral would produce numbers that
+read as findings. Where a description names both projections and no ViewPosition
+settles it, the study is held for review instead of guessed at.
+
+A two-film exam arrives under one Study Instance UID, so the frontal and the
+lateral become instances of one study. The study is analysed, illustrated and
+reported from its frontal instance, whichever of the two was received first;
+`chester.instances` makes that choice once for the worker, the thumbnail
+rebuild and the report sheet.
 
 ### 4. AI Inference Worker
 
@@ -227,7 +240,7 @@ Browser → POST /api/uploads (multipart, confirm_deidentified=true)
   → SHA-256 dedup check
   → DICOM parse (pydicom + pylibjpeg)
   → Patient ID pseudonymization (HMAC-SHA256)
-  → Chest/uncertain/non_chest validation
+  → Chest/uncertain/non_chest validation (a lateral projection is refused here)
   → Thumbnail generation (Pillow)
   → Store original + thumbnail (object storage)
   → Create Study + Instance + AnalysisJob records
@@ -235,7 +248,7 @@ Browser → POST /api/uploads (multipart, confirm_deidentified=true)
 
 Worker process:
   → Claim a queued job (FOR UPDATE SKIP LOCKED) and take a lease
-  → Retrieve the study's oldest instance from storage
+  → Retrieve the study's frontal instance from storage (oldest, absent a projection)
   → Decode and preprocess (pydicom/Pillow, then resize, crop, scale)
   → Run ONNX Runtime inference outside any transaction
   → Store AnalysisResult (raw_scores, op_normalized_scores, thresholds, above_threshold)

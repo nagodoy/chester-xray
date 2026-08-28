@@ -133,6 +133,11 @@ def extract_metadata(dataset: Any) -> dict:
         "body_part": _tag_str(dataset, "BodyPartExamined", "").upper(),
         "view_position": _tag_str(dataset, "ViewPosition", "").upper(),
         "description": study_description or series_description,
+        # Kept apart as well as merged: the worklist shows one description, but
+        # the projection is usually named in the series or the protocol, and
+        # collapsing them hides a "PERFIL" behind a study called "TORAX".
+        "series_description": series_description,
+        "protocol_name": _tag_str(dataset, "ProtocolName", ""),
         "study_instance_uid": _tag_str(dataset, "StudyInstanceUID", ""),
         "series_instance_uid": _tag_str(dataset, "SeriesInstanceUID", ""),
         "sop_instance_uid": _tag_str(dataset, "SOPInstanceUID", ""),

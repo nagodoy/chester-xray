@@ -28,9 +28,12 @@ from chester.imaging.dicom import (
 from chester.imaging.validation import (
     CHEST,
     CODE_IMAGE_ONLY,
+    CODE_LATERAL_VIEW,
+    LATERAL,
     NON_CHEST,
     UNCERTAIN,
     outcome,
+    projection,
     validate_study,
 )
 from chester.models import AnalysisJob, AuditEvent, Instance, Study, User
@@ -222,8 +225,10 @@ def _ingest_dicom(
     else:
         _fill_missing_metadata(study, meta)
 
+    drew_thumbnail = False
     if pixels is not None and not study.thumbnail_url:
         _store_thumbnail(db, study, pixels)
+        drew_thumbnail = True
 
     object_key = f"originals/{study.id}/{sha256[:8]}.dcm"
     store_bytes(object_key, data, DICOM_CONTENT_TYPE, session=db)
@@ -251,11 +256,19 @@ def _ingest_dicom(
 
     if is_new_study:
         _finalize_status(db, study, validation.state)
-    elif study.status == STATUS_NEEDS_REVIEW and validation.state == CHEST:
-        # A later instance supplied the evidence the first one lacked.
+    elif validation.state == CHEST and _awaiting_a_frontal(study):
+        # A later instance supplied the evidence the first one lacked -- often
+        # the frontal film of an exam whose lateral was sent first, which is
+        # also the image the study should be represented by from here on.
         study.validation_state = validation.state
         study.validation_reason_code = validation.code
         study.validation_reason = validation.reason
+        # The row describes the image the study is scored from, so the view of
+        # the instance that reopened it replaces whatever the earlier one wrote.
+        study.view_position = meta.get("view_position") or study.view_position
+        if pixels is not None and not drew_thumbnail:
+            # The study was pictured by the film it is no longer scored from.
+            _store_thumbnail(db, study, pixels)
         _finalize_status(db, study, validation.state)
 
     _audit(
@@ -384,14 +397,31 @@ def _ingest_image(
     )
 
 
+def _awaiting_a_frontal(study: Study) -> bool:
+    """Whether a study can still be turned into one worth analysing.
+
+    A study held for review can be: the evidence it lacked may arrive with a
+    later instance. So can one refused for being lateral, because an exam whose
+    lateral was sent first is not a lateral exam -- the frontal film is on its
+    way. Nothing else is reopened by an arriving instance: a study refused for
+    its modality or its body part stays refused.
+    """
+    if study.status == STATUS_NEEDS_REVIEW:
+        return True
+    return study.status == STATUS_REJECTED and study.validation_reason_code == CODE_LATERAL_VIEW
+
+
 def _fill_missing_metadata(study: Study, meta: dict) -> None:
     """Fill gaps only. The first instance's pseudonym is never overwritten."""
     study.patient_age = study.patient_age or meta.get("patient_age") or None
     study.patient_sex = study.patient_sex or meta.get("patient_sex") or None
     study.study_date = study.study_date or meta.get("study_date") or None
     study.modality = study.modality or meta.get("modality") or None
-    study.view_position = study.view_position or meta.get("view_position") or None
     study.description = study.description or meta.get("description") or None
+    # A lateral instance never names the study's view. The row describes the
+    # image the study is scored from, and that is never the lateral one.
+    if projection(meta) != LATERAL:
+        study.view_position = study.view_position or meta.get("view_position") or None
 
 
 def _store_thumbnail(db: Session, study: Study, pixels) -> None:

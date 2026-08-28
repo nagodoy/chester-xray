@@ -65,6 +65,8 @@ export const es: Dictionary = {
     non_chest_body_part: "La región {body_part} no es el tórax",
     chest_modality: "Modalidad torácica con metadatos de apoyo",
     chest_frontal: "Región torácica en proyección frontal",
+    lateral_view: "Proyección lateral; solo se analiza el tórax frontal (PA/AP)",
+    projection_ambiguous: "La descripción menciona proyección frontal y lateral; revisión manual",
     inconclusive_indicators: "Algunos indicios de tórax, pero no concluyentes",
     no_metadata: "Sin metadatos; se requiere revisión manual",
     insufficient_metadata: "Metadatos insuficientes para confirmar una radiografía de tórax",
