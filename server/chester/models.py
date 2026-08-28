@@ -204,6 +204,9 @@ class Study(TimestampMixin, Base):
     audit_events: Mapped[list[AuditEvent]] = relationship(
         back_populates="study", cascade="all, delete-orphan"
     )
+    delivery_jobs: Mapped[list[DeliveryJob]] = relationship(
+        back_populates="study", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("ix_studies_org_created", "organization_id", "created_at"),
@@ -367,3 +370,125 @@ class AccessControlAuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(
         UtcDateTime, nullable=False, default=utcnow, index=True
     )
+
+
+class NetworkLog(Base):
+    """One exchange with another system: an exam that arrived, or a report sent.
+
+    ``study_id`` is a plain identifier rather than a foreign key, deliberately.
+    A network log answers "what did this node exchange, and with whom", which is a
+    question about the connection and not about the study: deleting the study must
+    not erase the record that something was received from a modality or delivered
+    to a viewer. It is the same reasoning that keeps a ``study_deleted`` audit event
+    after its study is gone.
+    """
+
+    __tablename__ = "network_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    study_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
+
+    # received | sent
+    direction: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    # upload | stow-rs | c-store | wado on the way in; c-store on the way out.
+    channel: Mapped[str] = mapped_column(String(32), nullable=False)
+    # Where it came from or went to: an address on the way in, AE@host:port out.
+    peer: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    # success | failure | duplicate
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    actor: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    reference: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    detail: Mapped[dict | None] = mapped_column(JsonDocument, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, nullable=False, default=utcnow, index=True
+    )
+
+    __table_args__ = (
+        Index("ix_network_logs_org_created", "organization_id", "created_at"),
+        Index("ix_network_logs_direction_created", "direction", "created_at"),
+    )
+
+
+class SendDestination(TimestampMixin, Base):
+    """A node this organization stores generated reports on.
+
+    The destination used to be one address in the environment, which meant a site
+    with a PACS and a reading workstation could reach only one of them, and moving
+    either was a redeploy. It is a row now, so the console configures it.
+    """
+
+    __tablename__ = "send_destinations"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    host: Mapped[str] = mapped_column(String(253), nullable=False)
+    port: Mapped[int] = mapped_column(Integer, nullable=False, default=11112)
+    # DICOM caps an AE title at sixteen characters.
+    ae_title: Mapped[str] = mapped_column(String(16), nullable=False)
+    calling_ae_title: Mapped[str] = mapped_column(String(16), nullable=False, default="TORAX_AI")
+
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Whether a completed analysis is delivered here without anyone asking.
+    auto_send: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+
+    organization: Mapped[Organization] = relationship()
+    delivery_jobs: Mapped[list[DeliveryJob]] = relationship(
+        back_populates="destination", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("organization_id", "name", name="uq_send_destinations_org_name"),
+    )
+
+
+class DeliveryJob(Base):
+    """One report to store on one destination.
+
+    Delivery is queued rather than done inline at the end of an analysis: a node
+    that is down must not fail the analysis that produced the report, and an
+    attempt that failed for a reason that passes deserves another one.
+    """
+
+    __tablename__ = "delivery_jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    study_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("studies.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    destination_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("send_destinations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    # queued | processing | completed | error
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued", index=True)
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    lease_owner: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        UtcDateTime, nullable=True, index=True
+    )
+    # A failed attempt waits before the next one, so a node that is down is not
+    # hammered by the poll loop.
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, nullable=False, default=utcnow, index=True
+    )
+
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, nullable=False, default=utcnow, onupdate=utcnow
+    )
+    started_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+
+    study: Mapped[Study] = relationship(back_populates="delivery_jobs")
+    destination: Mapped[SendDestination] = relationship(back_populates="delivery_jobs")

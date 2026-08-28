@@ -18,7 +18,8 @@ export type Page =
   | "study-detail"
   | "upload"
   | "settings"
-  | "access-control";
+  | "access-control"
+  | "network-logs";
 
 export interface Access {
   email: string;
@@ -133,6 +134,26 @@ export interface DicomwebSettings {
   wado_anonymous: boolean;
 }
 
+/** A node this organization stores generated reports on. */
+export interface SendConnection {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  ae_title: string;
+  calling_ae_title: string;
+  active: boolean;
+  auto_send: boolean;
+  created_by: string | null;
+}
+
+export interface SendConnectionList {
+  items: SendConnection[];
+  /** The deployment's own address, in use only while nothing is configured. */
+  environment: Omit<SendConnection, "id" | "active" | "auto_send" | "created_by"> | null;
+  editable: boolean;
+}
+
 export interface ManagedUser {
   id: string;
   email: string;
@@ -177,4 +198,24 @@ export interface BulkDeleteOutcome {
   deleted: string[];
   not_found: string[];
   errors: { id: string; error: string }[];
+}
+
+/** One exchange with another system: an exam received, or a report sent. */
+export interface NetworkLogEntry {
+  id: string;
+  study_id: string | null;
+  direction: "received" | "sent";
+  channel: string;
+  peer: string | null;
+  status: "success" | "failure" | "duplicate";
+  actor: string | null;
+  reference: string | null;
+  message: string | null;
+  detail: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface NetworkLogList {
+  items: NetworkLogEntry[];
+  total: number;
 }

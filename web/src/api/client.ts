@@ -6,6 +6,9 @@ import type {
   DicomwebSettings,
   ManagedDomain,
   ManagedUser,
+  NetworkLogList,
+  SendConnection,
+  SendConnectionList,
   StudyDetail,
   StudyList,
   UploadOutcome,
@@ -137,6 +140,11 @@ export const api = {
       ...json({ ids }),
     }),
 
+  sendReport: (id: string) =>
+    request<StudyDetail>(`/api/studies/${encodeURIComponent(id)}/send-report`, {
+      method: "POST",
+    }),
+
   reviewStudy: (id: string, decision: "approve" | "reject") =>
     request<StudyDetail>(`/api/studies/${encodeURIComponent(id)}/review`, {
       method: "POST",
@@ -162,6 +170,27 @@ export const api = {
 
   getSettings: () => request<DicomwebSettings>("/api/settings/dicomweb"),
 
+  listDestinations: () => request<SendConnectionList>("/api/settings/destinations"),
+  createDestination: (body: {
+    name: string;
+    host: string;
+    port: number;
+    ae_title: string;
+    calling_ae_title: string;
+  }) => request<SendConnection>("/api/settings/destinations", { method: "POST", ...json(body) }),
+  updateDestination: (id: string, body: Record<string, unknown>) =>
+    request<SendConnection>(`/api/settings/destinations/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      ...json(body),
+    }),
+  deleteDestination: (id: string) =>
+    request<void>(`/api/settings/destinations/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  testDestination: (id: string) =>
+    request<{ ok: boolean; message: string }>(
+      `/api/settings/destinations/${encodeURIComponent(id)}/test`,
+      { method: "POST" },
+    ),
+
   accessMetadata: () => request<AccessMetadata>("/api/access-control/metadata"),
   listUsers: () => request<ManagedUser[]>("/api/access-control/users"),
   createUser: (body: { email: string; role: string; allowed_pages: string[] | null }) =>
@@ -185,4 +214,9 @@ export const api = {
     }),
 
   listAudit: () => request<AuditEntry[]>("/api/access-control/audit"),
+
+  listNetworkLogs: (direction: "received" | "sent", limit = 100) => {
+    const query = new URLSearchParams({ direction, limit: String(limit) });
+    return request<NetworkLogList>(`/api/network-logs?${query.toString()}`);
+  },
 };

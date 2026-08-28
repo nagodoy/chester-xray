@@ -55,7 +55,9 @@ class Settings(BaseSettings):
     dicom_scp_ae_title: str = "WORKLIST_SCP"
     dicom_stow_url: str = ""
 
-    # Where a generated TORAX IA series is sent, e.g. an OsiriX listener.
+    # Where a generated TORAX IA series is sent when no destination has been
+    # configured in the console, e.g. an OsiriX listener. Configured destinations
+    # take precedence; this is the fallback a deployment starts from.
     dicom_send_host: str = "superpaccs.com.br"
     dicom_send_port: int = 11112
     dicom_send_ae_title: str = "medfusion"
@@ -76,6 +78,10 @@ class Settings(BaseSettings):
     # Worker
     job_lease_minutes: int = 30
     worker_poll_seconds: float = 5.0
+    # Automatic delivery: how many times an attempt is repeated, and how long a
+    # failed one waits before the next.
+    delivery_max_attempts: int = 3
+    delivery_retry_minutes: float = 5.0
 
     debug: bool = False
     testing: bool = False

@@ -21,6 +21,9 @@ considering any clinical deployment.
 - DICOMweb STOW-RS ingestion with a service token
 - On-premises DICOM C-STORE gateway that forwards to STOW-RS
 - Conservative chest-radiograph validation, holding anything uncertain for review
+- Send connections configured in the console, with automatic delivery of a
+  finished report
+- Network log of every exam received and every report sent, with its outcome
 - Studies, jobs, results and audit trails in PostgreSQL
 - Background inference in a separate worker process
 - Raw scores, operating-point normalization, thresholds and recorded versions
@@ -112,7 +115,29 @@ in a private sequence, and a private tag is in no receiver's data dictionary,
 so under Implicit VR the wire carries no VR either and the far end decodes
 the sequence as raw bytes -- the image arrives and the findings do not.
 
-The destination defaults to `superpaccs.com.br:11112`, AE title `medfusion`,
+Where it goes is configured in **Ajustes**, not in the environment: a connection
+is a row with a name, an address, an AE title and a calling AE title, and an
+organization can have several -- a PACS and a reading workstation are two nodes.
+`--destination NAME` sends to one of them; without it the report goes to every
+active connection, and so does the button on the study.
+
+A connection marked automatic receives the report on its own: when the worker
+finishes an analysis it queues one delivery per automatic connection, and the
+same worker stores it. A node that is down does not fail the analysis -- the
+delivery is retried `DELIVERY_MAX_ATTEMPTS` times, `DELIVERY_RETRY_MINUTES`
+apart, and every attempt is a row in the network log.
+
+`DICOM_SEND_HOST` and its companions are the fallback a deployment starts from.
+They are used only while an organization has configured nothing at all; once it
+has, the console is the only thing that decides where reports go.
+
+Every attempt is recorded, from the command line and from the interface alike:
+the **Network logs** page lists what this node received and where it came from,
+and what it sent and whether the destination took it. A refused delivery is a row
+with the reason the far end gave, not a line in the log of whichever process
+happened to run the send.
+
+That fallback defaults to `superpaccs.com.br:11112`, AE title `medfusion`,
 calling as `TORAX_AI`; override with `DICOM_SEND_HOST`, `DICOM_SEND_PORT`,
 `DICOM_SEND_AE_TITLE` and `DICOM_SEND_CALLING_AE_TITLE`. Nothing leaves the
 process without `--send`.
@@ -145,6 +170,11 @@ cd web && npm run typecheck && npm run build
 | `POST /api/studies/{id}/retry` | Requeue a failed or stuck study | Session token |
 | `DELETE /api/studies/{id}` | Delete a study, its image and its analysis | Session token, administrator |
 | `POST /api/studies/bulk-delete` | Delete several studies, reporting each | Session token, administrator |
+| `POST /api/studies/{id}/send-report` | Build the TORAX IA report and store it on every active destination | Session token |
+| `GET /api/settings/destinations` | Configured send connections | Session token, `settings` page |
+| `POST/PATCH/DELETE /api/settings/destinations` | Manage send connections | Session token, administrator |
+| `POST /api/settings/destinations/{id}/test` | C-ECHO a connection | Session token, administrator |
+| `GET /api/network-logs` | Exams received and reports sent | Session token, `network-logs` page |
 | `GET /api/access-control/*` | Manage who may sign in | Session token, administrator |
 | `POST /dicomweb/studies` | STOW-RS ingestion | Service token |
 | `GET /dicomweb/studies` | Connectivity probe | Public |

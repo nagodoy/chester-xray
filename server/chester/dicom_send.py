@@ -90,3 +90,39 @@ def send_dataset(
     if code != 0x0000:
         raise SendFailed(f"{ae_title} rejected the store with status 0x{code:04X}")
     logger.info("Stored %s on %s at %s:%d", dataset.SOPInstanceUID, ae_title, host, port)
+
+
+def echo(
+    *,
+    host: str,
+    port: int,
+    ae_title: str,
+    calling_ae_title: str,
+) -> None:
+    """Verify a destination with C-ECHO, raising when it does not answer.
+
+    What this proves is that the node is reachable and accepts an association
+    from this AE title -- which is what an operator is asking when they save a
+    connection. It says nothing about whether the node will accept a Secondary
+    Capture, because Verification is a different presentation context.
+    """
+    from pynetdicom import AE
+    from pynetdicom.sop_class import Verification
+
+    application_entity = AE(ae_title=calling_ae_title)
+    application_entity.add_requested_context(Verification)
+
+    association = application_entity.associate(host, port, ae_title=ae_title)
+    if not association.is_established:
+        raise SendFailed(f"{ae_title} at {host}:{port} refused the association")
+
+    try:
+        status = association.send_c_echo()
+    finally:
+        association.release()
+
+    if not status:
+        raise SendFailed(f"{ae_title} returned no status for the echo")
+    code = getattr(status, "Status", None)
+    if code != 0x0000:
+        raise SendFailed(f"{ae_title} answered the echo with status 0x{code:04X}")

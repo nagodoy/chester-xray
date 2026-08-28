@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
+from chester import network_log
 from chester.imaging.dicom import (
     compute_sha256,
     extract_metadata,
@@ -70,15 +71,56 @@ def ingest_file(
     actor: str,
     db: Session,
     source: str = "upload",
+    origin: str | None = None,
 ) -> IngestResult:
-    """Ingest one file into the owner's worklist."""
+    """Ingest one file into the owner's worklist.
+
+    Every outcome -- accepted, duplicate or refused -- is written to the network
+    log here rather than at each call site, so an upload, a STOW-RS post and a
+    forwarded C-STORE are all recorded the same way.
+    """
     try:
         if looks_like_dicom(data, filename, content_type):
-            return _ingest_dicom(data, filename, owner, actor, db, source)
-        return _ingest_image(data, filename, content_type, owner, actor, db, source)
+            result = _ingest_dicom(data, filename, owner, actor, db, source)
+        else:
+            result = _ingest_image(data, filename, content_type, owner, actor, db, source)
     except Exception as exc:
         logger.exception("Ingestion failed for %s", filename)
-        return IngestResult(error=str(exc), filename=filename)
+        result = IngestResult(error=str(exc), filename=filename)
+
+    _record_receipt(db, result, owner=owner, actor=actor, channel=source, origin=origin)
+    return result
+
+
+def _record_receipt(
+    db: Session,
+    result: IngestResult,
+    *,
+    owner: User,
+    actor: str,
+    channel: str,
+    origin: str | None,
+) -> None:
+    if not result.ok:
+        status = network_log.FAILURE
+    elif result.deduplicated:
+        status = network_log.DUPLICATE
+    else:
+        status = network_log.SUCCESS
+
+    network_log.record(
+        db,
+        organization_id=owner.organization_id,
+        direction=network_log.RECEIVED,
+        channel=channel,
+        status=status,
+        study_id=result.study_id,
+        peer=origin,
+        actor=actor,
+        reference=result.sop_instance_uid or None,
+        message=result.error,
+        detail={"filename": result.filename or None, **result.detail},
+    )
 
 
 def _existing_instance(db: Session, owner: User, *, sha256: str = "", sop_uid: str = ""):
@@ -106,6 +148,7 @@ def _deduplicated(db: Session, instance: Instance, actor: str, filename: str, re
         sop_instance_uid=instance.sop_instance_uid or "",
         deduplicated=True,
         filename=filename,
+        detail={"deduplicated_by": reason},
     )
 
 
@@ -228,7 +271,12 @@ def _ingest_dicom(
             "source": source,
         },
     )
-    return IngestResult(study_id=study.id, sop_instance_uid=sop_uid, filename=filename)
+    return IngestResult(
+        study_id=study.id,
+        sop_instance_uid=sop_uid,
+        filename=filename,
+        detail={"validation_state": validation.state, "study_status": study.status},
+    )
 
 
 def _ingest_image(
@@ -329,7 +377,10 @@ def _ingest_image(
         },
     )
     return IngestResult(
-        study_id=study.id, sop_instance_uid=uids["sop_instance_uid"], filename=filename
+        study_id=study.id,
+        sop_instance_uid=uids["sop_instance_uid"],
+        filename=filename,
+        detail={"validation_state": validation.state, "study_status": study.status},
     )
 
 

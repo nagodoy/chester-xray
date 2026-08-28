@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { DicomwebSettings } from "../api/types";
 import { AppShell, PageHeading } from "../components/AppShell";
+import { SendConnections } from "../components/SendConnections";
 import { ErrorBox, Skeleton } from "../components/common";
 import { useI18n } from "../i18n";
 
@@ -51,13 +52,17 @@ export function SettingsPage() {
         eyebrow={t.settings.eyebrow}
         title={anonymous ? t.settings.titleAnonymous : t.settings.title}
         subtitle={anonymous ? t.settings.subtitleAnonymous : t.settings.subtitle}
-        actions={
-          <div className="settings-mark">
-            <RadioTower size={18} aria-hidden />
-            <span>{t.settings.readOnly}</span>
-          </div>
-        }
       />
+
+      <SendConnections />
+
+      <div className="section-heading">
+        <h2>{t.settings.ingestionTitle}</h2>
+        <div className="settings-mark">
+          <RadioTower size={18} aria-hidden />
+          <span>{t.settings.readOnly}</span>
+        </div>
+      </div>
 
       {error ? (
         <ErrorBox title={t.settings.unavailable} message={error} onRetry={() => void load()} />

@@ -37,6 +37,7 @@ PAGE_LABELS: dict[str, str] = {
     "study-detail": "Detalhe do estudo",
     "upload": "Envio de estudos",
     "settings": "Ajustes DICOMweb",
+    "network-logs": "Logs de rede",
     "access-control": "Controle de acesso",
 }
 

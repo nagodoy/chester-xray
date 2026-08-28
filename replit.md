@@ -31,6 +31,21 @@ itself is unauthenticated.
 Uncertain studies enter `needs_review`. Non-chest studies are rejected rather than
 silently discarded.
 
+## Delivery
+
+Where a finished report is stored is a row in `send_destinations`, edited in the
+console, not an environment variable. `DICOM_SEND_HOST` and its companions remain
+as the fallback used while an organization has configured nothing.
+
+A destination marked `auto_send` gets the report without anyone asking: the
+worker queues a `delivery_jobs` row when an analysis completes and stores it on
+the next pass. It is a queue rather than a call at the end of the analysis
+because a node that is down must not fail the analysis that produced the report;
+attempts are retried and every one of them is recorded in `network_logs`.
+
+Sending needs `pynetdicom`, which is a runtime dependency for that reason -- the
+gateway extra now only carries `requests`.
+
 ## Schema
 
 The ORM in `server/chester/models.py` is the schema. There is no migration tool:

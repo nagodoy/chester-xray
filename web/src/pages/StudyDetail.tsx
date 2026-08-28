@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, X } from "lucide-react";
+import { ArrowLeft, Check, Send, X } from "lucide-react";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "wouter";
 
@@ -52,6 +52,9 @@ export function StudyDetail() {
   const [study, setStudy] = useState<StudyDetailType | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // A delivery outcome is reported beside the study, not by replacing it: the
+  // study loaded fine, and a destination that refused is ordinary news.
+  const [delivery, setDelivery] = useState<{ ok: boolean; detail: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -74,6 +77,23 @@ export function StudyDetail() {
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const send = async () => {
+    if (!id) return;
+    setBusy(true);
+    setDelivery(null);
+    try {
+      setStudy(await api.sendReport(id));
+      setDelivery({ ok: true, detail: "" });
+    } catch (caught) {
+      setDelivery({
+        ok: false,
+        detail: caught instanceof Error ? caught.message : String(caught),
+      });
     } finally {
       setBusy(false);
     }
@@ -129,6 +149,16 @@ export function StudyDetail() {
                 {t.detail.retryAnalysis}
               </button>
             )}
+            {study.status === "completed" && (
+              <button
+                type="button"
+                className="btn btn-subtle"
+                disabled={busy}
+                onClick={() => void send()}
+              >
+                <Send size={15} aria-hidden /> {busy ? t.detail.sending : t.detail.sendReport}
+              </button>
+            )}
             {canReview && (
               <>
                 <button
@@ -153,6 +183,11 @@ export function StudyDetail() {
         </div>
       </div>
 
+      {delivery && (
+        <Notice strong={delivery.ok ? t.detail.reportSent : t.detail.reportNotSent}>
+          {delivery.detail}
+        </Notice>
+      )}
       {study.status === "error" && (
         <Notice strong={t.detail.inferenceError}>
           {study.error_message ?? t.detail.inferenceErrorBody}

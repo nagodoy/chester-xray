@@ -6,6 +6,7 @@ import type { Page } from "./api/types";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { I18nProvider, useI18n } from "./i18n";
 import { AccessControl } from "./pages/AccessControl";
+import { NetworkLogs } from "./pages/NetworkLogs";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SignIn } from "./pages/SignIn";
 import { StudyDetail } from "./pages/StudyDetail";
@@ -21,6 +22,7 @@ const PAGE_PATHS: Record<Page, string> = {
   upload: "/worklist",
   settings: "/settings",
   "access-control": "/access-control",
+  "network-logs": "/network-logs",
 };
 
 function Loading() {
@@ -92,6 +94,11 @@ function Routes() {
       <Route path="/settings">
         <Protected page="settings">
           <SettingsPage />
+        </Protected>
+      </Route>
+      <Route path="/network-logs">
+        <Protected page="network-logs">
+          <NetworkLogs />
         </Protected>
       </Route>
       <Route path="/access-control">

@@ -4,6 +4,7 @@ import {
   ClipboardList,
   LogOut,
   Microscope,
+  Network,
   Settings2,
   ShieldCheck,
 } from "lucide-react";
@@ -77,6 +78,16 @@ function Sidebar() {
           >
             <Settings2 size={16} aria-hidden />
             <span>{t.nav.settings}</span>
+          </Link>
+        )}
+        {can("network-logs") && (
+          <Link
+            href="/network-logs"
+            className={location === "/network-logs" ? "active" : ""}
+            aria-current={location === "/network-logs" ? "page" : undefined}
+          >
+            <Network size={16} aria-hidden />
+            <span>{t.nav.networkLogs}</span>
           </Link>
         )}
         {can("access-control") && (

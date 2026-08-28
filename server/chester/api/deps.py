@@ -15,6 +15,12 @@ from chester.security.tokens import hash_session_token
 SESSION_HEADER = "X-Session-Token"
 
 
+def client_ip(request: Request) -> str | None:
+    """The caller's address, preferring the proxy header this runs behind."""
+    forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    return forwarded or (request.client.host if request.client else None)
+
+
 def _unauthorized(detail: str = "Not authenticated") -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

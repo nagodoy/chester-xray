@@ -209,6 +209,38 @@ def review_study(
     return _to_detail(study)
 
 
+@router.post("/{study_id}/send-report", response_model=StudyDetailSchema)
+def send_report(
+    study_id: uuid.UUID,
+    access: AccessContext = Depends(require_page("study-detail")),
+    db: Session = Depends(get_session),
+):
+    """Build the TORAX IA report for a study and store it on every active destination."""
+    from chester.dicom_send import SendNotConfigured
+    from chester.report_delivery import deliver_to_active
+
+    study = _load(db, access, study_id)
+    try:
+        failures = deliver_to_active(db, study, actor=access.email)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SendNotConfigured as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Commit before answering either way: the attempts are recorded, and on the
+    # failing path the session dependency would otherwise roll back the very
+    # records that explain the failure.
+    db.commit()
+    if failures:
+        raise HTTPException(
+            status_code=502,
+            detail="; ".join(f"{destination.name}: {message}" for destination, message in failures),
+        )
+
+    db.refresh(study)
+    return _to_detail(study)
+
+
 def _purge_objects(db: Session, study: Study) -> None:
     """Remove the stored bytes for a study, before its rows go.
 

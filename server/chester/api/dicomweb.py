@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from chester.api.deps import client_ip
 from chester.config import settings
 from chester.db import get_session
 from chester.ingestion import ingest_file
@@ -302,6 +303,7 @@ async def handle_stow(
             actor=f"dicomweb:{owner.email}",
             db=db,
             source=ingest_source,
+            origin=client_ip(request),
         )
 
         if not result.ok:
