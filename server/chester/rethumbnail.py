@@ -23,36 +23,18 @@ generator produces is skipped, so a second run is close to a no-op.
 from __future__ import annotations
 
 import argparse
-import io
 import logging
 import sys
 
 from sqlalchemy.orm import Session
 
 from chester.db import session_scope
-from chester.imaging.dicom import generate_thumbnail, parse_dicom_bytes, render_frame
+from chester.imaging.dicom import generate_thumbnail
+from chester.imaging.source import pixels_from_stored
 from chester.models import Instance, Study
 from chester.storage import ObjectNotFound, retrieve_bytes, store_bytes
 
 logger = logging.getLogger("chester.rethumbnail")
-
-DICOM_CONTENT_TYPE = "application/dicom"
-
-
-def _pixels_from(data: bytes, content_type: str | None):
-    """Render a frame the way ingestion does, by how the bytes were filed.
-
-    Two paths, because two kinds of file are accepted: a DICOM goes through
-    the modality LUT and VOI windowing that render_frame applies, and a plain
-    PNG or JPEG is simply read as grayscale.
-    """
-    import numpy as np
-    from PIL import Image
-
-    if (content_type or "").startswith(DICOM_CONTENT_TYPE):
-        return render_frame(parse_dicom_bytes(data), frame_index=0)
-    with Image.open(io.BytesIO(data)) as image:
-        return np.array(image.convert("L"), dtype=np.float32)
 
 
 def _source_instance(db: Session, study: Study) -> Instance | None:
@@ -84,7 +66,7 @@ def regenerate(db: Session, study: Study, *, dry_run: bool) -> str:
         return "missing-bytes"
 
     try:
-        thumbnail = generate_thumbnail(_pixels_from(data, instance.content_type))
+        thumbnail = generate_thumbnail(pixels_from_stored(data, instance.content_type))
     except Exception as exc:
         logger.warning("Study %s: could not render %s: %s", study.id, instance.object_key, exc)
         return "unreadable"

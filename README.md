@@ -76,6 +76,54 @@ Each study is committed on its own, so the run is safe to interrupt, and one
 already carrying the current thumbnail is skipped, so it is safe to repeat.
 Studies whose bytes are gone are reported and passed over.
 
+## TORAX IA report series
+
+Turns a completed analysis into a Secondary Capture instance and, optionally,
+stores it on a viewer:
+
+```bash
+cd server
+python -m chester.dicom_report --study <id> --out report.dcm
+python -m chester.dicom_report --study <id> --send      # to DICOM_SEND_HOST
+```
+
+The instance is a new series, `TORAX IA`, inside the source study. It carries
+a rendered sheet -- the radiograph over an identification cell and a table of
+every reported finding -- and repeats the same findings in a private block:
+a creator at `(270F,0010)` and a sequence of `CodeMeaning` / `TextValue`
+pairs, modelled on the AZMED/Rayvolve tags.
+
+Each finding is called `ABSENT` under its operating point, `CONFIDENT` over
+it, and `DOUBT` within ten per cent of it either way -- the band straddles
+the threshold, because a score just under is no more decidable than one just
+over.
+
+Every tag of the source instance is copied except those describing its pixels
+and geometry. Pixel spacing in particular is dropped: left on a rendered
+sheet, it would let a viewer measure distances on the report.
+
+`--private-creator` changes the creator string. It defaults to `TORAX AI`
+rather than `AZMED`, because that string is what attributes the findings to a
+producer; set it to another vendor's only to satisfy a viewer that reads
+their block, knowing what it claims.
+
+Sending proposes Explicit VR Little Endian and nothing else. The findings are
+in a private sequence, and a private tag is in no receiver's data dictionary,
+so under Implicit VR the wire carries no VR either and the far end decodes
+the sequence as raw bytes -- the image arrives and the findings do not.
+
+The destination defaults to `superpaccs.com.br:11112`, AE title `medfusion`,
+calling as `TORAX_AI`; override with `DICOM_SEND_HOST`, `DICOM_SEND_PORT`,
+`DICOM_SEND_AE_TITLE` and `DICOM_SEND_CALLING_AE_TITLE`. Nothing leaves the
+process without `--send`.
+
+The instance names itself: `SendingApplicationEntityTitle (0002,0017)` carries
+the calling AE, so the tag and the association cannot claim different senders.
+That tag is file meta, which C-STORE does not transmit -- a receiver writes
+its own -- so the producer is also recorded where it does travel, in
+`Manufacturer`, `ManufacturerModelName` and the Secondary Capture device tags.
+Those would otherwise still name whoever made the source exam.
+
 ## Checks
 
 ```bash
