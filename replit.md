@@ -29,7 +29,10 @@ owner's worklist. Requests are size-capped and read in chunks, but the endpoint
 itself is unauthenticated.
 
 Uncertain studies enter `needs_review`. Non-chest studies are rejected rather than
-silently discarded.
+silently discarded, and so are lateral films: only the frontal (PA/AP) projection
+is analysed. An exam sent as two films shares one Study Instance UID, so both
+become instances of one study, which is then scored, illustrated and reported
+from its frontal instance whichever arrived first.
 
 ## Delivery
 

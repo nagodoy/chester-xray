@@ -21,6 +21,8 @@ considering any clinical deployment.
 - DICOMweb STOW-RS ingestion with a service token
 - On-premises DICOM C-STORE gateway that forwards to STOW-RS
 - Conservative chest-radiograph validation, holding anything uncertain for review
+- Frontal (PA/AP) chest films only: a lateral is refused, and an exam holding
+  both is analysed from its frontal image
 - Send connections configured in the console, with automatic delivery of a
   finished report
 - Network log of every exam received and every report sent, with its outcome
@@ -67,7 +69,8 @@ the API process, which is what the deployment does.
 Thumbnails are written once, at ingestion. Studies filed before the generator
 was fixed still carry a thumbnail that was stretched onto a square, and
 re-running analysis will not replace it. Rebuild them from the instances
-already in storage:
+already in storage -- which also redraws a two-film exam from its frontal
+image, where the thumbnail was taken from the lateral that arrived first:
 
 ```bash
 cd server

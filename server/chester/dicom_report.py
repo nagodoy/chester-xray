@@ -218,16 +218,17 @@ def latest_result(study):
     return max(completed, key=lambda result: result.created_at)
 
 
-def source_instance(study):
+def source_instance(db, study):
     """The instance the report draws its picture from.
 
-    The oldest carrying bytes, matching what the thumbnail and the analysis
-    were built from, so the sheet shows the image that was actually scored.
+    The same one the thumbnail and the analysis were built from -- the frontal
+    projection where the study holds one, the oldest carrying bytes otherwise --
+    so the sheet shows the image that was actually scored rather than the
+    lateral filed beside it.
     """
-    candidates = [item for item in study.instances if item.object_key]
-    if not candidates:
-        return None
-    return min(candidates, key=lambda item: item.created_at)
+    from chester.instances import representative_instance
+
+    return representative_instance(db, study)
 
 
 def build_for_study(db, study, *, private_creator: str = DEFAULT_PRIVATE_CREATOR):
@@ -239,7 +240,7 @@ def build_for_study(db, study, *, private_creator: str = DEFAULT_PRIVATE_CREATOR
     if result is None:
         raise ValueError("study has no completed analysis to report")
 
-    instance = source_instance(study)
+    instance = source_instance(db, study)
     if instance is None:
         raise ValueError("study has no stored instance to draw from")
 

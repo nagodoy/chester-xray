@@ -66,6 +66,8 @@ export const en: Dictionary = {
     non_chest_body_part: "Body part {body_part} is not the chest",
     chest_modality: "Chest modality with supporting metadata",
     chest_frontal: "Chest body part with frontal view",
+    lateral_view: "Lateral projection; only frontal (PA/AP) chest views are analysed",
+    projection_ambiguous: "Both a frontal and a lateral projection are named; manual review required",
     inconclusive_indicators: "Some chest indicators present but not conclusive",
     no_metadata: "No metadata available; manual review required",
     insufficient_metadata: "Insufficient metadata to confirm chest X-ray",

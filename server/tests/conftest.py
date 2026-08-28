@@ -117,6 +117,8 @@ def make_dicom():
         study_uid: str | None = None,
         pixels=None,
         study_description: str = "CHEST PA",
+        series_description: str = "",
+        protocol_name: str = "",
     ) -> bytes:
         import io
 
@@ -150,6 +152,8 @@ def make_dicom():
         ds.BodyPartExamined = body_part
         ds.ViewPosition = view_position
         ds.StudyDescription = study_description
+        ds.SeriesDescription = series_description
+        ds.ProtocolName = protocol_name
         ds.Rows = rows
         ds.Columns = columns
         ds.BitsAllocated = bits_allocated

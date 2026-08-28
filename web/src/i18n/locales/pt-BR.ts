@@ -59,6 +59,8 @@ export const ptBR = {
     non_chest_body_part: "Região {body_part} não é o tórax",
     chest_modality: "Modalidade torácica com metadados de apoio",
     chest_frontal: "Região torácica em incidência frontal",
+    lateral_view: "Incidência em perfil; apenas tórax de frente (PA/AP) é analisado",
+    projection_ambiguous: "A descrição cita frente e perfil; revisão manual necessária",
     inconclusive_indicators: "Alguns indícios de tórax, mas não conclusivos",
     no_metadata: "Sem metadados; revisão manual necessária",
     insufficient_metadata: "Metadados insuficientes para confirmar radiografia de tórax",

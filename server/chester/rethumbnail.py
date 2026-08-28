@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session
 from chester.db import session_scope
 from chester.imaging.dicom import generate_thumbnail
 from chester.imaging.source import pixels_from_stored
+from chester.instances import representative_instance
 from chester.models import Instance, Study
 from chester.storage import ObjectNotFound, retrieve_bytes, store_bytes
 
@@ -38,19 +39,15 @@ logger = logging.getLogger("chester.rethumbnail")
 
 
 def _source_instance(db: Session, study: Study) -> Instance | None:
-    """The instance ingestion would have drawn the thumbnail from.
+    """The instance the study is represented by.
 
-    The oldest one carrying bytes: ingestion writes the thumbnail from the
-    first instance to arrive and leaves it alone thereafter, so picking the
-    oldest reproduces that choice rather than quietly changing which image
-    represents a multi-instance study.
+    The same choice the worker and the report make: the frontal projection where
+    the study holds one, and otherwise the oldest instance carrying bytes, which
+    is what ingestion drew from. A study whose thumbnail was written from a
+    lateral -- because the lateral arrived first -- is redrawn from the frontal
+    film here, which is the image that was actually scored.
     """
-    return (
-        db.query(Instance)
-        .filter(Instance.study_id == study.id, Instance.object_key.isnot(None))
-        .order_by(Instance.created_at.asc())
-        .first()
-    )
+    return representative_instance(db, study)
 
 
 def regenerate(db: Session, study: Study, *, dry_run: bool) -> str:

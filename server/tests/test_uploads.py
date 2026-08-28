@@ -173,3 +173,88 @@ def test_the_body_part_is_recorded(upload, make_dicom):
     ]
 
     assert study["body_part"] == "CHEST"
+
+
+def test_a_lateral_chest_dicom_is_refused(upload, make_dicom):
+    """Only frontal films are analysed, so the lateral is filed and refused."""
+    data = make_dicom(view_position="LL", study_description="TORAX", series_description="PERFIL")
+    study = upload([("files", ("perfil.dcm", data, "application/dicom"))]).json()["studies"][0]
+
+    assert study["status"] == "rejected"
+    assert study["validation_state"] == "non_chest"
+    assert study["validation_reason_code"] == "lateral_view"
+
+
+def test_the_frontal_reopens_a_study_whose_lateral_arrived_first(upload, make_dicom, session):
+    """Two films, one Study Instance UID. Order of arrival must not decide."""
+    from pydicom.uid import generate_uid
+
+    study_uid = generate_uid()
+    lateral = make_dicom(study_uid=study_uid, view_position="LL", study_description="TORAX")
+    frontal = make_dicom(study_uid=study_uid, view_position="PA", study_description="TORAX")
+
+    first = upload([("files", ("perfil.dcm", lateral, "application/dicom"))]).json()["studies"][0]
+    assert first["status"] == "rejected"
+
+    second = upload([("files", ("frente.dcm", frontal, "application/dicom"))]).json()["studies"][0]
+
+    assert second["id"] == first["id"]
+    assert second["status"] == "queued"
+    assert second["validation_state"] == "chest"
+    assert second["view_position"] == "PA"
+
+
+def test_a_lateral_arriving_second_leaves_a_queued_study_alone(upload, make_dicom, session):
+    from pydicom.uid import generate_uid
+
+    study_uid = generate_uid()
+    frontal = make_dicom(study_uid=study_uid, view_position="PA")
+    lateral = make_dicom(study_uid=study_uid, view_position="LL")
+
+    upload([("files", ("frente.dcm", frontal, "application/dicom"))])
+    study = upload([("files", ("perfil.dcm", lateral, "application/dicom"))]).json()["studies"][0]
+
+    assert study["status"] == "queued"
+    assert study["validation_state"] == "chest"
+    assert study["view_position"] == "PA"
+
+
+def test_only_one_analysis_is_queued_for_a_two_film_exam(upload, make_dicom, session):
+    """The lateral joins the study; it does not earn the exam a second job."""
+    import uuid
+
+    from pydicom.uid import generate_uid
+
+    from chester.models import AnalysisJob
+
+    study_uid = generate_uid()
+    frontal = make_dicom(study_uid=study_uid, view_position="PA")
+    lateral = make_dicom(study_uid=study_uid, view_position="LL")
+
+    upload([("files", ("frente.dcm", frontal, "application/dicom"))])
+    body = upload([("files", ("perfil.dcm", lateral, "application/dicom"))]).json()
+
+    study_id = uuid.UUID(body["studies"][0]["id"])
+    jobs = session.query(AnalysisJob).filter_by(study_id=study_id).count()
+    assert jobs == 1
+
+
+def test_the_picture_is_redrawn_when_the_frontal_reopens_a_study(upload, make_dicom, session):
+    """A study must not be illustrated by the film it is no longer scored from."""
+    import uuid
+
+    from pydicom.uid import generate_uid
+
+    from chester.storage import retrieve_bytes
+
+    study_uid = generate_uid()
+    lateral = make_dicom(study_uid=study_uid, view_position="LL", rows=96, columns=64)
+    frontal = make_dicom(study_uid=study_uid, view_position="PA", rows=64, columns=96)
+
+    first = upload([("files", ("perfil.dcm", lateral, "application/dicom"))]).json()["studies"][0]
+    study_id = uuid.UUID(first["id"])
+    from_the_lateral = retrieve_bytes(f"thumbnails/{study_id}.png", session=session)
+
+    upload([("files", ("frente.dcm", frontal, "application/dicom"))])
+
+    assert retrieve_bytes(f"thumbnails/{study_id}.png", session=session) != from_the_lateral
