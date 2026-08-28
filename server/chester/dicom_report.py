@@ -270,6 +270,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Store the instance on the configured DICOM destination",
     )
     parser.add_argument(
+        "--destination",
+        default="",
+        help="Send only to the configured destination with this name",
+    )
+    parser.add_argument(
         "--private-creator",
         default=DEFAULT_PRIVATE_CREATOR,
         help=(
@@ -320,13 +325,28 @@ def main(argv: list[str] | None = None) -> int:
         # network log with everything else this node exchanged, whether the
         # destination took the instance or refused it.
         if args.send:
+            from chester import destinations
             from chester.dicom_send import SendFailed, SendNotConfigured
             from chester.report_delivery import deliver_report
 
-            try:
-                deliver_report(db, study, actor="cli", dataset=dataset)
-            except (SendFailed, SendNotConfigured) as exc:
-                logger.error("Not delivered: %s", exc)
+            targets = destinations.active(db, study.organization_id)
+            if args.destination:
+                targets = [item for item in targets if item.name == args.destination]
+                if not targets:
+                    logger.error("No active destination named %s", args.destination)
+                    return 1
+            if not targets:
+                logger.error("No active destination is configured")
+                return 1
+
+            failed = False
+            for destination in targets:
+                try:
+                    deliver_report(db, study, destination, actor="cli", dataset=dataset)
+                except (SendFailed, SendNotConfigured) as exc:
+                    logger.error("Not delivered to %s: %s", destination.name, exc)
+                    failed = True
+            if failed:
                 return 1
     return 0
 

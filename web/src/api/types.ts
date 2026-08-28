@@ -134,6 +134,26 @@ export interface DicomwebSettings {
   wado_anonymous: boolean;
 }
 
+/** A node this organization stores generated reports on. */
+export interface SendConnection {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  ae_title: string;
+  calling_ae_title: string;
+  active: boolean;
+  auto_send: boolean;
+  created_by: string | null;
+}
+
+export interface SendConnectionList {
+  items: SendConnection[];
+  /** The deployment's own address, in use only while nothing is configured. */
+  environment: Omit<SendConnection, "id" | "active" | "auto_send" | "created_by"> | null;
+  editable: boolean;
+}
+
 export interface ManagedUser {
   id: string;
   email: string;

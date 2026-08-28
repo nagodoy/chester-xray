@@ -215,22 +215,28 @@ def send_report(
     access: AccessContext = Depends(require_page("study-detail")),
     db: Session = Depends(get_session),
 ):
-    """Build the TORAX IA report for a study and store it on the configured node."""
-    from chester.dicom_send import SendFailed, SendNotConfigured
-    from chester.report_delivery import deliver_report
+    """Build the TORAX IA report for a study and store it on every active destination."""
+    from chester.dicom_send import SendNotConfigured
+    from chester.report_delivery import deliver_to_active
 
     study = _load(db, access, study_id)
     try:
-        deliver_report(db, study, actor=access.email)
+        failures = deliver_to_active(db, study, actor=access.email)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except (SendFailed, SendNotConfigured) as exc:
-        # The attempt was recorded; commit it before the failing response, or the
-        # session dependency rolls back the very record that explains the failure.
-        db.commit()
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except SendNotConfigured as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    # Commit before answering either way: the attempts are recorded, and on the
+    # failing path the session dependency would otherwise roll back the very
+    # records that explain the failure.
     db.commit()
+    if failures:
+        raise HTTPException(
+            status_code=502,
+            detail="; ".join(f"{destination.name}: {message}" for destination, message in failures),
+        )
+
     db.refresh(study)
     return _to_detail(study)
 

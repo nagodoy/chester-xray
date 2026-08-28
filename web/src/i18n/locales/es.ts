@@ -206,6 +206,7 @@ export const es: Dictionary = {
     subtitle: "Endpoints de investigación y de entrada para dispositivos autorizados.",
     subtitleAnonymous: "Endpoint WADO de entrada para OsiriX.",
     readOnly: "solo lectura",
+    ingestionTitle: "Entrada de estudios",
     unavailable: "Configuración no disponible",
     scpTitle: "Gateway de entrada",
     scpDescription:
@@ -250,6 +251,32 @@ export const es: Dictionary = {
       "Úsalo solo con datos de prueba o anonimizados. El puerto DICOM SCP no debe exponerse a internet.",
     footerNote:
       "Conectividad informativa · los valores reflejan la configuración de este entorno.",
+  },
+
+  connections: {
+    title: "Conexiones de envío",
+    subtitle: "A dónde se envía el informe generado",
+    name: "Nombre",
+    address: "Dirección",
+    aeTitle: "AE title",
+    callingAeTitle: "AE de llamada",
+    state: "Estado",
+    automatic: "Automático",
+    automaticOn: "Automático",
+    automaticOff: "Manual",
+    test: "Probar",
+    probeOk: "respondió al C-ECHO",
+    empty: "Ninguna conexión configurada.",
+    environmentInUse:
+      "Sin conexión configurada, el envío usa la dirección del entorno: {address}. Añada una conexión para reemplazarla.",
+    automaticNote:
+      "Una conexión marcada como automática recibe el informe en cuanto termina el análisis. Cada intento queda en Registros de red.",
+    namePlaceholder: "Nombre (p. ej. PACS)",
+    hostPlaceholder: "Dirección (host)",
+    portPlaceholder: "Puerto",
+    aeTitlePlaceholder: "AE title",
+    callingAeTitlePlaceholder: "AE de llamada",
+    confirmDelete: "¿Eliminar la conexión {name}?",
   },
 
   networkLogs: {

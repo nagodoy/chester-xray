@@ -200,6 +200,7 @@ export const ptBR = {
     subtitle: "Endpoints de pesquisa e entrada para dispositivos autorizados.",
     subtitleAnonymous: "Endpoint WADO de entrada para o OsiriX.",
     readOnly: "somente leitura",
+    ingestionTitle: "Entrada de exames",
     unavailable: "Configuração indisponível",
     scpTitle: "Gateway de entrada",
     scpDescription:
@@ -242,6 +243,33 @@ export const ptBR = {
     securityNote:
       "Use somente com dados de teste ou desidentificados. A porta DICOM SCP não deve ser exposta à internet.",
     footerNote: "Conectividade informativa · os valores refletem a configuração deste ambiente.",
+  },
+
+  /** Conexões de envio: para onde o laudo gerado é armazenado. */
+  connections: {
+    title: "Conexões de envio",
+    subtitle: "Para onde o laudo gerado é enviado",
+    name: "Nome",
+    address: "Endereço",
+    aeTitle: "AE title",
+    callingAeTitle: "AE de chamada",
+    state: "Situação",
+    automatic: "Automático",
+    automaticOn: "Automático",
+    automaticOff: "Manual",
+    test: "Testar",
+    probeOk: "respondeu ao C-ECHO",
+    empty: "Nenhuma conexão cadastrada.",
+    environmentInUse:
+      "Sem conexão cadastrada, o envio usa o endereço do ambiente: {address}. Cadastre uma conexão para substituí-lo.",
+    automaticNote:
+      "Uma conexão marcada como automática recebe o laudo assim que a análise conclui. As tentativas ficam em Logs de rede.",
+    namePlaceholder: "Nome (ex.: PACS)",
+    hostPlaceholder: "Endereço (host)",
+    portPlaceholder: "Porta",
+    aeTitlePlaceholder: "AE title",
+    callingAeTitlePlaceholder: "AE de chamada",
+    confirmDelete: "Remover a conexão {name}?",
   },
 
   networkLogs: {

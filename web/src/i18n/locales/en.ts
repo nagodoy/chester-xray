@@ -207,6 +207,7 @@ export const en: Dictionary = {
     subtitle: "Research and ingestion endpoints for authorized devices.",
     subtitleAnonymous: "WADO ingestion endpoint for OsiriX.",
     readOnly: "read only",
+    ingestionTitle: "Exam ingestion",
     unavailable: "Configuration unavailable",
     scpTitle: "Ingestion gateway",
     scpDescription:
@@ -249,6 +250,32 @@ export const en: Dictionary = {
     securityNote:
       "Use only with test or de-identified data. The DICOM SCP port must not face the internet.",
     footerNote: "Informational connectivity · values reflect this environment's configuration.",
+  },
+
+  connections: {
+    title: "Send connections",
+    subtitle: "Where the generated report is stored",
+    name: "Name",
+    address: "Address",
+    aeTitle: "AE title",
+    callingAeTitle: "Calling AE",
+    state: "State",
+    automatic: "Automatic",
+    automaticOn: "Automatic",
+    automaticOff: "Manual",
+    test: "Test",
+    probeOk: "answered the C-ECHO",
+    empty: "No connection configured.",
+    environmentInUse:
+      "With no connection configured, sending uses the environment address: {address}. Add a connection to replace it.",
+    automaticNote:
+      "A connection marked automatic receives the report as soon as the analysis completes. Every attempt is in Network logs.",
+    namePlaceholder: "Name (e.g. PACS)",
+    hostPlaceholder: "Host",
+    portPlaceholder: "Port",
+    aeTitlePlaceholder: "AE title",
+    callingAeTitlePlaceholder: "Calling AE",
+    confirmDelete: "Remove the connection {name}?",
   },
 
   networkLogs: {

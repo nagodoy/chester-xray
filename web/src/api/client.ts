@@ -7,6 +7,8 @@ import type {
   ManagedDomain,
   ManagedUser,
   NetworkLogList,
+  SendConnection,
+  SendConnectionList,
   StudyDetail,
   StudyList,
   UploadOutcome,
@@ -167,6 +169,27 @@ export const api = {
   },
 
   getSettings: () => request<DicomwebSettings>("/api/settings/dicomweb"),
+
+  listDestinations: () => request<SendConnectionList>("/api/settings/destinations"),
+  createDestination: (body: {
+    name: string;
+    host: string;
+    port: number;
+    ae_title: string;
+    calling_ae_title: string;
+  }) => request<SendConnection>("/api/settings/destinations", { method: "POST", ...json(body) }),
+  updateDestination: (id: string, body: Record<string, unknown>) =>
+    request<SendConnection>(`/api/settings/destinations/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      ...json(body),
+    }),
+  deleteDestination: (id: string) =>
+    request<void>(`/api/settings/destinations/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  testDestination: (id: string) =>
+    request<{ ok: boolean; message: string }>(
+      `/api/settings/destinations/${encodeURIComponent(id)}/test`,
+      { method: "POST" },
+    ),
 
   accessMetadata: () => request<AccessMetadata>("/api/access-control/metadata"),
   listUsers: () => request<ManagedUser[]>("/api/access-control/users"),

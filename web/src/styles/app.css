@@ -635,6 +635,30 @@ td b {
 /* A UID, an address and a sentence from the far end are all long, and cells
    never wrap: three of them together drag a table off the panel. Clip them and
    keep the whole value in the title, which is where a reader looks for it. */
+/* Titles the settings page uses to separate what it describes -- the ingestion
+   endpoints, which are the deployment -- from what it configures. */
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 24px 0 -4px;
+}
+
+.section-heading h2 {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.input-narrow {
+  max-width: 140px;
+}
+
+.probe-failed {
+  color: var(--red);
+}
+
 .cell-clip {
   max-width: 220px;
   overflow: hidden;

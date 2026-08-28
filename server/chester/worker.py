@@ -24,7 +24,15 @@ from sqlalchemy.orm import Session
 
 from chester.config import settings
 from chester.db import session_scope
-from chester.models import AnalysisJob, AnalysisResult, AuditEvent, Instance, Study, utcnow
+from chester.models import (
+    AnalysisJob,
+    AnalysisResult,
+    AuditEvent,
+    DeliveryJob,
+    Instance,
+    Study,
+    utcnow,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +187,8 @@ def process_job(job_id: uuid.UUID) -> None:
             )
         )
         _complete(db, job, study, utcnow())
+        if study is not None:
+            queue_deliveries(db, study)
 
 
 def _complete(db: Session, job: AnalysisJob, study: Study | None, completed_at) -> None:
@@ -200,6 +210,106 @@ def _fail(db: Session, job: AnalysisJob, study: Study | None, message: str) -> N
     if study is not None:
         study.status = STATUS_ERROR
         study.error_message = message
+    db.flush()
+
+
+def queue_deliveries(db: Session, study: Study) -> int:
+    """Queue the finished report for every destination that sends on its own.
+
+    Queued rather than sent here: a node that is down must not fail the analysis
+    that produced the report, and the attempt belongs where it can be retried.
+    """
+    from chester import destinations
+
+    queued = 0
+    for destination in destinations.automatic(db, study.organization_id):
+        db.add(DeliveryJob(study_id=study.id, destination_id=destination.id))
+        queued += 1
+    if queued:
+        logger.info("Queued %d automatic deliver(ies) for study %s", queued, study.id)
+        db.flush()
+    return queued
+
+
+def claim_delivery(db: Session) -> uuid.UUID | None:
+    """Take ownership of one delivery that is due, or return None."""
+    job = (
+        db.query(DeliveryJob)
+        .filter(
+            DeliveryJob.status == STATUS_QUEUED,
+            DeliveryJob.next_attempt_at <= utcnow(),
+        )
+        .order_by(DeliveryJob.next_attempt_at.asc())
+        .with_for_update(skip_locked=True)
+        .first()
+    )
+    if job is None:
+        return None
+
+    job.status = STATUS_PROCESSING
+    job.started_at = utcnow()
+    job.attempt = (job.attempt or 0) + 1
+    job.lease_owner = WORKER_ID
+    job.lease_expires_at = _lease_expiry()
+    db.flush()
+    return job.id
+
+
+def process_delivery(job_id: uuid.UUID) -> None:
+    """Store one report on one destination, recording the attempt either way."""
+    from chester.destinations import from_row
+    from chester.report_delivery import deliver_report
+
+    with session_scope() as db:
+        job = db.get(DeliveryJob, job_id)
+        if job is None or job.lease_owner != WORKER_ID:
+            logger.warning("Delivery %s is no longer held by this worker", job_id)
+            return
+
+        study = db.get(Study, job.study_id)
+        destination = job.destination
+        if study is None or destination is None or not destination.active:
+            _fail_delivery(db, job, "Study or destination is gone", retry=False)
+            return
+
+        try:
+            deliver_report(db, study, from_row(destination), actor=f"worker:{WORKER_ID}")
+        except ValueError as exc:
+            # Nothing to report on. Another attempt would find the same, so this
+            # one is finished rather than retried.
+            _fail_delivery(db, job, str(exc), retry=False)
+            return
+        except Exception as exc:
+            _fail_delivery(db, job, str(exc), retry=True)
+            return
+
+        job.status = STATUS_COMPLETED
+        job.completed_at = utcnow()
+        job.error_message = None
+        job.lease_owner = None
+        job.lease_expires_at = None
+        db.flush()
+
+
+def _fail_delivery(db: Session, job: DeliveryJob, message: str, *, retry: bool) -> None:
+    """Requeue the attempt if any are left, otherwise give up on it."""
+    job.error_message = message
+    job.lease_owner = None
+    job.lease_expires_at = None
+
+    if retry and job.attempt < settings.delivery_max_attempts:
+        job.status = STATUS_QUEUED
+        job.next_attempt_at = utcnow() + timedelta(minutes=settings.delivery_retry_minutes)
+        logger.info(
+            "Delivery %s failed on attempt %d; retrying after %g minute(s)",
+            job.id,
+            job.attempt,
+            settings.delivery_retry_minutes,
+        )
+    else:
+        job.status = STATUS_ERROR
+        job.completed_at = utcnow()
+        logger.warning("Delivery %s failed for good: %s", job.id, message)
     db.flush()
 
 
@@ -225,13 +335,27 @@ def recover_expired_leases(db: Session) -> int:
         )
         .all()
     )
-    for job in stale:
+    deliveries = (
+        db.query(DeliveryJob)
+        .filter(
+            DeliveryJob.status == STATUS_PROCESSING,
+            or_(
+                DeliveryJob.lease_expires_at < now,
+                and_(
+                    DeliveryJob.lease_expires_at.is_(None),
+                    DeliveryJob.started_at < cutoff,
+                ),
+            ),
+        )
+        .all()
+    )
+    for job in [*stale, *deliveries]:
         logger.info("Recovering job %s from an expired lease", job.id)
         job.status = STATUS_QUEUED
         job.lease_owner = None
         job.lease_expires_at = None
     db.flush()
-    return len(stale)
+    return len(stale) + len(deliveries)
 
 
 def run(stop: threading.Event | None = None) -> None:
@@ -248,11 +372,20 @@ def run(stop: threading.Event | None = None) -> None:
         try:
             with session_scope() as db:
                 job_id = claim_job(db)
-            if job_id is None:
+            if job_id is not None:
+                logger.info("Processing job %s", job_id)
+                process_job(job_id)
+                continue
+
+            # Analysis first: a delivery is worth nothing until the report it
+            # carries exists.
+            with session_scope() as db:
+                delivery_id = claim_delivery(db)
+            if delivery_id is None:
                 stop.wait(timeout=settings.worker_poll_seconds)
                 continue
-            logger.info("Processing job %s", job_id)
-            process_job(job_id)
+            logger.info("Processing delivery %s", delivery_id)
+            process_delivery(delivery_id)
         except Exception:
             logger.exception("Worker loop error")
             stop.wait(timeout=settings.worker_poll_seconds * 2)
