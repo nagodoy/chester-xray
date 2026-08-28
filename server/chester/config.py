@@ -56,9 +56,11 @@ class Settings(BaseSettings):
     dicom_stow_url: str = ""
 
     # Where a generated TORAX IA series is sent, e.g. an OsiriX listener.
-    dicom_send_host: str = ""
+    dicom_send_host: str = "superpaccs.com.br"
     dicom_send_port: int = 11112
-    dicom_send_ae_title: str = "OSIRIX"
+    dicom_send_ae_title: str = "medfusion"
+    # Also written into SendingApplicationEntityTitle, so the tag on the
+    # instance and the AE that carried it cannot say different things.
     dicom_send_calling_ae_title: str = "TORAX_AI"
     public_app_url: str = ""
 

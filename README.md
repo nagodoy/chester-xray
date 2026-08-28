@@ -112,8 +112,17 @@ in a private sequence, and a private tag is in no receiver's data dictionary,
 so under Implicit VR the wire carries no VR either and the far end decodes
 the sequence as raw bytes -- the image arrives and the findings do not.
 
-Configure the destination with `DICOM_SEND_HOST`, `DICOM_SEND_PORT`,
-`DICOM_SEND_AE_TITLE` and `DICOM_SEND_CALLING_AE_TITLE`.
+The destination defaults to `superpaccs.com.br:11112`, AE title `medfusion`,
+calling as `TORAX_AI`; override with `DICOM_SEND_HOST`, `DICOM_SEND_PORT`,
+`DICOM_SEND_AE_TITLE` and `DICOM_SEND_CALLING_AE_TITLE`. Nothing leaves the
+process without `--send`.
+
+The instance names itself: `SendingApplicationEntityTitle (0002,0017)` carries
+the calling AE, so the tag and the association cannot claim different senders.
+That tag is file meta, which C-STORE does not transmit -- a receiver writes
+its own -- so the producer is also recorded where it does travel, in
+`Manufacturer`, `ManufacturerModelName` and the Secondary Capture device tags.
+Those would otherwise still name whoever made the source exam.
 
 ## Checks
 

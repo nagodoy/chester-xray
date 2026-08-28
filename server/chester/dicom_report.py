@@ -20,6 +20,7 @@ EXPLICIT_VR_LITTLE_ENDIAN = "1.2.840.10008.1.2.1"
 
 SERIES_DESCRIPTION = "TORAX IA"
 SERIES_NUMBER = 9901
+PRODUCER = "TORAX AI"
 
 # The private block, laid out as the AZMED/Rayvolve tags this was modelled on:
 # a creator at (gggg,0010) and then five elements in its block. The creator
@@ -121,6 +122,20 @@ def build_report_dataset(
     dataset.ConversionType = "WSD"
     dataset.Modality = source.get("Modality", "OT") or "OT"
 
+    # Who made *this* instance, which is not who made the source. Copying the
+    # tags wholesale left the sheet claiming the source's manufacturer -- the
+    # same misattribution the private creator avoids, and unlike
+    # SendingApplicationEntityTitle these travel: file meta is a file-format
+    # construct that C-STORE does not carry, so a receiver reads the producer
+    # from here and from the calling AE of the association.
+    dataset.Manufacturer = PRODUCER
+    dataset.ManufacturerModelName = SERIES_DESCRIPTION
+    dataset.SecondaryCaptureDeviceManufacturer = PRODUCER
+    dataset.SecondaryCaptureDeviceManufacturerModelName = SERIES_DESCRIPTION
+    model_version = getattr(result, "model_version", None)
+    if model_version:
+        dataset.SoftwareVersions = str(model_version)
+
     dataset.SamplesPerPixel = 3
     dataset.PhotometricInterpretation = "RGB"
     dataset.PlanarConfiguration = 0
@@ -159,13 +174,24 @@ def _apply_private_block(dataset, rows: list[dict], private_creator: str) -> Non
 
 
 def _file_meta(dataset):
+    """File meta for the new instance, naming the application that made it.
+
+    SendingApplicationEntityTitle is what a receiver reads to say where an
+    instance came from -- the source exam carries AZMED there, because AZMED
+    produced it. This one is ours, and it is taken from the same setting the
+    C-STORE association uses as its calling AE, so the tag and the association
+    cannot drift apart and claim different senders.
+    """
     from pydicom.dataset import FileMetaDataset
     from pydicom.uid import ExplicitVRLittleEndian
+
+    from chester.config import settings
 
     meta = FileMetaDataset()
     meta.MediaStorageSOPClassUID = dataset.SOPClassUID
     meta.MediaStorageSOPInstanceUID = dataset.SOPInstanceUID
     meta.TransferSyntaxUID = ExplicitVRLittleEndian
+    meta.SendingApplicationEntityTitle = settings.dicom_send_calling_ae_title
     return meta
 
 

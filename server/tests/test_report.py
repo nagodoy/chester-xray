@@ -313,3 +313,65 @@ class TestSending:
 
         with pytest.raises(dicom_send.SendNotConfigured):
             dicom_send.send_dataset(dataset)
+
+
+class TestProvenance:
+    """Who produced the instance, and how a receiver can tell."""
+
+    def test_the_sending_application_names_us_in_the_file_meta(self, source_dicom, pixels, result):
+        dataset = build_report_dataset(source_dicom, pixels, result)
+
+        parsed = dcmread(io.BytesIO(dataset_to_bytes(dataset)))
+
+        assert parsed.file_meta.SendingApplicationEntityTitle == "TORAX_AI"
+
+    def test_the_file_meta_title_follows_the_calling_ae_of_the_association(
+        self, monkeypatch, source_dicom, pixels, result
+    ):
+        """The tag and the AE that carries it must not claim different senders."""
+        from chester.config import settings
+
+        monkeypatch.setattr(settings, "dicom_send_calling_ae_title", "OTHER_AE")
+
+        dataset = build_report_dataset(source_dicom, pixels, result)
+
+        assert dataset.file_meta.SendingApplicationEntityTitle == "OTHER_AE"
+
+    def test_the_producer_is_us_rather_than_whoever_made_the_source(
+        self, source_dicom, pixels, result
+    ):
+        """Copying every tag would leave the sheet claiming AZMED made it.
+
+        Unlike the file meta, these travel: C-STORE carries the dataset, not
+        the file-format header, so this is what a receiver actually reads.
+        """
+        source = dcmread(io.BytesIO(source_dicom))
+        source.Manufacturer = "AZMED"
+        source.ManufacturerModelName = "Rayvolve"
+        buffer = io.BytesIO()
+        source.save_as(buffer, enforce_file_format=True)
+
+        dataset = build_report_dataset(buffer.getvalue(), pixels, result)
+
+        assert dataset.Manufacturer == "TORAX AI"
+        assert dataset.ManufacturerModelName == SERIES_DESCRIPTION
+        assert dataset.SecondaryCaptureDeviceManufacturer == "TORAX AI"
+
+    def test_the_model_version_is_recorded_when_the_result_carries_one(
+        self, source_dicom, pixels, result
+    ):
+        result.model_version = "chester-onnx:densenet121-res224-all"
+
+        dataset = build_report_dataset(source_dicom, pixels, result)
+
+        assert dataset.SoftwareVersions == "chester-onnx:densenet121-res224-all"
+
+
+def test_the_destination_defaults_to_the_configured_viewer():
+    """Nothing is sent without --send, so these are defaults, not a trigger."""
+    from chester.config import settings
+
+    assert settings.dicom_send_host == "superpaccs.com.br"
+    assert settings.dicom_send_port == 11112
+    assert settings.dicom_send_ae_title == "medfusion"
+    assert settings.dicom_send_calling_ae_title == "TORAX_AI"
