@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     dicom_scp_ae_title: str = "WORKLIST_SCP"
     dicom_stow_url: str = ""
 
-    # Where a generated TORAX IA series is sent when no destination has been
+    # Where a generated ANALISADA series is sent when no destination has been
     # configured in the console, e.g. an OsiriX listener. Configured destinations
     # take precedence; this is the fallback a deployment starts from.
     dicom_send_host: str = "superpaccs.com.br"

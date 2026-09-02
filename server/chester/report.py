@@ -11,7 +11,7 @@ the operating points differ by an order of magnitude between findings: 0.0101 fo
 Fibrosis against 0.1032 for Effusion. So one exam could print Fibrosis CONFIDENT
 at a raw score of 0.0121 and, two rows below, Effusion ABSENT at three times that
 score. A radiologist reading CONFIDENT reasonably heard "the model is confident
-this finding is present", which is a claim nothing here makes. ACIMA, LIMITROFE
+this finding is present", which is a claim nothing here makes. ACIMA, DUVIDOSO
 and ABAIXO say what is actually being reported: where the score sits relative to
 its own threshold.
 """
@@ -21,7 +21,7 @@ from __future__ import annotations
 from chester.inference import REPORTED_PATHOLOGIES
 
 SIGNAL_BELOW = "ABAIXO"
-SIGNAL_BORDERLINE = "LIMÍTROFE"
+SIGNAL_BORDERLINE = "DUVIDOSO"
 SIGNAL_ABOVE = "ACIMA"
 
 # The band around the operating point, as a fraction of it, inside which the
@@ -30,7 +30,7 @@ DOUBT_BAND = 0.10
 
 
 def classify_confidence(score: float, threshold: float) -> str:
-    """ABAIXO under the operating point, ACIMA over, LIMÍTROFE either side of it.
+    """ABAIXO under the operating point, ACIMA over, DUVIDOSO either side of it.
 
     The band is checked first and deliberately straddles the threshold: a score
     a hair under the operating point is no more decidable than one a hair over,

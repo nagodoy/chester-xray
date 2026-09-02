@@ -1,4 +1,4 @@
-"""Send a study's TORAX IA report to a destination and record what happened.
+"""Send a study's ANALISADA report to a destination and record what happened.
 
 Building the report and storing it on a node already live in
 ``chester.dicom_report`` and ``chester.dicom_send``. What was missing is the part

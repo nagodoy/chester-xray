@@ -218,7 +218,7 @@ def send_report(
     access: AccessContext = Depends(require_page("study-detail")),
     db: Session = Depends(get_session),
 ):
-    """Build the TORAX IA report for a study and store it on every active destination."""
+    """Build the ANALISADA report for a study and store it on every active destination."""
     from chester.dicom_send import SendNotConfigured
     from chester.report_delivery import deliver_to_active
 

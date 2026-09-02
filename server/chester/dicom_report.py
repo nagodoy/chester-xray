@@ -1,4 +1,4 @@
-"""Build the TORAX IA secondary capture from a source instance and a result.
+"""Build the ANALISADA secondary capture from a source instance and a result.
 
 A new series inside the same study, carrying the rendered sheet as its pixels
 and the findings as private tags, so a viewer that reads neither the picture
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 SECONDARY_CAPTURE_SOP_CLASS = "1.2.840.10008.5.1.4.1.1.7"
 EXPLICIT_VR_LITTLE_ENDIAN = "1.2.840.10008.1.2.1"
 
-SERIES_DESCRIPTION = "TORAX IA"
+SERIES_DESCRIPTION = "ANALISADA"
 SERIES_NUMBER = 9901
 PRODUCER = "TORAX AI"
 

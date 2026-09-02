@@ -23,7 +23,7 @@ from chester.inference import REPORTED_PATHOLOGIES
 
 
 class TestConfidence:
-    """ABAIXO under the operating point, ACIMA over, LIMÍTROFE either side.
+    """ABAIXO under the operating point, ACIMA over, DUVIDOSO either side.
 
     The words report where a score sits against its own operating point, and
     nothing more. They said CONFIDENT / DOUBT / ABSENT, which claimed a certainty
@@ -319,7 +319,7 @@ class TestSecondaryCapture:
         items = {item.CodeMeaning: item.TextValue for item in block[0x03].value}
         assert items == {
             "CARDIOMEGALY": "ACIMA",
-            "EFFUSION": "LIMÍTROFE",
+            "EFFUSION": "DUVIDOSO",
             "MASS": "ABAIXO",
         }
         assert block[0x02].value == "true"
@@ -352,7 +352,7 @@ class TestSecondaryCapture:
         items = dataset.private_block(PRIVATE_GROUP, DEFAULT_PRIVATE_CREATOR)[0x03].value
         assert {item.CodeMeaning: item.TextValue for item in items} == {
             "CARDIOMEGALY": "ACIMA",
-            "EFFUSION": "LIMÍTROFE",
+            "EFFUSION": "DUVIDOSO",
             "MASS": "ABAIXO",
         }
 
