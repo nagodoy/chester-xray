@@ -13,6 +13,10 @@ export const ptBR = {
     active: "Ativo",
     inactive: "Inativo",
     checkingAccess: "Verificando acesso…",
+    previous: "Anterior",
+    next: "Próxima",
+    pageOf: "Página {page} de {pages}",
+    showingRange: "{first}–{last} de {total}",
   },
 
   nav: {

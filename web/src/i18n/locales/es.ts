@@ -20,6 +20,10 @@ export const es: Dictionary = {
     active: "Activo",
     inactive: "Inactivo",
     checkingAccess: "Verificando acceso…",
+    previous: "Anterior",
+    next: "Siguiente",
+    pageOf: "Página {page} de {pages}",
+    showingRange: "{first}–{last} de {total}",
   },
 
   nav: {

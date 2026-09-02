@@ -21,6 +21,10 @@ export const en: Dictionary = {
     active: "Active",
     inactive: "Inactive",
     checkingAccess: "Checking access…",
+    previous: "Previous",
+    next: "Next",
+    pageOf: "Page {page} of {pages}",
+    showingRange: "{first}–{last} of {total}",
   },
 
   nav: {

@@ -590,6 +590,47 @@ a {
   overflow-x: auto;
 }
 
+/* A page of the network log is 25 rows, which is taller than most screens.
+   Cap the body so the rows scroll inside the panel instead of pushing the page
+   controls below the fold, and pin the header so a row halfway down still has
+   its column names in view. */
+.table-scroll-rows {
+  max-height: min(62vh, 640px);
+  overflow-y: auto;
+}
+
+.table-scroll-rows thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-muted);
+  font-size: var(--fs-xs);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagination-page {
+  min-width: 116px;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
