@@ -1,10 +1,13 @@
 """Outputs this deployment computes and does not report.
 
-Two outputs are withheld: Fracture, the last of the six the CHESTER
-configuration blanked that is still suppressed, and Fibrosis, withdrawn here on a
-measurement taken here. The other five that configuration blanked -- Infiltration,
-Pneumothorax, Pneumonia, Nodule and Lung Lesion -- are reported again, so the
-reported set is sixteen.
+Five outputs are withheld, on three kinds of evidence. Fracture is inherited
+from the CHESTER configuration and never re-examined. Nodule, Fibrosis and
+Emphysema each fire on reference images whose known label is not that finding.
+Pneumonia is the odd one: it fires on nothing it should not, and is withheld for
+swinging by a median factor of 20.5 across renderings of the same anatomy.
+
+That leaves thirteen reported. Infiltration, Pneumothorax and Lung Lesion, three
+of the six the CHESTER configuration blanked, are among them.
 
 The rule that matters here is that suppression reaches *stored* results too: a
 study analysed before the change still carries the output in its document, and a
@@ -25,8 +28,8 @@ class TestTheReportedSet:
         assert "Fibrosis" not in inference.REPORTED_PATHOLOGIES
         assert not inference.is_reported("Fibrosis")
 
-    def test_sixteen_outputs_are_reported(self):
-        assert len(inference.REPORTED_PATHOLOGIES) == 16
+    def test_thirteen_outputs_are_reported(self):
+        assert len(inference.REPORTED_PATHOLOGIES) == 13
 
     def test_the_reported_set_keeps_the_models_own_order(self):
         expected = [
@@ -36,19 +39,35 @@ class TestTheReportedSet:
         ]
         assert list(inference.REPORTED_PATHOLOGIES) == expected
 
-    def test_fracture_is_the_blanked_output_still_suppressed(self):
-        """The last of the CHESTER six. The other five came back."""
-        assert not inference.is_reported("Fracture")
+    def test_the_blanked_outputs_still_suppressed(self):
+        """Three of the CHESTER six. The other three came back."""
+        for name in ("Nodule", "Fracture", "Pneumonia"):
+            assert not inference.is_reported(name)
+
+    def test_emphysema_is_withdrawn_on_the_measurement(self):
+        """The worst of the set on the one image labelled No Finding: 13.9x.
+
+        Withdrawn last, though it behaved worse than Fibrosis and Nodule the
+        whole time they were being withdrawn for the same thing.
+        """
+        assert not inference.is_reported("Emphysema")
+
+    def test_pneumonia_is_withdrawn_on_instability(self):
+        """Not for firing falsely -- it does not -- but for moving with the window."""
+        assert not inference.is_reported("Pneumonia")
+
+    def test_nodule_is_withdrawn_on_the_measurement(self):
+        """Withdrawn, not never-enabled: it was reported until it was measured.
+
+        7 of 7 on reference images where nodule is not the label is the bar
+        Fibrosis was withdrawn on, so it has to apply here too.
+        """
+        assert not inference.is_reported("Nodule")
+        assert "Nodule" not in inference.REPORTED_PATHOLOGIES
 
     def test_the_outputs_the_previous_deployment_blanked_are_reported_again(self):
         """Pinned by name: the count alone would not say which ones came back."""
-        for name in (
-            "Infiltration",
-            "Pneumothorax",
-            "Pneumonia",
-            "Nodule",
-            "Lung Lesion",
-        ):
+        for name in ("Infiltration", "Pneumothorax", "Lung Lesion"):
             assert inference.is_reported(name)
             assert name in inference.REPORTED_PATHOLOGIES
 
@@ -123,7 +142,10 @@ class TestFreshResults:
 
         assert "Fibrosis" not in outcome["raw_scores"]
         assert "Fibrosis" not in outcome["above_threshold_findings"]
-        assert len(outcome["raw_scores"]) == 16
+        assert "Nodule" not in outcome["raw_scores"]
+        assert "Emphysema" not in outcome["raw_scores"]
+        assert "Pneumonia" not in outcome["raw_scores"]
+        assert len(outcome["raw_scores"]) == 13
 
     def test_a_new_run_records_the_restored_outputs_against_their_thresholds(self, monkeypatch):
         """The scores are written now, each judged against its own operating point."""
@@ -141,8 +163,6 @@ class TestFreshResults:
         for name, index in (
             ("Infiltration", 2),
             ("Pneumothorax", 3),
-            ("Pneumonia", 8),
-            ("Nodule", 11),
             ("Lung Lesion", 14),
         ):
             assert outcome["raw_scores"][name] == 0.5
