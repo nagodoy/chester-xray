@@ -231,15 +231,17 @@ python -m chester.gateway --stow-url https://your-host --token ... --owner you@e
 ## The model
 
 `models/chester-all-224.onnx` is the torchxrayvision `densenet121-res224-all`
-classifier. It reports 15 of the model's 18 outputs. The three withheld are
-Fracture, carried over from the original CHESTER configuration, which blanked its
-label, and Fibrosis and Nodule, each withdrawn here because it fired on 7 of 7
-reference images whose known label is not that finding.
+classifier. It reports 13 of the model's 18 outputs. Five are withheld, on three
+kinds of evidence: Fracture is inherited from the original CHESTER
+configuration, which blanked its label, and was never re-examined; Fibrosis,
+Nodule and Emphysema each fire on reference images whose known label is not that
+finding; and Pneumonia, which fires on nothing it should not, is withheld for
+swinging by a median factor of 20.5 across renderings of the same anatomy.
 
-That configuration blanked four other labels -- Infiltration, Pneumothorax,
-Pneumonia and Lung Lesion -- and all four are reported again, each on its
-published operating point rather than a locally calibrated one. The note in
-`server/chester/inference.py` records what that does and does not establish.
+Three of the six labels that configuration blanked -- Infiltration, Pneumothorax
+and Lung Lesion -- are reported again, each on its published operating point
+rather than a locally calibrated one. The note in `server/chester/inference.py`
+records what each decision does and does not establish.
 
 `tools/calibrate_thresholds.py` runs that measurement over exams a radiologist
 has read, and proposes a threshold per output:

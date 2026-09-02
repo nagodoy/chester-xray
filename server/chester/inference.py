@@ -51,44 +51,57 @@ PATHOLOGIES: tuple[str, ...] = (
 # Outputs that are computed and never reported. Which findings are surfaced is a
 # clinical decision, not an implementation detail to change in passing.
 #
-# Indices 11 and 15 -- Nodule and Fracture -- are two of the six the CHESTER
-# configuration blanked. Fracture was never re-examined here. Nodule was: it was
-# reported again on the argument that nothing had ever measured it, and then it
-# was measured. On the seven reference images in examples/ whose label is known,
-# it fires on 7 of 7 where nodule is not the label, including the one labelled No
-# Finding at 4.7 times its threshold. That is the criterion Fibrosis was
-# withdrawn on, so it withdraws Nodule too. Reporting it again needs a threshold
-# fitted to local exams read by a radiologist -- tools/calibrate_thresholds.py
-# runs that measurement.
+# Five are withheld, on three different kinds of evidence. The kind matters:
+# it is what a later reader needs to know whether a decision can be revisited.
 #
-# The other three the configuration blanked -- 2 Infiltration, 3 Pneumothorax and
-# 8 Pneumonia -- plus 14 Lung Lesion are reported, on their published operating
-# points, none calibrated against local exams. On the same seven images
-# Pneumothorax, Pneumonia and Lung Lesion fire on nothing they should not;
-# Infiltration fires on 6 of 7, which is the second worst in the set and is not
-# resolved. Pneumothorax also runs the second lowest operating point of the
-# eighteen, 0.0098, below Fibrosis's 0.0101; its sensitivity to rendering has
-# never been measured the way Fibrosis's was.
+# Index 15, Fracture, is inherited. The CHESTER configuration blanked its label
+# and nothing here ever re-examined it. No measurement supports or opposes it.
 #
-# The measurement that would settle any of this is seven images wide. It decides
-# nothing about a population; it was enough for Nodule only because Nodule failed
-# the project's own existing bar.
+# Indices 11 Nodule, 6 Fibrosis and 5 Emphysema fail the project's own bar:
+# firing on reference images in examples/ whose known label is not that finding,
+# measured on the one image labelled No Finding, which is the only real negative
+# claim in the set.
 #
-# Index 6, Fibrosis, was added here. Its published operating point is 0.0101, the
-# third lowest of the eighteen -- it read as the second lowest when this was
-# written, because Pneumothorax below it was suppressed at the time and not
-# counted -- and the output is by far the most sensitive in the set to how the
-# pixels are rendered: across renderings of the same anatomy
-# it swings by a median factor of 48.6, against 14.6 for the next output and 1.5
-# for Lung Opacity. What that combination produces is a verdict decided by the
-# window rather than by the chest. On the reference images in examples/ whose
-# label is known and is not fibrosis, it fires on 7 of 7 -- including the one
-# labelled No Finding, at 8.5 times its threshold.
+#   Emphysema   5 of 6, and 13.9x its threshold on No Finding -- the highest of
+#               the eighteen, above both of the others
+#   Fibrosis    7 of 7, 8.5x
+#   Nodule      7 of 7, 4.7x
 #
-# The operating point is not wrong for the population it was fitted on; it does
-# not transfer to this one. Reporting it again needs a threshold calibrated
-# against local exams read by a radiologist, not a change here.
-SUPPRESSED_INDICES: frozenset[int] = frozenset({6, 11, 15})
+# Emphysema was reported throughout the period the other two were withdrawn for
+# behaving less badly than it does. That was an inconsistency, not a judgement.
+#
+# Index 8, Pneumonia, is withheld on something else, and the difference is worth
+# stating plainly. It fires on 0 of 7, at 0.02x its threshold on No Finding --
+# the quietest output in the set. Its case is instability: across four renderings
+# of the same anatomy on five real CR exams, its score swings by a median factor
+# of 20.5, the widest of the eighteen on that data. A verdict decided by the
+# window rather than by the chest is the argument that withdrew Fibrosis, so the
+# same reasoning applies. But that measurement is five exams from one
+# manufacturer, with rendering variants chosen here rather than observed in a
+# deployment. It is the thinnest basis of the three kinds, and the first that
+# should be re-run when more exams are available.
+#
+# What remains reported and unresolved: 2 Infiltration fires on 6 of 7, the
+# worst of the outputs still surfaced. 3 Pneumothorax runs the second lowest
+# operating point of the eighteen, 0.0098, below Fibrosis's 0.0101, though on
+# the five real exams it was among the least render-sensitive at 2.1x.
+#
+# All of this rests on seven reference images and five uncalibrated exams. It
+# decides nothing about a population. It was enough for these withdrawals only
+# because each failed a bar this project had already set for itself.
+# tools/calibrate_thresholds.py runs the measurement that would settle it, over
+# exams a radiologist has read.
+#
+# Fibrosis carries a second finding from its own withdrawal, kept because it is
+# the only render-sensitivity figure measured before the five CR exams above: on
+# that earlier set it swung by a median factor of 48.6, against 14.6 for the next
+# output and 1.5 for Lung Opacity. Its operating point, 0.0101, is the third
+# lowest of the eighteen -- it read as second lowest when first written, because
+# Pneumothorax below it was suppressed then and not counted.
+#
+# None of these operating points is wrong for the population it was fitted on.
+# They do not transfer to this one, which is the whole of the problem.
+SUPPRESSED_INDICES: frozenset[int] = frozenset({5, 6, 8, 11, 15})
 
 # The findings this deployment surfaces, in the model's own order. Results
 # recorded before an output was suppressed still carry it, so everything that

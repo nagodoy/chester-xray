@@ -30,10 +30,10 @@ settle it:
    deliberate suppressions, not a different label set.
 
 This describes the config file as it is vendored. It is not the deployment's
-current reported set: four of those six -- 2, 3, 8 and 14 -- are reported again,
-11 (Nodule) and 15 (Fracture) are still withheld, and index 6, Fibrosis, was added
-to the withheld set. `server/chester/inference.py` is the authority on what this
-node surfaces.
+current reported set: three of those six -- 2, 3 and 14 -- are reported again;
+8 (Pneumonia), 11 (Nodule) and 15 (Fracture) are withheld; and 5 (Emphysema) and
+6 (Fibrosis) were added to the withheld set. `server/chester/inference.py` is the
+authority on what this node surfaces.
 
 ## Method
 
