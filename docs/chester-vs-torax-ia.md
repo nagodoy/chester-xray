@@ -148,15 +148,34 @@ A docstring de `finding_rows` afirma "in the model's own order". Em SQLite é
 verdade; em PostgreSQL, que é o que roda em produção, não é. O artefato de
 armazenamento vaza para a folha do laudo e para o tag DICOM que sai para o PACS.
 
-Correção: iterar `inference.PATHOLOGIES` e buscar cada score, em vez de iterar as
-chaves do documento.
+**Corrigido.** `finding_rows` agora itera `inference.REPORTED_PATHOLOGIES` e busca
+cada score, em vez de iterar as chaves do documento. Um nome que o resultado não
+carrega é pulado, não reportado como score zero. Um exame novo sai assim:
 
-### Lacuna: o tag não carrega número
+```text
+ATELECTASIS\ABSENT\CONSOLIDATION\ABSENT\EDEMA\ABSENT\EMPHYSEMA\ABSENT\
+EFFUSION\ABSENT\PLEURALTHICKENING\ABSENT\CARDIOMEGALY\ABSENT\MASS\ABSENT\
+HERNIA\ABSENT\LUNGOPACITY\ABSENT\ENLARGEDCARDIOMEDIASTINUM\ABSENT
+```
 
-Cada item leva `CodeMeaning` e `TextValue`, e nada mais. Um visualizador que leia
-os tags vê `FIBROSIS\CONFIDENT` sem meio de saber que são 0.0121 contra um limiar
-de 0.0101. A folha renderizada mostra o score; os tags, não. Quem consome os dois
-recebe informações de precisão diferente sobre o mesmo achado.
+### Lacuna: o tag não carregava número
+
+Cada item levava `CodeMeaning` e `TextValue`, e nada mais. Um visualizador que
+lesse os tags via `FIBROSIS\CONFIDENT` sem meio de saber que eram 0.0121 contra um
+limiar de 0.0101. A folha renderizada mostrava o score; os tags, não.
+
+**Corrigido.** Cada item da sequência ganhou um bloco privado próprio, com o mesmo
+criador, carregando três `DS`:
+
+| Elemento | Conteúdo |
+| --- | --- |
+| `01` | score bruto |
+| `02` | ponto operacional |
+| `03` | score normalizado |
+
+Nada foi removido: um leitor que só conhece `CodeMeaning` e `TextValue` vê
+exatamente o que via antes. Os números atravessam o round-trip pelo formato de
+arquivo, que é o que o PACS recebe.
 
 ## 4. Fibrosis: falso positivo sistemático (suprimida)
 
@@ -210,15 +229,15 @@ radiologista, não uma mudança de código.
 
 ## Recomendações
 
-1. **Corrigir a ordem** em `report.finding_rows`. Muda a saída de um artefato
-   clínico já enviado ao PACS, então é decisão de quem opera, não da correção.
-2. **Considerar levar score e limiar para dentro da sequência privada**, para que
-   o tag e a folha digam a mesma coisa com a mesma precisão.
+1. ~~Corrigir a ordem em `report.finding_rows`.~~ Feito.
+2. ~~Levar score e limiar para dentro da sequência privada.~~ Feito.
 3. **Revisar a palavra `CONFIDENT`.** "Acima do ponto operacional" é o que ela
-   significa; é o que ela deveria dizer.
+   significa; é o que ela deveria dizer. Em aberto.
 4. **Para qualquer comparativo futuro com o demo**, exportar o raster de
    `render_frame_for_model` e alimentar os dois com esse arquivo. Sem isso, a
-   medição é da janela.
+   medição é da janela. Em aberto.
+5. **Recalibrar o ponto operacional da Fibrosis** contra exames locais lidos por
+   um radiologista, se quiser voltar a reportá-la. Em aberto.
 
 ## Como reproduzir
 

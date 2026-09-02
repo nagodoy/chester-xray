@@ -8,7 +8,7 @@ picture must not be told different things.
 
 from __future__ import annotations
 
-from chester.inference import is_reported
+from chester.inference import REPORTED_PATHOLOGIES
 
 CONFIDENCE_ABSENT = "ABSENT"
 CONFIDENCE_DOUBT = "DOUBT"
@@ -50,10 +50,19 @@ def finding_rows(result) -> list[dict]:
     report that showed only positives would leave the reader unable to tell a
     negative from something the model never looked at.
 
-    A result recorded before an output was suppressed still carries it, so the
-    stored document is filtered rather than trusted. Otherwise a study analysed
-    last week would keep printing a finding this deployment no longer stands
-    behind, on a sheet and in DICOM tags that go to a PACS.
+    The order comes from REPORTED_PATHOLOGIES rather than from the stored
+    document's own keys. Those keys are not in the order they were written:
+    PostgreSQL orders JSONB object keys by length and then bytewise, so reading
+    the document back gave Mass, Edema, Hernia, Effusion -- shortest name first.
+    That reordering reached the sheet a radiologist reads and the DICOM tags sent
+    to a PACS, which is a storage detail deciding how a clinical artefact is laid
+    out. On SQLite the keys came back in insertion order and the bug was
+    invisible.
+
+    Filtering rather than trusting the document also covers suppression: a result
+    recorded before an output was withdrawn still carries it, and a study
+    analysed last week must not keep printing a finding this deployment no longer
+    stands behind.
     """
     raw = result.raw_scores or {}
     thresholds = result.thresholds or {}
@@ -62,11 +71,15 @@ def finding_rows(result) -> list[dict]:
         {
             "pathology": pathology,
             "code_meaning": dicom_code_meaning(pathology),
-            "score": float(score),
+            "score": float(raw[pathology]),
             "threshold": float(thresholds.get(pathology, 0.0)),
             "normalized": float(normalized.get(pathology, 0.0)),
-            "confidence": classify_confidence(float(score), float(thresholds.get(pathology, 0.0))),
+            "confidence": classify_confidence(
+                float(raw[pathology]), float(thresholds.get(pathology, 0.0))
+            ),
         }
-        for pathology, score in raw.items()
-        if is_reported(pathology)
+        # A result carries only the outputs that ran, so a name the document does
+        # not have is skipped rather than reported as a score of zero.
+        for pathology in REPORTED_PATHOLOGIES
+        if pathology in raw
     ]
