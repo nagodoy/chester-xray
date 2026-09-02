@@ -219,3 +219,17 @@ export interface NetworkLogList {
   items: NetworkLogEntry[];
   total: number;
 }
+
+export interface NetworkLogRetention {
+  /** Hours of network log kept. Always one of `options`. */
+  hours: number;
+  options: number[];
+  /** How many entries the window has already expired. */
+  expiring: number;
+  last_swept_at: string | null;
+}
+
+export interface RetentionPurgeOutcome {
+  deleted: number;
+  retention: NetworkLogRetention;
+}

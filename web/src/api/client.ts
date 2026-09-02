@@ -7,6 +7,8 @@ import type {
   ManagedDomain,
   ManagedUser,
   NetworkLogList,
+  NetworkLogRetention,
+  RetentionPurgeOutcome,
   SendConnection,
   SendConnectionList,
   StudyDetail,
@@ -215,8 +217,23 @@ export const api = {
 
   listAudit: () => request<AuditEntry[]>("/api/access-control/audit"),
 
-  listNetworkLogs: (direction: "received" | "sent", limit = 100) => {
-    const query = new URLSearchParams({ direction, limit: String(limit) });
+  listNetworkLogs: (direction: "received" | "sent", limit = 25, offset = 0) => {
+    const query = new URLSearchParams({
+      direction,
+      limit: String(limit),
+      offset: String(offset),
+    });
     return request<NetworkLogList>(`/api/network-logs?${query.toString()}`);
   },
+
+  getRetention: () => request<NetworkLogRetention>("/api/network-logs/retention"),
+
+  setRetention: (hours: number) =>
+    request<NetworkLogRetention>("/api/network-logs/retention", {
+      method: "PUT",
+      ...json({ hours }),
+    }),
+
+  purgeNetworkLogs: () =>
+    request<RetentionPurgeOutcome>("/api/network-logs/retention/purge", { method: "POST" }),
 };

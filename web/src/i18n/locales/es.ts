@@ -20,6 +20,10 @@ export const es: Dictionary = {
     active: "Activo",
     inactive: "Inactivo",
     checkingAccess: "Verificando acceso…",
+    previous: "Anterior",
+    next: "Siguiente",
+    pageOf: "Página {page} de {pages}",
+    showingRange: "{first}–{last} de {total}",
   },
 
   nav: {
@@ -310,6 +314,24 @@ export const es: Dictionary = {
       "c-store": "C-STORE",
       wado: "WADO",
     },
+  },
+
+  retention: {
+    title: "Retención de datos",
+    subtitle:
+      "La rutina borra los registros de red más antiguos que el período elegido. La operación no se puede deshacer.",
+    subtitleReadOnly:
+      "La rutina borra los registros de red más antiguos que el período elegido. Solo un administrador puede cambiarlo.",
+    keepFor: "BORRAR MÁS ANTIGUOS QUE",
+    hours: "{hours} h",
+    expiring: "{count} registros se borrarán",
+    oneExpiring: "1 registro se borrará",
+    nothingExpiring: "Nada fuera del período",
+    purgeNow: "Borrar registros antiguos",
+    lastSwept: "Última limpieza: {when}",
+    confirmTitle: "Borrar registros antiguos",
+    confirmBody:
+      "Esto borra {count} registro(s) de red con más de {hours} horas. No se puede deshacer.",
   },
 
   access: {

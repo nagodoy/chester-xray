@@ -12,6 +12,8 @@ import io
 
 import numpy as np
 
+from chester.report import SIGNAL_ABOVE, SIGNAL_BELOW, SIGNAL_BORDERLINE
+
 # The picture keeps seven parts to the table's three, matching the study
 # detail screen, so the sheet and the application read the same way.
 IMAGE_SHARE = 7 / 3
@@ -30,10 +32,14 @@ INK = (248, 250, 252)
 INK_SOFT = (148, 163, 184)
 TEAL = (45, 212, 191)
 
+# Keyed off the constants rather than the words themselves. Written out by hand,
+# a change to the wording would leave every key unmatched, and the .get default
+# below would quietly render the whole column in plain ink -- the colour coding
+# gone with nothing raised.
 CONFIDENCE_COLOURS = {
-    "ABSENT": (148, 163, 184),
-    "DOUBT": (251, 191, 36),
-    "CONFIDENT": (248, 113, 113),
+    SIGNAL_BELOW: (148, 163, 184),
+    SIGNAL_BORDERLINE: (251, 191, 36),
+    SIGNAL_ABOVE: (248, 113, 113),
 }
 
 # Whatever the host has. The sheet must still render on a machine with no

@@ -21,6 +21,10 @@ export const en: Dictionary = {
     active: "Active",
     inactive: "Inactive",
     checkingAccess: "Checking access…",
+    previous: "Previous",
+    next: "Next",
+    pageOf: "Page {page} of {pages}",
+    showingRange: "{first}–{last} of {total}",
   },
 
   nav: {
@@ -309,6 +313,24 @@ export const en: Dictionary = {
       "c-store": "C-STORE",
       wado: "WADO",
     },
+  },
+
+  retention: {
+    title: "Data retention",
+    subtitle:
+      "The routine deletes network log entries older than the chosen window. This cannot be undone.",
+    subtitleReadOnly:
+      "The routine deletes network log entries older than the chosen window. Only an administrator can change it.",
+    keepFor: "DELETE ENTRIES OLDER THAN",
+    hours: "{hours} h",
+    expiring: "{count} entries will be deleted",
+    oneExpiring: "1 entry will be deleted",
+    nothingExpiring: "Nothing outside the window",
+    purgeNow: "Delete old entries",
+    lastSwept: "Last swept {when}",
+    confirmTitle: "Delete old entries",
+    confirmBody:
+      "This deletes {count} network log entr(ies) older than {hours} hours. It cannot be undone.",
   },
 
   access: {

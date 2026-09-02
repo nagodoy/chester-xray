@@ -11,7 +11,7 @@ import io
 import logging
 
 from chester.imaging.report_image import render_report
-from chester.report import finding_rows
+from chester.report import SIGNAL_BELOW, finding_rows
 
 logger = logging.getLogger(__name__)
 
@@ -153,12 +153,38 @@ def build_report_dataset(
     return dataset
 
 
+def _decimal_string(value: float) -> str:
+    """A float as DICOM DS: at most 16 characters, and no exponent notation.
+
+    Six decimals is far past what any of these numbers means and still leaves
+    room inside the VR's limit for a value that arrives larger than expected.
+    """
+    return f"{value:.6f}"[:16]
+
+
 def _apply_private_block(dataset, rows: list[dict], private_creator: str) -> None:
-    """Write the findings into the private block, one item per pathology."""
+    """Write the findings into the private block, one item per pathology.
+
+    Each item carries the finding's name and its confidence word, and then the
+    three numbers the word was derived from, in a private block of its own inside
+    the item.
+
+    The numbers are there because the word alone is not readable. ACIMA means
+    "above this output's operating point by more than a tenth of it", and those
+    operating points differ by an order of magnitude between findings: 0.0101 for
+    Fibrosis against 0.1032 for Effusion. A viewer shown only FIBROSIS/ACIMA
+    cannot tell 0.0121 from 0.99, while the rendered sheet beside it prints the
+    score -- so the two halves of the same report disagreed on how much they were
+    willing to say. Nothing is removed: a reader that only knows CodeMeaning and
+    TextValue sees exactly what it saw before.
+    """
     from pydicom.dataset import Dataset
 
     block = dataset.private_block(PRIVATE_GROUP, private_creator, create=True)
-    positives = [row for row in rows if row["confidence"] != "ABSENT"]
+    # Compared against the constant, not the word. Spelled out here, a change to
+    # the wording would match no row at all and this flag would read true on
+    # every report, including the wholly negative ones.
+    positives = [row for row in rows if row["confidence"] != SIGNAL_BELOW]
     block.add_new(0x01, "SH", "true")
     block.add_new(0x02, "SH", "true" if positives else "false")
 
@@ -167,6 +193,11 @@ def _apply_private_block(dataset, rows: list[dict], private_creator: str) -> Non
         item = Dataset()
         item.CodeMeaning = row["code_meaning"]
         item.TextValue = row["confidence"]
+
+        scores = item.private_block(PRIVATE_GROUP, private_creator, create=True)
+        scores.add_new(0x01, "DS", _decimal_string(row["score"]))
+        scores.add_new(0x02, "DS", _decimal_string(row["threshold"]))
+        scores.add_new(0x03, "DS", _decimal_string(row["normalized"]))
         items.append(item)
     block.add_new(0x03, "SQ", items)
     block.add_new(0x04, "SH", "ORIGINAL")

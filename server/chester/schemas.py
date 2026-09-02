@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class InstanceSchema(BaseModel):
@@ -29,6 +29,13 @@ class InstanceSchema(BaseModel):
 
 
 class AnalysisResultSchema(BaseModel):
+    """One scored run, carrying only the outputs this deployment reports.
+
+    A result recorded before an output was suppressed still holds it in the
+    stored document. The interface builds its table from whatever keys arrive,
+    so the filtering happens here, once, rather than in each reader.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
@@ -40,6 +47,20 @@ class AnalysisResultSchema(BaseModel):
     above_threshold: dict[str, bool] | None
     above_threshold_findings: list[str] | None
     created_at: datetime
+
+    @model_validator(mode="after")
+    def _drop_suppressed(self):
+        from chester.inference import is_reported
+
+        for field in ("raw_scores", "op_normalized_scores", "thresholds", "above_threshold"):
+            stored = getattr(self, field)
+            if stored:
+                setattr(self, field, {k: v for k, v in stored.items() if is_reported(k)})
+        if self.above_threshold_findings:
+            self.above_threshold_findings = [
+                name for name in self.above_threshold_findings if is_reported(name)
+            ]
+        return self
 
 
 class StudySchema(BaseModel):
@@ -133,3 +154,22 @@ class NetworkLogSchema(BaseModel):
 class NetworkLogListResponse(BaseModel):
     items: list[NetworkLogSchema]
     total: int
+
+
+class RetentionSchema(BaseModel):
+    """The network log retention window, and what applying it would remove now."""
+
+    hours: int
+    # The windows the interface may offer, so it does not hard-code the set.
+    options: list[int]
+    expiring: int
+    last_swept_at: datetime | None
+
+
+class RetentionUpdate(BaseModel):
+    hours: int
+
+
+class RetentionPurgeResponse(BaseModel):
+    deleted: int
+    retention: RetentionSchema

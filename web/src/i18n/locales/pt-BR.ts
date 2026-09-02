@@ -13,6 +13,10 @@ export const ptBR = {
     active: "Ativo",
     inactive: "Inativo",
     checkingAccess: "Verificando acesso…",
+    previous: "Anterior",
+    next: "Próxima",
+    pageOf: "Página {page} de {pages}",
+    showingRange: "{first}–{last} de {total}",
   },
 
   nav: {
@@ -303,6 +307,24 @@ export const ptBR = {
       "c-store": "C-STORE",
       wado: "WADO",
     },
+  },
+
+  retention: {
+    title: "Retenção de dados",
+    subtitle:
+      "A rotina apaga automaticamente os registros de rede mais antigos que o período escolhido. A operação não pode ser desfeita.",
+    subtitleReadOnly:
+      "A rotina apaga automaticamente os registros de rede mais antigos que o período escolhido. Só um administrador pode alterá-lo.",
+    keepFor: "APAGAR MAIS ANTIGOS QUE",
+    hours: "{hours} h",
+    expiring: "{count} registros serão apagados",
+    oneExpiring: "1 registro será apagado",
+    nothingExpiring: "Nenhum registro fora do período",
+    purgeNow: "Apagar registros antigos",
+    lastSwept: "Última limpeza em {when}",
+    confirmTitle: "Apagar registros antigos",
+    confirmBody:
+      "Isto apaga {count} registro(s) de rede com mais de {hours} horas. A operação não pode ser desfeita.",
   },
 
   access: {

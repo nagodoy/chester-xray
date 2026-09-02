@@ -111,3 +111,57 @@ export function Notice({ strong, children }: { strong: string; children?: ReactN
     </div>
   );
 }
+
+/**
+ * Page controls for a table that reads one window of rows at a time. The page
+ * index is zero-based here, as the offset the API wants, and one-based in the
+ * label, which is what a reader expects. A single page of results renders
+ * nothing: the controls would only ever be disabled.
+ */
+export function Pagination({
+  page,
+  pageSize,
+  total,
+  onChange,
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  onChange: (page: number) => void;
+}) {
+  const { t, format } = useI18n();
+  if (total <= pageSize) return null;
+
+  const pageCount = Math.ceil(total / pageSize);
+  const first = page * pageSize + 1;
+  const last = Math.min(total, (page + 1) * pageSize);
+
+  return (
+    <div className="pagination">
+      <span className="pagination-range">
+        {format(t.common.showingRange, { first, last, total })}
+      </span>
+      <div className="pagination-controls">
+        <button
+          type="button"
+          className="btn btn-subtle"
+          onClick={() => onChange(page - 1)}
+          disabled={page <= 0}
+        >
+          {t.common.previous}
+        </button>
+        <span className="pagination-page" aria-live="polite">
+          {format(t.common.pageOf, { page: page + 1, pages: pageCount })}
+        </span>
+        <button
+          type="button"
+          className="btn btn-subtle"
+          onClick={() => onChange(page + 1)}
+          disabled={page >= pageCount - 1}
+        >
+          {t.common.next}
+        </button>
+      </div>
+    </div>
+  );
+}

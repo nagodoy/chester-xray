@@ -8,7 +8,7 @@ import uuid
 
 import pytest
 
-from chester import worker
+from chester import inference, worker
 from chester.models import AnalysisJob, AnalysisResult, Instance, Study, utcnow
 from chester.security.roles import ROLE_ADMIN
 
@@ -163,7 +163,7 @@ class TestProcessing:
 
         result = session.query(AnalysisResult).filter_by(job_id=job.id).one()
         assert result.model_version.startswith("chester-onnx:")
-        assert len(result.raw_scores) == 12
+        assert set(result.raw_scores) == set(inference.REPORTED_PATHOLOGIES)
         assert set(result.raw_scores) == set(result.thresholds)
         assert all(0.0 <= value <= 1.0 for value in result.raw_scores.values())
         assert all(0.0 <= value <= 1.0 for value in result.op_normalized_scores.values())

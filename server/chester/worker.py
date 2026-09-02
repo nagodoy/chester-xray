@@ -16,12 +16,14 @@ import os
 import signal
 import socket
 import threading
+import time
 import uuid
 from datetime import timedelta
 
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
+from chester import retention
 from chester.config import settings
 from chester.db import session_scope
 from chester.models import (
@@ -354,6 +356,32 @@ def recover_expired_leases(db: Session) -> int:
     return len(stale) + len(deliveries)
 
 
+def sweep_retention(last_sweep: float) -> float:
+    """Apply every organization's retention window if one is due.
+
+    Returns the monotonic time of the sweep that ran, or ``last_sweep`` when none
+    was due. This is what makes retention a routine rather than a button: the
+    window holds whether or not anyone opens the network log page.
+
+    A failure here must not stop the worker from analysing studies, which is what
+    it exists for, so the sweep logs and yields rather than raising.
+    """
+    now = time.monotonic()
+    if now - last_sweep < settings.retention_sweep_minutes * 60:
+        return last_sweep
+
+    try:
+        with session_scope() as db:
+            removed = retention.sweep(db)
+    except Exception:
+        logger.exception("Retention sweep failed; will try again next interval")
+        return now
+
+    if removed:
+        logger.info("Retention removed %d network log entr(ies)", removed)
+    return now
+
+
 def run(stop: threading.Event | None = None) -> None:
     """Poll for work until asked to stop."""
     stop = stop or threading.Event()
@@ -364,8 +392,14 @@ def run(stop: threading.Event | None = None) -> None:
     if recovered:
         logger.info("Requeued %d job(s) with expired leases", recovered)
 
+    # Negative infinity, so the first pass of the loop sweeps: a worker that has
+    # been down longer than the window should not wait an interval to catch up.
+    last_sweep = float("-inf")
+
     while not stop.is_set():
         try:
+            last_sweep = sweep_retention(last_sweep)
+
             with session_scope() as db:
                 job_id = claim_job(db)
             if job_id is not None:
