@@ -23,17 +23,22 @@ from chester.inference import REPORTED_PATHOLOGIES
 
 
 class TestConfidence:
-    """ABSENT under the operating point, CONFIDENT over, DOUBT either side."""
+    """ABAIXO under the operating point, ACIMA over, LIMÍTROFE either side.
+
+    The words report where a score sits against its own operating point, and
+    nothing more. They said CONFIDENT / DOUBT / ABSENT, which claimed a certainty
+    about the finding that the comparison never established.
+    """
 
     @pytest.mark.parametrize(
         ("score", "expected"),
         [
-            (0.10, report.CONFIDENCE_ABSENT),
-            (0.40, report.CONFIDENCE_ABSENT),
-            (0.46, report.CONFIDENCE_DOUBT),
-            (0.50, report.CONFIDENCE_DOUBT),
-            (0.54, report.CONFIDENCE_DOUBT),
-            (0.70, report.CONFIDENCE_CONFIDENT),
+            (0.10, report.SIGNAL_BELOW),
+            (0.40, report.SIGNAL_BELOW),
+            (0.46, report.SIGNAL_BORDERLINE),
+            (0.50, report.SIGNAL_BORDERLINE),
+            (0.54, report.SIGNAL_BORDERLINE),
+            (0.70, report.SIGNAL_ABOVE),
         ],
     )
     def test_the_bands_around_an_operating_point_of_one_half(self, score, expected):
@@ -41,18 +46,18 @@ class TestConfidence:
 
     def test_the_band_straddles_the_threshold_rather_than_sitting_above_it(self):
         """A score just under is no more decidable than one just over."""
-        assert report.classify_confidence(0.48, 0.5) == report.CONFIDENCE_DOUBT
-        assert report.classify_confidence(0.52, 0.5) == report.CONFIDENCE_DOUBT
+        assert report.classify_confidence(0.48, 0.5) == report.SIGNAL_BORDERLINE
+        assert report.classify_confidence(0.52, 0.5) == report.SIGNAL_BORDERLINE
 
     def test_the_band_is_proportional_to_the_operating_point(self):
         """A tenth of 0.04 is a much narrower band than a tenth of 0.5."""
-        assert report.classify_confidence(0.045, 0.04) == report.CONFIDENCE_CONFIDENT
-        assert report.classify_confidence(0.045, 0.5) == report.CONFIDENCE_ABSENT
+        assert report.classify_confidence(0.045, 0.04) == report.SIGNAL_ABOVE
+        assert report.classify_confidence(0.045, 0.5) == report.SIGNAL_BELOW
 
     def test_an_operating_point_of_zero_falls_back_to_over_or_under(self):
         """There is no band to be near, so the only honest split is the sign."""
-        assert report.classify_confidence(0.0, 0.0) == report.CONFIDENCE_ABSENT
-        assert report.classify_confidence(0.1, 0.0) == report.CONFIDENCE_CONFIDENT
+        assert report.classify_confidence(0.0, 0.0) == report.SIGNAL_BELOW
+        assert report.classify_confidence(0.1, 0.0) == report.SIGNAL_ABOVE
 
     def test_finding_names_take_the_shape_the_private_tags_use(self):
         assert report.dicom_code_meaning("Pleural Thickening") == "PLEURALTHICKENING"
@@ -240,6 +245,29 @@ class TestSheet:
         assert _fit_text(draw, "AB", _font(21), 500) == "AB"
 
 
+class TestSheetColours:
+    """Every word the classifier can produce has a colour on the sheet.
+
+    The map is keyed off the constants. Spelled out as literals, a change to the
+    wording would leave every key unmatched and the .get default would render the
+    whole column in plain ink -- the colour coding gone, and nothing raised.
+    """
+
+    def test_each_word_the_classifier_produces_has_its_own_colour(self):
+        from chester.imaging.report_image import CONFIDENCE_COLOURS
+
+        words = {report.SIGNAL_BELOW, report.SIGNAL_BORDERLINE, report.SIGNAL_ABOVE}
+        assert set(CONFIDENCE_COLOURS) == words
+        # Three distinct colours: the column is read at a glance, not word by word.
+        assert len(set(CONFIDENCE_COLOURS.values())) == 3
+
+    def test_no_word_falls_through_to_the_default(self):
+        from chester.imaging.report_image import CONFIDENCE_COLOURS
+
+        for score, threshold in ((0.9, 0.5), (0.5, 0.5), (0.1, 0.5)):
+            assert report.classify_confidence(score, threshold) in CONFIDENCE_COLOURS
+
+
 class TestSecondaryCapture:
     def test_the_patient_study_and_accession_come_across_untouched(
         self, source_dicom, pixels, result
@@ -290,9 +318,9 @@ class TestSecondaryCapture:
         block = dataset.private_block(PRIVATE_GROUP, DEFAULT_PRIVATE_CREATOR)
         items = {item.CodeMeaning: item.TextValue for item in block[0x03].value}
         assert items == {
-            "CARDIOMEGALY": "CONFIDENT",
-            "EFFUSION": "DOUBT",
-            "MASS": "ABSENT",
+            "CARDIOMEGALY": "ACIMA",
+            "EFFUSION": "LIMÍTROFE",
+            "MASS": "ABAIXO",
         }
         assert block[0x02].value == "true"
         assert block[0x05].value == "CHEST"
@@ -300,7 +328,7 @@ class TestSecondaryCapture:
     def test_each_finding_carries_the_numbers_its_word_came_from(
         self, source_dicom, pixels, result
     ):
-        """CONFIDENT alone is not readable: the operating points differ tenfold."""
+        """ACIMA alone is not readable: the operating points differ tenfold."""
         dataset = build_report_dataset(source_dicom, pixels, result)
 
         items = dataset.private_block(PRIVATE_GROUP, DEFAULT_PRIVATE_CREATOR)[0x03].value
@@ -323,9 +351,9 @@ class TestSecondaryCapture:
 
         items = dataset.private_block(PRIVATE_GROUP, DEFAULT_PRIVATE_CREATOR)[0x03].value
         assert {item.CodeMeaning: item.TextValue for item in items} == {
-            "CARDIOMEGALY": "CONFIDENT",
-            "EFFUSION": "DOUBT",
-            "MASS": "ABSENT",
+            "CARDIOMEGALY": "ACIMA",
+            "EFFUSION": "LIMÍTROFE",
+            "MASS": "ABAIXO",
         }
 
     def test_the_numbers_survive_the_file_format(self, source_dicom, pixels, result):
@@ -354,6 +382,22 @@ class TestSecondaryCapture:
         dataset = build_report_dataset(source_dicom, pixels, quiet)
 
         block = dataset.private_block(PRIVATE_GROUP, DEFAULT_PRIVATE_CREATOR)
+        assert block[0x02].value == "false"
+
+    def test_a_wholly_negative_report_still_says_so(self, source_dicom, pixels):
+        """The has-a-positive flag compares against the constant, not the word.
+
+        Written out as a literal, a change to the wording would match no row and
+        this flag would read true on every report, negative ones included.
+        """
+        quiet = _Result(
+            {"Mass": 0.01, "Effusion": 0.01, "Cardiomegaly": 0.01},
+            {"Mass": 0.5, "Effusion": 0.5, "Cardiomegaly": 0.5},
+        )
+        dataset = build_report_dataset(source_dicom, pixels, quiet)
+
+        block = dataset.private_block(PRIVATE_GROUP, DEFAULT_PRIVATE_CREATOR)
+        assert {item.TextValue for item in block[0x03].value} == {report.SIGNAL_BELOW}
         assert block[0x02].value == "false"
 
     def test_the_creator_is_ours_unless_asked_otherwise(self, source_dicom, pixels, result):

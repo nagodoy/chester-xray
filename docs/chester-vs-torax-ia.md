@@ -129,6 +129,13 @@ A Fibrosis recebe `CONFIDENT` com um terço do score da Effusion, que recebe
 limiares por patologia, e a palavra é que engana: `CONFIDENT` descreve a posição
 relativa ao limiar, não a confiança do modelo no achado.
 
+**Corrigido.** As três palavras passaram a ser `ACIMA`, `LIMÍTROFE` e `ABAIXO`,
+que é o que a comparação de fato estabelece. Alinha também com a tela do estudo,
+que já mostrava "acima"/"abaixo" na coluna SINAL. A regra de classificação não
+mudou, nem o cabeçalho `CONFIANÇA` da folha, nem o `CodeMeaning` — os nomes de
+patologia seguem em inglês. Os exemplos de tag acima e nas tabelas desta seção
+ficam com as palavras antigas: são registro do que foi emitido na época.
+
 ### Defeito: a ordem dos achados é artefato do banco
 
 A ordem do tag não é a do modelo. Verificado:
@@ -231,8 +238,7 @@ radiologista, não uma mudança de código.
 
 1. ~~Corrigir a ordem em `report.finding_rows`.~~ Feito.
 2. ~~Levar score e limiar para dentro da sequência privada.~~ Feito.
-3. **Revisar a palavra `CONFIDENT`.** "Acima do ponto operacional" é o que ela
-   significa; é o que ela deveria dizer. Em aberto.
+3. ~~Revisar a palavra `CONFIDENT`.~~ Feito: `ACIMA` / `LIMÍTROFE` / `ABAIXO`.
 4. **Para qualquer comparativo futuro com o demo**, exportar o raster de
    `render_frame_for_model` e alimentar os dois com esse arquivo. Sem isso, a
    medição é da janela. Em aberto.

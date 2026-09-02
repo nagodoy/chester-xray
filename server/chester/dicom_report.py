@@ -11,7 +11,7 @@ import io
 import logging
 
 from chester.imaging.report_image import render_report
-from chester.report import finding_rows
+from chester.report import SIGNAL_BELOW, finding_rows
 
 logger = logging.getLogger(__name__)
 
@@ -169,10 +169,10 @@ def _apply_private_block(dataset, rows: list[dict], private_creator: str) -> Non
     three numbers the word was derived from, in a private block of its own inside
     the item.
 
-    The numbers are there because the word alone is not readable. CONFIDENT means
+    The numbers are there because the word alone is not readable. ACIMA means
     "above this output's operating point by more than a tenth of it", and those
     operating points differ by an order of magnitude between findings: 0.0101 for
-    Fibrosis against 0.1032 for Effusion. A viewer shown only FIBROSIS/CONFIDENT
+    Fibrosis against 0.1032 for Effusion. A viewer shown only FIBROSIS/ACIMA
     cannot tell 0.0121 from 0.99, while the rendered sheet beside it prints the
     score -- so the two halves of the same report disagreed on how much they were
     willing to say. Nothing is removed: a reader that only knows CodeMeaning and
@@ -181,7 +181,10 @@ def _apply_private_block(dataset, rows: list[dict], private_creator: str) -> Non
     from pydicom.dataset import Dataset
 
     block = dataset.private_block(PRIVATE_GROUP, private_creator, create=True)
-    positives = [row for row in rows if row["confidence"] != "ABSENT"]
+    # Compared against the constant, not the word. Spelled out here, a change to
+    # the wording would match no row at all and this flag would read true on
+    # every report, including the wholly negative ones.
+    positives = [row for row in rows if row["confidence"] != SIGNAL_BELOW]
     block.add_new(0x01, "SH", "true")
     block.add_new(0x02, "SH", "true" if positives else "false")
 

@@ -75,7 +75,7 @@ class TestHistoricalResults:
         assert rows["Mass"]["score"] == 0.0127
         assert rows["Mass"]["threshold"] == 0.01939503
         # 0.0127 sits below the 0.00194 band around Mass's operating point.
-        assert rows["Mass"]["confidence"] == report.CONFIDENCE_ABSENT
+        assert rows["Mass"]["confidence"] == report.SIGNAL_BELOW
 
     def test_the_api_does_not_serve_a_suppressed_output(self):
         import uuid
