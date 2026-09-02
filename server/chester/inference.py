@@ -48,10 +48,39 @@ PATHOLOGIES: tuple[str, ...] = (
     "Enlarged Cardiomediastinum",
 )
 
-# Outputs the CHESTER configuration deliberately blanked out and never reported.
-# Preserved from the previous deployment: which findings are surfaced is a
+# Outputs that are computed and never reported. Which findings are surfaced is a
 # clinical decision, not an implementation detail to change in passing.
-SUPPRESSED_INDICES: frozenset[int] = frozenset({2, 3, 8, 11, 14, 15})
+#
+# Indices 2, 3, 8, 11, 14 and 15 -- Infiltration, Pneumothorax, Pneumonia,
+# Nodule, Lung Lesion and Fracture -- are preserved from the previous deployment,
+# where the CHESTER configuration blanked their labels.
+#
+# Index 6, Fibrosis, was added here. Its published operating point is 0.0101, the
+# second lowest of the eighteen, and the output is by far the most sensitive in
+# the set to how the pixels are rendered: across renderings of the same anatomy
+# it swings by a median factor of 48.6, against 14.6 for the next output and 1.5
+# for Lung Opacity. What that combination produces is a verdict decided by the
+# window rather than by the chest. On the reference images in examples/ whose
+# label is known and is not fibrosis, it fires on 7 of 7 -- including the one
+# labelled No Finding, at 8.5 times its threshold.
+#
+# The operating point is not wrong for the population it was fitted on; it does
+# not transfer to this one. Reporting it again needs a threshold calibrated
+# against local exams read by a radiologist, not a change here.
+SUPPRESSED_INDICES: frozenset[int] = frozenset({2, 3, 6, 8, 11, 14, 15})
+
+# The findings this deployment surfaces, in the model's own order. Results
+# recorded before an output was suppressed still carry it, so everything that
+# shows a stored result filters through this rather than trusting what it reads.
+REPORTED_PATHOLOGIES: tuple[str, ...] = tuple(
+    name for index, name in enumerate(PATHOLOGIES) if index not in SUPPRESSED_INDICES
+)
+
+
+def is_reported(pathology: str) -> bool:
+    """Whether this deployment surfaces an output at all."""
+    return pathology in REPORTED_PATHOLOGIES
+
 
 # Operating points published for these weights. Verified identical to the values
 # in the retired TensorFlow.js config to nine decimal places.

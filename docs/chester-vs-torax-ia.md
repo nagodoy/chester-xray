@@ -158,6 +158,56 @@ os tags vê `FIBROSIS\CONFIDENT` sem meio de saber que são 0.0121 contra um lim
 de 0.0101. A folha renderizada mostra o score; os tags, não. Quem consome os dois
 recebe informações de precisão diferente sobre o mesmo achado.
 
+## 4. Fibrosis: falso positivo sistemático (suprimida)
+
+Um segundo exame trouxe `Fibrosis` acima do limiar. Medido, não estimado:
+
+Nas 15 imagens de `examples/`, Fibrosis dispara em 11 (73%). Restringindo às 7
+cujo rótulo é conhecido e **não** é fibrose, dispara em **7 de 7** — incluindo a
+rotulada *No Finding*, a 8,5 vezes o limiar:
+
+| Rótulo verdadeiro | Bruto | × limiar |
+| --- | --- | --- |
+| Cardiomegaly | 0.0908 | 9.0 |
+| Cardiomegaly + Emphysema | 0.0315 | 3.1 |
+| Cardiomegaly + Effusion | 0.0550 | 5.5 |
+| Cardiomegaly + Effusion | 0.0569 | 5.7 |
+| Cardiomegaly + Effusion | 0.0472 | 4.7 |
+| **No Finding** | **0.0853** | **8.5** |
+| Hernia | 0.0199 | 2.0 |
+
+Não é desalinhamento de índice: `OP_POINT[6] = 0.010060724` no `config.json` do
+modelo legado é mesmo o de Fibrosis, verificado posição a posição. É o mesmo
+limiar que o demo do Chester usa.
+
+São duas propriedades somadas:
+
+- **O ponto operacional é o segundo mais baixo dos 18** (0.0101). A saída de
+  fibrose é minúscula em quase toda imagem e o limiar cai no meio do ruído.
+- **É a saída mais sensível ao contraste do conjunto.** Variação mediana entre
+  renderizações da mesma anatomia:
+
+| Patologia | Ponto op. | Fator máx/mín | Vereditos que mudam |
+| --- | --- | --- | --- |
+| **Fibrosis** | 0.0101 | **48.6×** | 11 de 15 |
+| Edema | 0.0236 | 14.6× | 10 de 15 |
+| Cardiomegaly | 0.0503 | 11.7× | 7 de 15 |
+| … | | | |
+| Lung Opacity | 0.2020 | 1.5× | 4 de 15 |
+
+Quem decide se Fibrosis lê "acima" é a renderização, não a anatomia. O ponto
+operacional não está errado para a população em que foi ajustado; ele não
+transfere para esta.
+
+**Fibrosis foi movida para `SUPPRESSED_INDICES`**, junto das seis que o CHESTER
+já não reportava. O laudo passa a ter 11 achados. A supressão é aplicada também
+onde resultados já gravados são exibidos — a folha, os tags DICOM, o resumo da
+worklist e o schema da API — porque um estudo analisado antes da mudança ainda
+carrega a saída no documento armazenado.
+
+Voltar a reportá-la exige um limiar calibrado contra exames locais lidos por um
+radiologista, não uma mudança de código.
+
 ## Recomendações
 
 1. **Corrigir a ordem** em `report.finding_rows`. Muda a saída de um artefato

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from chester.api.deps import require_admin, require_page
 from chester.db import get_session
+from chester.inference import is_reported
 from chester.models import AnalysisJob, AuditEvent, Study
 from chester.schemas import (
     AnalysisResultSchema,
@@ -57,7 +58,9 @@ def top_findings(study: Study, limit: int = 5) -> list[dict]:
             "threshold": (latest.thresholds or {}).get(pathology),
             "above_threshold": (latest.above_threshold or {}).get(pathology, False),
         }
-        for pathology in (latest.above_threshold_findings or [])[:limit]
+        for pathology in [
+            name for name in (latest.above_threshold_findings or []) if is_reported(name)
+        ][:limit]
     ]
 
 

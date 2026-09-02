@@ -8,6 +8,8 @@ picture must not be told different things.
 
 from __future__ import annotations
 
+from chester.inference import is_reported
+
 CONFIDENCE_ABSENT = "ABSENT"
 CONFIDENCE_DOUBT = "DOUBT"
 CONFIDENCE_CONFIDENT = "CONFIDENT"
@@ -47,6 +49,11 @@ def finding_rows(result) -> list[dict]:
     Every finding is listed, not only the ones over their operating point: a
     report that showed only positives would leave the reader unable to tell a
     negative from something the model never looked at.
+
+    A result recorded before an output was suppressed still carries it, so the
+    stored document is filtered rather than trusted. Otherwise a study analysed
+    last week would keep printing a finding this deployment no longer stands
+    behind, on a sheet and in DICOM tags that go to a PACS.
     """
     raw = result.raw_scores or {}
     thresholds = result.thresholds or {}
@@ -61,4 +68,5 @@ def finding_rows(result) -> list[dict]:
             "confidence": classify_confidence(float(score), float(thresholds.get(pathology, 0.0))),
         }
         for pathology, score in raw.items()
+        if is_reported(pathology)
     ]

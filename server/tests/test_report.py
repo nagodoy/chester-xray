@@ -69,9 +69,14 @@ class _Result:
 
 @pytest.fixture
 def result() -> _Result:
+    """Three reported findings: one over, one on the band, one well under.
+
+    Every name here must be one the deployment reports -- a suppressed output is
+    filtered out of the sheet and the tags, which is its own test.
+    """
     return _Result(
-        {"Cardiomegaly": 0.9, "Effusion": 0.5, "Nodule": 0.01},
-        {"Cardiomegaly": 0.5, "Effusion": 0.5, "Nodule": 0.5},
+        {"Cardiomegaly": 0.9, "Effusion": 0.5, "Mass": 0.01},
+        {"Cardiomegaly": 0.5, "Effusion": 0.5, "Mass": 0.5},
     )
 
 
@@ -230,13 +235,13 @@ class TestSecondaryCapture:
         assert items == {
             "CARDIOMEGALY": "CONFIDENT",
             "EFFUSION": "DOUBT",
-            "NODULE": "ABSENT",
+            "MASS": "ABSENT",
         }
         assert block[0x02].value == "true"
         assert block[0x05].value == "CHEST"
 
     def test_a_study_with_nothing_over_its_operating_points_says_so(self, source_dicom, pixels):
-        quiet = _Result({"Nodule": 0.01}, {"Nodule": 0.5})
+        quiet = _Result({"Mass": 0.01}, {"Mass": 0.5})
 
         dataset = build_report_dataset(source_dicom, pixels, quiet)
 
