@@ -125,9 +125,7 @@ class TestFreshResults:
         assert "Fibrosis" not in outcome["above_threshold_findings"]
         assert len(outcome["raw_scores"]) == 16
 
-    def test_a_new_run_records_the_restored_outputs_against_their_thresholds(
-        self, monkeypatch
-    ):
+    def test_a_new_run_records_the_restored_outputs_against_their_thresholds(self, monkeypatch):
         """The scores are written now, each judged against its own operating point."""
         import numpy as np
 
