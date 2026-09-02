@@ -84,9 +84,10 @@ Verificado ponta a ponta. Está correto e faz o que documenta:
 3. **Pré-processamento** — `inference.preprocess` redimensiona o lado menor para
    224 (bilinear, PIL), recorta 224×224 no centro e mapeia 0..255 para
    `[-1024, 1024]`.
-4. **Inferência** — ONNX Runtime, 18 saídas, seis suprimidas: cinco por decisão
-   clínica herdada (Infiltration, Pneumothorax, Pneumonia, Lung Lesion, Fracture)
-   e a Fibrosis, retirada aqui. Nodule foi religado e volta a ser reportado.
+4. **Inferência** — ONNX Runtime, 18 saídas, duas suprimidas: Fracture, por
+   decisão clínica herdada, e Fibrosis, retirada aqui. As outras cinco que o
+   CHESTER não reportava (Infiltration, Pneumothorax, Pneumonia, Nodule, Lung
+   Lesion) foram religadas.
 5. **Apresentação** — bruto, normalizado pelo ponto operacional e o veredito de
    confiança, os três guardados separadamente.
 
@@ -208,8 +209,10 @@ limiar que o demo do Chester usa.
 
 São duas propriedades somadas:
 
-- **O ponto operacional é o segundo mais baixo dos 18** (0.0101). A saída de
+- **O ponto operacional é o terceiro mais baixo dos 18** (0.0101). A saída de
   fibrose é minúscula em quase toda imagem e o limiar cai no meio do ruído.
+  (Lia-se "segundo mais baixo" quando isto foi escrito, porque o Pneumothorax,
+  a 0.0098, estava suprimido e não entrava na conta. Hoje entra.)
 - **É a saída mais sensível ao contraste do conjunto.** Variação mediana entre
   renderizações da mesma anatomia:
 
@@ -226,7 +229,9 @@ operacional não está errado para a população em que foi ajustado; ele não
 transfere para esta.
 
 **Fibrosis foi movida para `SUPPRESSED_INDICES`**, junto das seis que o CHESTER
-já não reportava. O laudo passa a ter 11 achados. A supressão é aplicada também
+já não reportava. O laudo passou a ter 11 achados. (Depois disso, cinco daquelas
+seis foram religadas e o laudo passou a ter 16; Fibrosis e Fracture são as duas
+que seguem suprimidas.) A supressão é aplicada também
 onde resultados já gravados são exibidos — a folha, os tags DICOM, o resumo da
 worklist e o schema da API — porque um estudo analisado antes da mudança ainda
 carrega a saída no documento armazenado.
