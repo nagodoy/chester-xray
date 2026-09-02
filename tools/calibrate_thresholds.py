@@ -39,6 +39,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 import onnxruntime as ort
@@ -125,6 +126,45 @@ BY_NORMALIZED = {normalize(name): name for name in PATHOLOGIES}
 NO_FINDING = {"nofinding", "normal", "semachado", "semachados"}
 
 
+class Exam(NamedTuple):
+    """One labelled exam: what the report carries, and what it cannot rule out.
+
+    `excluded` is the part a plain label set cannot express. A PadChest report
+    reading "COPD signs" says nothing about Emphysema either way: counting that
+    exam as an Emphysema negative would manufacture a false positive, and
+    counting it as a positive would invent a diagnosis. It is dropped from that
+    one output's arithmetic and kept for every other.
+    """
+
+    path: Path
+    positives: frozenset[str]
+    excluded: frozenset[str] = frozenset()
+
+
+# PadChest labels that mean the same finding as a model output.
+PADCHEST_EQUIVALENT = {
+    "pleural effusion": "Effusion",
+    "infiltrates": "Infiltration",
+    "laminar atelectasis": "Atelectasis",
+    "pulmonary fibrosis": "Fibrosis",
+    "rib fracture": "Fracture",
+    "lung metastasis": "Lung Lesion",
+}
+
+# PadChest labels that bear on an output without settling it. An exam carrying
+# one is excluded from that output's counts rather than scored against it.
+# Radiology, not string matching, decides this table; it is deliberately short.
+PADCHEST_AMBIGUOUS = {
+    "copd signs": "Emphysema",
+    "air trapping": "Emphysema",
+    "alveolar pattern": "Lung Opacity",
+    "interstitial pattern": "Lung Opacity",
+    "heart insufficiency": "Edema",
+    "pulmonary edema": "Edema",
+    "costophrenic angle blunting": "Effusion",
+}
+
+
 def resolve_labels(raw: list[str], source: str, strict: bool) -> set[str]:
     """Map written labels onto model outputs, refusing what it cannot place."""
     resolved: set[str] = set()
@@ -142,13 +182,80 @@ def resolve_labels(raw: list[str], source: str, strict: bool) -> set[str]:
     return resolved
 
 
-def read_manifest(path: Path, strict: bool) -> list[tuple[Path, set[str]]]:
+def looks_like_padchest(path: Path) -> bool:
+    """A PadChest export names its columns; a plain manifest does not."""
+    with path.open(newline="", encoding="utf-8") as handle:
+        header = next(csv.reader(handle), [])
+    return "ImageID" in header and "Labels" in header
+
+
+def read_padchest(path: Path, images_dir: Path) -> list[Exam]:
+    """Read a PadChest CSV: `ImageID` plus a Python-literal `Labels` list.
+
+    PadChest's vocabulary is far wider than the model's eighteen outputs, and
+    that width is the point of this reader. A label is handled three ways:
+
+      equivalent  same finding -- counted as a positive for that output
+      ambiguous   bears on an output without settling it -- that exam is
+                  excluded from that output's counts (see Exam.excluded)
+      unrelated   no bearing at all ("pacemaker", "kyphosis") -- ignored, and
+                  the exam still counts as a negative for every model output
+
+    That last case is what makes the set usable: a report describing a pacemaker
+    and nothing else is a genuine negative for all eighteen findings.
+    """
+    import ast
+
+    exams: list[Exam] = []
+    dropped: set[str] = set()
+    with path.open(newline="", encoding="utf-8") as handle:
+        for line_number, row in enumerate(csv.DictReader(handle), start=2):
+            image = images_dir / (row.get("ImageID") or "").strip()
+            if not image.is_file():
+                raise SystemExit(
+                    f"{path}:{line_number}: image not found: {image}\n"
+                    f"Pass --images-dir pointing at the directory holding the PNGs."
+                )
+            try:
+                labels = ast.literal_eval(row.get("Labels") or "[]")
+            except (ValueError, SyntaxError):
+                raise SystemExit(f"{path}:{line_number}: cannot parse Labels") from None
+
+            positives: set[str] = set()
+            excluded: set[str] = set()
+            for label in labels:
+                key = str(label).strip().lower()
+                if not key or normalize(key) in NO_FINDING:
+                    continue
+                if normalize(key) in BY_NORMALIZED:
+                    positives.add(BY_NORMALIZED[normalize(key)])
+                elif key in PADCHEST_EQUIVALENT:
+                    positives.add(PADCHEST_EQUIVALENT[key])
+                elif key in PADCHEST_AMBIGUOUS:
+                    excluded.add(PADCHEST_AMBIGUOUS[key])
+                else:
+                    dropped.add(key)
+            exams.append(Exam(image, frozenset(positives), frozenset(excluded - positives)))
+
+    if dropped:
+        print(
+            f"  {len(dropped)} label(s) have no model output and were treated as "
+            f"unrelated: {', '.join(sorted(dropped)[:8])}"
+            + (" ..." if len(dropped) > 8 else ""),
+            file=sys.stderr,
+        )
+    if not exams:
+        raise SystemExit(f"{path}: no rows")
+    return exams
+
+
+def read_manifest(path: Path, strict: bool) -> list[Exam]:
     """CSV of `path,labels`, labels separated by ';'. Empty means no finding.
 
     A header row is optional; one whose first field is not an existing file and
     reads like a column name is skipped.
     """
-    rows: list[tuple[Path, set[str]]] = []
+    rows: list[Exam] = []
     base = path.parent
     with path.open(newline="", encoding="utf-8") as handle:
         for line_number, fields in enumerate(csv.reader(handle), start=1):
@@ -168,38 +275,39 @@ def read_manifest(path: Path, strict: bool) -> list[tuple[Path, set[str]]]:
             if not image.is_file():
                 raise SystemExit(f"{path}:{line_number}: no such image: {image}")
             raw = fields[1].split(";") if len(fields) > 1 else []
-            rows.append((image, resolve_labels(raw, f"{path}:{line_number}", strict)))
+            labels = resolve_labels(raw, f"{path}:{line_number}", strict)
+            rows.append(Exam(image, frozenset(labels)))
     if not rows:
         raise SystemExit(f"{path}: no rows")
     return rows
 
 
-def read_filenames(paths: list[Path], strict: bool) -> list[tuple[Path, set[str]]]:
+def read_filenames(paths: list[Path], strict: bool) -> list[Exam]:
     """Labels from NIH-style names: `00000001_001-Cardiomegaly-Emphysema.png`.
 
     Only the part after the first '-' is read, so a file with no '-' carries no
     label and is dropped rather than counted as a negative -- an unlabelled exam
     is not the same as one reported clean.
     """
-    rows: list[tuple[Path, set[str]]] = []
+    rows: list[Exam] = []
     for path in paths:
         stem = path.stem
         if "-" not in stem:
             print(f"  skipping {path.name}: no label in the filename", file=sys.stderr)
             continue
         parts = [re.sub(r"\d+$", "", part) for part in stem.split("-")[1:]]
-        rows.append((path, resolve_labels(parts, str(path), strict)))
+        rows.append(Exam(path, frozenset(resolve_labels(parts, str(path), strict))))
     if not rows:
         raise SystemExit("no labelled images: names must read `id-Label[-Label].ext`")
     return rows
 
 
-def score(rows: list[tuple[Path, set[str]]], model: Path) -> np.ndarray:
+def score(rows: list[Exam], model: Path) -> np.ndarray:
     """One row of 18 raw scores per exam, in the order given."""
     session = ort.InferenceSession(str(model), providers=["CPUExecutionProvider"])
     out = np.empty((len(rows), len(PATHOLOGIES)), dtype=np.float64)
-    for index, (path, _) in enumerate(rows):
-        tensor = preprocess(load_grayscale(path)).reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE)
+    for index, exam in enumerate(rows):
+        tensor = preprocess(load_grayscale(exam.path)).reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE)
         out[index] = session.run(["scores"], {"image": tensor})[0].reshape(-1)
     return out
 
@@ -228,9 +336,17 @@ def suggest(negatives: np.ndarray, positives: np.ndarray, specificity: float) ->
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--manifest", type=Path, help="CSV of `path,labels`")
+    source.add_argument(
+        "--manifest", type=Path, help="CSV of `path,labels`, or a PadChest export"
+    )
     source.add_argument(
         "--from-filenames", nargs="+", type=Path, metavar="IMAGE", help="label by filename"
+    )
+    parser.add_argument(
+        "--images-dir",
+        type=Path,
+        default=None,
+        help="where a PadChest export's ImageID files live (default: next to the CSV)",
     )
     parser.add_argument("--onnx", type=Path, default=ROOT / "models" / "chester-all-224.onnx")
     parser.add_argument(
@@ -257,15 +373,18 @@ def main() -> int:
         raise SystemExit(f"model artifact is missing: {args.onnx}")
 
     strict = not args.lenient
-    rows = (
-        read_manifest(args.manifest, strict)
-        if args.manifest
-        else read_filenames(args.from_filenames, strict)
-    )
+    if args.manifest and looks_like_padchest(args.manifest):
+        images_dir = args.images_dir or args.manifest.parent
+        print(f"reading {args.manifest.name} as a PadChest export\n", file=sys.stderr)
+        rows = read_padchest(args.manifest, images_dir)
+    elif args.manifest:
+        rows = read_manifest(args.manifest, strict)
+    else:
+        rows = read_filenames(args.from_filenames, strict)
     scores = score(rows, args.onnx)
     published = operating_points()
 
-    labelled_positive = sum(1 for _, labels in rows if labels)
+    labelled_positive = sum(1 for exam in rows if exam.positives)
     print(
         f"{len(rows)} exams, {labelled_positive} carrying at least one finding, "
         f"target specificity {args.target_specificity:.0%}\n"
@@ -278,7 +397,7 @@ def main() -> int:
         )
 
     header = (
-        f"{'output':<27}{'pos':>4}{'neg':>5}{'published':>11}{'fp_rate':>9}"
+        f"{'output':<27}{'pos':>4}{'neg':>5}{'exc':>4}{'published':>11}{'fp_rate':>9}"
         f"{'recall':>8}{'suggested':>12}{'fp':>7}{'recall':>8}"
     )
     print(header)
@@ -287,9 +406,11 @@ def main() -> int:
     table = []
     breached = []
     for index, name in enumerate(PATHOLOGIES):
-        truth = np.array([name in labels for _, labels in rows], dtype=bool)
+        truth = np.array([name in exam.positives for exam in rows], dtype=bool)
+        kept = np.array([name not in exam.excluded for exam in rows], dtype=bool)
         column = scores[:, index]
-        negatives, positives = column[~truth], column[truth]
+        negatives, positives = column[~truth & kept], column[truth]
+        excluded_here = int((~kept).sum())
 
         fires_neg = int((negatives >= published[index]).sum())
         fires_pos = int((positives >= published[index]).sum())
@@ -307,7 +428,8 @@ def main() -> int:
 
         thin = negatives.size < MIN_NEGATIVES
         print(
-            f"{name:<27}{positives.size:>4}{negatives.size:>5}{published[index]:>11.5f}"
+            f"{name:<27}{positives.size:>4}{negatives.size:>5}{excluded_here:>4}"
+            f"{published[index]:>11.5f}"
             f"{fmt(fp_rate):>9}{fmt(recall):>8}"
             f"{(f'{proposal:.5f}' if proposal else '--'):>12}"
             f"{fmt(new_fp):>7}{fmt(new_recall):>8}"
@@ -320,6 +442,7 @@ def main() -> int:
                 "index": index,
                 "positives": int(positives.size),
                 "negatives": int(negatives.size),
+                "excluded": excluded_here,
                 "published_threshold": float(published[index]),
                 "fp_rate": None if np.isnan(fp_rate) else fp_rate,
                 "recall": None if np.isnan(recall) else recall,
@@ -332,7 +455,9 @@ def main() -> int:
         if args.max_fp_rate is not None and not thin and fp_rate > args.max_fp_rate:
             breached.append((name, fp_rate))
 
-    print("\n  ~ = fewer than "
+    print("\n  exc = exams whose report bears on this finding without settling it;")
+    print("      they are dropped from this row rather than counted as negatives.")
+    print("  ~ = fewer than "
           f"{MIN_NEGATIVES} negatives; the rate on that row is arithmetic, not evidence")
     print("  fp_rate/recall are at the published operating point; the last two columns")
     print("  are what the suggested threshold would give on this same set.")
