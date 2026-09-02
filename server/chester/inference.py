@@ -51,23 +51,30 @@ PATHOLOGIES: tuple[str, ...] = (
 # Outputs that are computed and never reported. Which findings are surfaced is a
 # clinical decision, not an implementation detail to change in passing.
 #
-# Indices 2, 3, 8, 14 and 15 -- Infiltration, Pneumothorax, Pneumonia, Lung
-# Lesion and Fracture -- are preserved from the previous deployment, where the
-# CHESTER configuration blanked their labels.
+# Index 15, Fracture, is the last of the six the CHESTER configuration blanked
+# that is still withheld here.
 #
-# Index 11, Nodule, was blanked by that same configuration and is reported again
-# from here. The reversal is deliberate: nothing in this repository ever measured
-# that output, so the suppression rested on an inherited decision whose reasoning
-# was never written down, and a finding a reader expects to see was missing with
-# no record of why. Its operating point, 0.0240, is the published one and has not
-# been calibrated against local exams -- unlike Fibrosis below, which was
-# withdrawn on a measurement taken here. If Nodule turns out to behave the way
-# Fibrosis does on this population, the answer is the same as it was there: a
-# threshold fitted to exams read by a radiologist.
+# The other five it blanked -- 2 Infiltration, 3 Pneumothorax, 8 Pneumonia,
+# 11 Nodule and 14 Lung Lesion -- are reported again. The reversal is deliberate:
+# nothing in this repository ever measured those outputs, so the suppression
+# rested on an inherited decision whose reasoning was never written down, and
+# findings a reader expects to see were missing with no record of why. All five
+# run on their published operating points, none of which has been calibrated
+# against local exams.
+#
+# One of them deserves naming. Pneumothorax's operating point, 0.0098, is the
+# second lowest of the eighteen -- below Fibrosis's 0.0101, and half of what
+# withdrawing Fibrosis was partly about: a threshold sitting in the middle of the
+# output's noise. Its sensitivity to rendering was never measured the way
+# Fibrosis's was, so whether it fails the same way is unknown rather than ruled
+# out. It is reported because that was the decision taken, not because the
+# question was answered.
 #
 # Index 6, Fibrosis, was added here. Its published operating point is 0.0101, the
-# second lowest of the eighteen, and the output is by far the most sensitive in
-# the set to how the pixels are rendered: across renderings of the same anatomy
+# third lowest of the eighteen -- it read as the second lowest when this was
+# written, because Pneumothorax below it was suppressed at the time and not
+# counted -- and the output is by far the most sensitive in the set to how the
+# pixels are rendered: across renderings of the same anatomy
 # it swings by a median factor of 48.6, against 14.6 for the next output and 1.5
 # for Lung Opacity. What that combination produces is a verdict decided by the
 # window rather than by the chest. On the reference images in examples/ whose
@@ -77,7 +84,7 @@ PATHOLOGIES: tuple[str, ...] = (
 # The operating point is not wrong for the population it was fitted on; it does
 # not transfer to this one. Reporting it again needs a threshold calibrated
 # against local exams read by a radiologist, not a change here.
-SUPPRESSED_INDICES: frozenset[int] = frozenset({2, 3, 6, 8, 14, 15})
+SUPPRESSED_INDICES: frozenset[int] = frozenset({6, 15})
 
 # The findings this deployment surfaces, in the model's own order. Results
 # recorded before an output was suppressed still carry it, so everything that
