@@ -7,6 +7,8 @@ import type {
   ManagedDomain,
   ManagedUser,
   NetworkLogList,
+  NetworkLogRetention,
+  RetentionPurgeOutcome,
   SendConnection,
   SendConnectionList,
   StudyDetail,
@@ -223,4 +225,15 @@ export const api = {
     });
     return request<NetworkLogList>(`/api/network-logs?${query.toString()}`);
   },
+
+  getRetention: () => request<NetworkLogRetention>("/api/network-logs/retention"),
+
+  setRetention: (hours: number) =>
+    request<NetworkLogRetention>("/api/network-logs/retention", {
+      method: "PUT",
+      ...json({ hours }),
+    }),
+
+  purgeNetworkLogs: () =>
+    request<RetentionPurgeOutcome>("/api/network-logs/retention/purge", { method: "POST" }),
 };

@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import type { NetworkLogEntry } from "../api/types";
 import { AppShell, PageHeading } from "../components/AppShell";
 import { ErrorBox, Pagination, Skeleton } from "../components/common";
+import { RetentionPanel } from "../components/RetentionPanel";
 import { useI18n } from "../i18n";
 
 /** Reuses the worklist pills: a delivery either landed or it did not. */
@@ -115,6 +116,8 @@ export function NetworkLogs() {
 
       {error && <ErrorBox title={t.networkLogs.title} message={error} onRetry={reload} />}
       {!loaded && <Skeleton count={2} />}
+
+      <RetentionPanel onPurged={reload} />
 
       <section className="panel">
         <div className="panel-title">

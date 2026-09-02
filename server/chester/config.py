@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     # failed one waits before the next.
     delivery_max_attempts: int = 3
     delivery_retry_minutes: float = 5.0
+    # Data retention: how often the worker applies each organization's network
+    # log window. Well below the shortest window, so an entry never outlives it
+    # by much, and far above the cost of one bulk delete.
+    retention_sweep_minutes: float = 15.0
 
     debug: bool = False
     testing: bool = False

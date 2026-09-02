@@ -492,3 +492,33 @@ class DeliveryJob(Base):
 
     study: Mapped[Study] = relationship(back_populates="delivery_jobs")
     destination: Mapped[SendDestination] = relationship(back_populates="delivery_jobs")
+
+
+class RetentionPolicy(TimestampMixin, Base):
+    """How long an organization keeps its network log.
+
+    A table of its own rather than a column on ``organizations``, because this
+    project has no migration tool: ``create_all`` builds whole tables and never
+    adds a column to one that already exists, so a column here would apply to new
+    deployments and silently not at all to running ones. A new table applies
+    everywhere on the next schema run.
+
+    A missing row means the default window, so nothing has to backfill: the row
+    appears the first time the window is set or the sweep runs.
+    """
+
+    __tablename__ = "retention_policies"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    # Hours of network log to keep. One of chester.retention.WINDOW_HOURS.
+    network_log_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=24)
+    # When the routine last swept this organization, for the interface to show.
+    last_swept_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+
+    organization: Mapped[Organization] = relationship()

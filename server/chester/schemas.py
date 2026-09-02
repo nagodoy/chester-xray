@@ -133,3 +133,22 @@ class NetworkLogSchema(BaseModel):
 class NetworkLogListResponse(BaseModel):
     items: list[NetworkLogSchema]
     total: int
+
+
+class RetentionSchema(BaseModel):
+    """The network log retention window, and what applying it would remove now."""
+
+    hours: int
+    # The windows the interface may offer, so it does not hard-code the set.
+    options: list[int]
+    expiring: int
+    last_swept_at: datetime | None
+
+
+class RetentionUpdate(BaseModel):
+    hours: int
+
+
+class RetentionPurgeResponse(BaseModel):
+    deleted: int
+    retention: RetentionSchema

@@ -606,6 +606,108 @@ a {
   background: var(--surface);
 }
 
+/* ---------- Data retention ---------- */
+
+/* The panel that says how long the network log is kept. Red at the title and on
+   the button, muted everywhere else: it describes a routine that is already
+   running, and only the button does something irreversible. */
+.retention-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.retention-heading svg {
+  color: var(--red);
+}
+
+.retention-note {
+  margin-top: 8px;
+  color: var(--ink-muted);
+  font-size: var(--fs-sm);
+}
+
+.retention-window {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.retention-label {
+  margin-right: 4px;
+  color: var(--ink-faint);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--track-caption);
+  text-transform: uppercase;
+}
+
+.window-option {
+  padding: 6px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--field);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.window-option:not(:disabled):hover {
+  border-color: var(--line-hover);
+  color: var(--ink);
+}
+
+.window-option:disabled {
+  cursor: default;
+}
+
+/* The chosen window is outlined in red rather than filled: it is a setting for a
+   destructive routine, not an action waiting to be taken. */
+.window-option.is-chosen {
+  border-color: var(--red-edge);
+  background: var(--red-soft);
+  color: var(--red);
+  font-weight: 600;
+}
+
+.retention-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.retention-count {
+  color: var(--ink-muted);
+  font-size: var(--fs-sm);
+}
+
+.retention-count.is-pending {
+  color: var(--amber);
+  font-weight: 600;
+}
+
+.retention-swept,
+.retention-error {
+  margin-top: 10px;
+  font-size: var(--fs-xs);
+}
+
+.retention-swept {
+  color: var(--ink-faint);
+}
+
+.retention-error {
+  color: var(--red);
+}
+
 .pagination {
   display: flex;
   align-items: center;
