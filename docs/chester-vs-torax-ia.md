@@ -84,10 +84,11 @@ Verificado ponta a ponta. Está correto e faz o que documenta:
 3. **Pré-processamento** — `inference.preprocess` redimensiona o lado menor para
    224 (bilinear, PIL), recorta 224×224 no centro e mapeia 0..255 para
    `[-1024, 1024]`.
-4. **Inferência** — ONNX Runtime, 18 saídas, duas suprimidas: Fracture, por
-   decisão clínica herdada, e Fibrosis, retirada aqui. As outras cinco que o
-   CHESTER não reportava (Infiltration, Pneumothorax, Pneumonia, Nodule, Lung
-   Lesion) foram religadas.
+4. **Inferência** — ONNX Runtime, 18 saídas, três suprimidas: Fracture, por
+   decisão clínica herdada, e Fibrosis e Nodule, retiradas aqui pela mesma
+   medição (7 de 7 em imagens cujo rótulo não é o achado). As outras quatro que o
+   CHESTER não reportava (Infiltration, Pneumothorax, Pneumonia, Lung Lesion)
+   foram religadas.
 5. **Apresentação** — bruto, normalizado pelo ponto operacional e o veredito de
    confiança, os três guardados separadamente.
 
