@@ -1,4 +1,4 @@
-"""Render the two-panel sheet that becomes the TORAX IA secondary capture.
+"""Render the two-panel sheet that becomes the ANALISADA secondary capture.
 
 The radiograph on top, the identification cell and the findings table beneath
 it, on one RGB canvas. Everything the reader needs is on the picture itself,
@@ -96,7 +96,7 @@ def render_report(
     accession_number: str,
     study_date: str,
     rows: list[dict],
-    title: str = "TORAX IA",
+    title: str = "ANALISADA",
 ) -> bytes:
     """Draw the sheet and return it as PNG bytes."""
     from PIL import Image, ImageDraw

@@ -82,7 +82,7 @@ Each study is committed on its own, so the run is safe to interrupt, and one
 already carrying the current thumbnail is skipped, so it is safe to repeat.
 Studies whose bytes are gone are reported and passed over.
 
-## TORAX IA report series
+## ANALISADA report series
 
 Turns a completed analysis into a Secondary Capture instance and, optionally,
 stores it on a viewer:
@@ -93,14 +93,14 @@ python -m chester.dicom_report --study <id> --out report.dcm
 python -m chester.dicom_report --study <id> --send      # to DICOM_SEND_HOST
 ```
 
-The instance is a new series, `TORAX IA`, inside the source study. It carries
+The instance is a new series, `ANALISADA`, inside the source study. It carries
 a rendered sheet -- the radiograph over an identification cell and a table of
 every reported finding -- and repeats the same findings in a private block:
 a creator at `(270F,0010)` and a sequence of `CodeMeaning` / `TextValue`
 pairs, modelled on the AZMED/Rayvolve tags.
 
-Each finding is called `ABSENT` under its operating point, `CONFIDENT` over
-it, and `DOUBT` within ten per cent of it either way -- the band straddles
+Each finding is called `ABAIXO` under its operating point, `ACIMA` over
+it, and `DUVIDOSO` within ten per cent of it either way -- the band straddles
 the threshold, because a score just under is no more decidable than one just
 over.
 
@@ -173,7 +173,7 @@ cd web && npm run typecheck && npm run build
 | `POST /api/studies/{id}/retry` | Requeue a failed or stuck study | Session token |
 | `DELETE /api/studies/{id}` | Delete a study, its image and its analysis | Session token, administrator |
 | `POST /api/studies/bulk-delete` | Delete several studies, reporting each | Session token, administrator |
-| `POST /api/studies/{id}/send-report` | Build the TORAX IA report and store it on every active destination | Session token |
+| `POST /api/studies/{id}/send-report` | Build the ANALISADA report and store it on every active destination | Session token |
 | `GET /api/settings/destinations` | Configured send connections | Session token, `settings` page |
 | `POST/PATCH/DELETE /api/settings/destinations` | Manage send connections | Session token, administrator |
 | `POST /api/settings/destinations/{id}/test` | C-ECHO a connection | Session token, administrator |
