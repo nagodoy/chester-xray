@@ -231,8 +231,12 @@ python -m chester.gateway --stow-url https://your-host --token ... --owner you@e
 ## The model
 
 `models/chester-all-224.onnx` is the torchxrayvision `densenet121-res224-all`
-classifier. It reports 12 of the model's 18 outputs; the other six are suppressed,
-carried over from the original CHESTER configuration.
+classifier. It reports 12 of the model's 18 outputs. Five of the six withheld are
+carried over from the original CHESTER configuration, which blanked their labels;
+the sixth is Fibrosis, withdrawn here because it fired on 7 of 7 reference images
+whose known label is not fibrosis. Nodule was blanked by that configuration too
+and is reported again, on its published operating point rather than a locally
+calibrated one -- see the note in `server/chester/inference.py`.
 
 Regenerate and re-verify it with:
 

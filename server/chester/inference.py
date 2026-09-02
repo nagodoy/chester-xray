@@ -51,9 +51,19 @@ PATHOLOGIES: tuple[str, ...] = (
 # Outputs that are computed and never reported. Which findings are surfaced is a
 # clinical decision, not an implementation detail to change in passing.
 #
-# Indices 2, 3, 8, 11, 14 and 15 -- Infiltration, Pneumothorax, Pneumonia,
-# Nodule, Lung Lesion and Fracture -- are preserved from the previous deployment,
-# where the CHESTER configuration blanked their labels.
+# Indices 2, 3, 8, 14 and 15 -- Infiltration, Pneumothorax, Pneumonia, Lung
+# Lesion and Fracture -- are preserved from the previous deployment, where the
+# CHESTER configuration blanked their labels.
+#
+# Index 11, Nodule, was blanked by that same configuration and is reported again
+# from here. The reversal is deliberate: nothing in this repository ever measured
+# that output, so the suppression rested on an inherited decision whose reasoning
+# was never written down, and a finding a reader expects to see was missing with
+# no record of why. Its operating point, 0.0240, is the published one and has not
+# been calibrated against local exams -- unlike Fibrosis below, which was
+# withdrawn on a measurement taken here. If Nodule turns out to behave the way
+# Fibrosis does on this population, the answer is the same as it was there: a
+# threshold fitted to exams read by a radiologist.
 #
 # Index 6, Fibrosis, was added here. Its published operating point is 0.0101, the
 # second lowest of the eighteen, and the output is by far the most sensitive in
@@ -67,7 +77,7 @@ PATHOLOGIES: tuple[str, ...] = (
 # The operating point is not wrong for the population it was fitted on; it does
 # not transfer to this one. Reporting it again needs a threshold calibrated
 # against local exams read by a radiologist, not a change here.
-SUPPRESSED_INDICES: frozenset[int] = frozenset({2, 3, 6, 8, 11, 14, 15})
+SUPPRESSED_INDICES: frozenset[int] = frozenset({2, 3, 6, 8, 14, 15})
 
 # The findings this deployment surfaces, in the model's own order. Results
 # recorded before an output was suppressed still carry it, so everything that
