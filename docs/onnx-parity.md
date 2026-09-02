@@ -29,6 +29,11 @@ settle it:
    Infiltration, Pneumothorax, Pneumonia, Nodule, Lung Lesion and Fracture. They are
    deliberate suppressions, not a different label set.
 
+This describes the config file as it is vendored. It is not the deployment's
+current reported set: index 11, Nodule, is reported again, and index 6, Fibrosis,
+is now withheld. `server/chester/inference.py` is the authority on what this node
+surfaces.
+
 ## Method
 
 Model parity and preprocessing parity are separate questions, so they were separated.

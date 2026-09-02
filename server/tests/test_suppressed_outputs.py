@@ -1,10 +1,13 @@
 """Outputs this deployment computes and does not report.
 
-Fibrosis joined the six the CHESTER configuration already blanked. The rule that
-matters here is that suppression reaches *stored* results too: a study analysed
-before the change still carries the output in its document, and a report sheet or
-a DICOM tag built from it must not print a finding this node no longer stands
-behind.
+Six outputs are withheld: five the CHESTER configuration blanked, plus Fibrosis,
+withdrawn here on a measurement taken here. Nodule was blanked by that same
+configuration and is reported again, so the reported set is twelve.
+
+The rule that matters here is that suppression reaches *stored* results too: a
+study analysed before the change still carries the output in its document, and a
+report sheet or a DICOM tag built from it must not print a finding this node no
+longer stands behind.
 """
 
 from __future__ import annotations
@@ -20,8 +23,8 @@ class TestTheReportedSet:
         assert "Fibrosis" not in inference.REPORTED_PATHOLOGIES
         assert not inference.is_reported("Fibrosis")
 
-    def test_eleven_outputs_are_reported(self):
-        assert len(inference.REPORTED_PATHOLOGIES) == 11
+    def test_twelve_outputs_are_reported(self):
+        assert len(inference.REPORTED_PATHOLOGIES) == 12
 
     def test_the_reported_set_keeps_the_models_own_order(self):
         expected = [
@@ -32,15 +35,20 @@ class TestTheReportedSet:
         assert list(inference.REPORTED_PATHOLOGIES) == expected
 
     def test_the_outputs_the_previous_deployment_blanked_are_still_suppressed(self):
+        """The five still withheld. Nodule was the sixth and is reported again."""
         for name in (
             "Infiltration",
             "Pneumothorax",
             "Pneumonia",
-            "Nodule",
             "Lung Lesion",
             "Fracture",
         ):
             assert not inference.is_reported(name)
+
+    def test_nodule_is_reported_again(self):
+        """Pinned by name: the count alone would not say which one came back."""
+        assert inference.is_reported("Nodule")
+        assert "Nodule" in inference.REPORTED_PATHOLOGIES
 
     def test_the_findings_that_remain_are_still_reported(self):
         for name in ("Atelectasis", "Effusion", "Cardiomegaly", "Lung Opacity"):
@@ -113,4 +121,21 @@ class TestFreshResults:
 
         assert "Fibrosis" not in outcome["raw_scores"]
         assert "Fibrosis" not in outcome["above_threshold_findings"]
-        assert len(outcome["raw_scores"]) == 11
+        assert len(outcome["raw_scores"]) == 12
+
+    def test_a_new_run_records_nodule_against_its_published_threshold(self, monkeypatch):
+        """The score is written now, and judged against index 11's own operating point."""
+        import numpy as np
+
+        scores = np.full(inference.OUTPUT_COUNT, 0.5, dtype=np.float32)
+
+        class FakeSession:
+            def run(self, _outputs, _inputs):
+                return [scores.reshape(1, -1)]
+
+        monkeypatch.setattr(inference, "get_session", lambda: FakeSession())
+        outcome = inference.infer(np.full((256, 256), 128.0, dtype=np.float32))
+
+        assert outcome["raw_scores"]["Nodule"] == 0.5
+        assert outcome["thresholds"]["Nodule"] == inference.OPERATING_POINTS[11]
+        assert "Nodule" in outcome["above_threshold_findings"]
