@@ -113,7 +113,15 @@ def preprocess(pixels: np.ndarray) -> np.ndarray:
 
 
 def operating_points() -> np.ndarray:
-    """The published thresholds, read from the vendored config."""
+    """The published thresholds, read from the vendored config.
+
+    Published, not deployed. The config carries the values that shipped with the
+    weights and is left that way on purpose -- it is the record of the model's
+    lineage. `server/chester/inference.py` may raise or lower any of them for
+    this node, and at present raises Infiltration and Pneumothorax by 8%. So the
+    `published` column below is the baseline this measurement is being read
+    against, not necessarily the line production draws.
+    """
     return np.asarray(json.loads(LEGACY_CONFIG.read_text())["OP_POINT"], dtype=np.float64)
 
 
@@ -359,7 +367,8 @@ def main() -> int:
         "--max-fp-rate",
         type=float,
         default=None,
-        help="exit non-zero if any output exceeds this fp_rate at its published point",
+        help="exit non-zero if any output exceeds this fp_rate at its published "
+        "point (published, not the deployment's -- see the note under the table)",
     )
     parser.add_argument(
         "--lenient", action="store_true", help="ignore labels with no matching output"
@@ -461,6 +470,9 @@ def main() -> int:
           f"{MIN_NEGATIVES} negatives; the rate on that row is arithmetic, not evidence")
     print("  fp_rate/recall are at the published operating point; the last two columns")
     print("  are what the suggested threshold would give on this same set.")
+    print("  published = the point that shipped with the weights. The deployment may")
+    print("      run a different one: server/chester/inference.py decides that, and")
+    print("      currently sets Infiltration and Pneumothorax 8% above these.")
 
     if args.json:
         args.json.write_text(

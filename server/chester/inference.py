@@ -82,9 +82,31 @@ PATHOLOGIES: tuple[str, ...] = (
 # should be re-run when more exams are available.
 #
 # What remains reported and unresolved: 2 Infiltration fires on 6 of 7, the
-# worst of the outputs still surfaced. 3 Pneumothorax runs the second lowest
+# worst of the outputs still surfaced. 3 Pneumothorax ran the second lowest
 # operating point of the eighteen, 0.0098, below Fibrosis's 0.0101, though on
 # the five real exams it was among the least render-sensitive at 2.1x.
+#
+# Both were raised to 1.08x their published point in September 2026. Re-running
+# the reference set at the new points says plainly what 8% buys, which is close
+# to nothing on this evidence:
+#
+#   Infiltration    fires on 6 of 7 before, 6 of 7 after -- the same six. Its
+#                   score on the No Finding image falls from 1.45x its threshold
+#                   to 1.34x, and the six it fires on sit at 0.118 to 0.216,
+#                   far enough above 0.106 that no plausible raise reaches them.
+#   Pneumothorax    fires on 0 of 7 before and after. It never fired here.
+#
+# Across all eleven images in examples/ exactly one verdict moves, and it is a
+# score that was already under the line: 0.0884 on Infiltration goes from
+# DUVIDOSO to ABAIXO. So the raise does not address the complaint that motivates
+# it. What it does change is the ranking: Pneumothorax at 0.0106 is no longer
+# the second lowest operating point of the eighteen, sitting just above
+# Fibrosis, which takes that position back; and Infiltration at 0.1060 passes
+# Effusion to become the second highest, behind only Lung Opacity.
+#
+# The honest reading is that 8% is a judgement about a population these points
+# were not fitted on, and seven reference images cannot confirm or refute it.
+# The one thing they do establish is that it is not what would fix Infiltration.
 #
 # All of this rests on seven reference images and five uncalibrated exams. It
 # decides nothing about a population. It was enough for these withdrawals only
@@ -95,9 +117,12 @@ PATHOLOGIES: tuple[str, ...] = (
 # Fibrosis carries a second finding from its own withdrawal, kept because it is
 # the only render-sensitivity figure measured before the five CR exams above: on
 # that earlier set it swung by a median factor of 48.6, against 14.6 for the next
-# output and 1.5 for Lung Opacity. Its operating point, 0.0101, is the third
-# lowest of the eighteen -- it read as second lowest when first written, because
-# Pneumothorax below it was suppressed then and not counted.
+# output and 1.5 for Lung Opacity. Its operating point, 0.0101, is the second
+# lowest of the eighteen. That reading has moved twice: it was written as second
+# lowest while Pneumothorax below it was suppressed and not counted, became third
+# when Pneumothorax was restored, and is second again now that Pneumothorax has
+# been raised past it. The number never changed; what it is being ranked against
+# did.
 #
 # None of these operating points is wrong for the population it was fitted on.
 # They do not transfer to this one, which is the whole of the problem.
@@ -116,13 +141,26 @@ def is_reported(pathology: str) -> bool:
     return pathology in REPORTED_PATHOLOGIES
 
 
-# Operating points published for these weights. Verified identical to the values
-# in the retired TensorFlow.js config to nine decimal places.
+# Operating points for these weights. Sixteen of the eighteen are the values
+# published with the model, verified identical to the retired TensorFlow.js
+# config to nine decimal places.
+#
+# Two are not. On 3 September 2026 Infiltration and Pneumothorax were each raised
+# to 1.08x their published point, aimed at the two outputs the note above leaves
+# unresolved. That factor is an operating decision, not a measurement: no
+# calibration set was fitted to produce it, and on the reference images it
+# changes neither what Infiltration fires on nor what Pneumothorax does, as the
+# note records. tools/calibrate_thresholds.py is what would price the trade it
+# is meant to make, over exams a radiologist has read.
+#
+# models/xrv-all-45rot15trans15scale/config.json keeps the published values
+# unchanged; it is the record of the model's lineage, not this node's config.
+# Where the two disagree, these are the numbers the deployment uses.
 OPERATING_POINTS: tuple[float, ...] = (
     0.07422872,
     0.038290843,
-    0.09814756,
-    0.0098118475,
+    0.1059993648,  # Infiltration: 1.08 x the published 0.09814756
+    0.0105967953,  # Pneumothorax: 1.08 x the published 0.0098118475
     0.023601074,
     0.0022490358,
     0.010060724,
