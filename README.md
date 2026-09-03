@@ -239,9 +239,14 @@ finding; and Pneumonia, which fires on nothing it should not, is withheld for
 swinging by a median factor of 20.5 across renderings of the same anatomy.
 
 Three of the six labels that configuration blanked -- Infiltration, Pneumothorax
-and Lung Lesion -- are reported again, each on its published operating point
-rather than a locally calibrated one. The note in `server/chester/inference.py`
-records what each decision does and does not establish.
+and Lung Lesion -- are reported again. Lung Lesion runs on its published
+operating point; Infiltration and Pneumothorax run 8% above theirs, raised to
+tighten the two outputs the reference set leaves unresolved. That factor is an
+operating decision rather than a calibrated one: no labelled set was fitted to
+produce it, and on the reference images it changes nothing either output fires
+on. The note in `server/chester/inference.py` records what each decision does
+and does not establish, and `tools/calibrate_thresholds.py` is what would settle
+it on read exams.
 
 `tools/calibrate_thresholds.py` runs that measurement over exams a radiologist
 has read, and proposes a threshold per output:

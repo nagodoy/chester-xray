@@ -35,6 +35,13 @@ current reported set: three of those six -- 2, 3 and 14 -- are reported again;
 6 (Fibrosis) were added to the withheld set. `server/chester/inference.py` is the
 authority on what this node surfaces.
 
+Nor is it the deployment's thresholds. The config keeps the published `OP_POINT`
+values, which is what makes the match above evidence of lineage, and it is not
+edited for operating decisions. `inference.py` diverges from it at two positions:
+2 (Infiltration) and 3 (Pneumothorax) are each set to 1.08x the published point.
+The other sixteen still agree to nine decimal places, and
+`server/tests/test_suppressed_outputs.py` holds that to be true.
+
 ## Method
 
 Model parity and preprocessing parity are separate questions, so they were separated.

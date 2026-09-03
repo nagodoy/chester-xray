@@ -210,10 +210,13 @@ limiar que o demo do Chester usa.
 
 São duas propriedades somadas:
 
-- **O ponto operacional é o terceiro mais baixo dos 18** (0.0101). A saída de
+- **O ponto operacional é o segundo mais baixo dos 18** (0.0101). A saída de
   fibrose é minúscula em quase toda imagem e o limiar cai no meio do ruído.
-  (Lia-se "segundo mais baixo" quando isto foi escrito, porque o Pneumothorax,
-  a 0.0098, estava suprimido e não entrava na conta. Hoje entra.)
+  (Esta posição já mudou duas vezes sem o número mudar: lia-se "segundo mais
+  baixo" quando isto foi escrito, porque o Pneumothorax, a 0.0098, estava
+  suprimido e não entrava na conta; virou terceiro quando o Pneumothorax voltou;
+  e é segundo de novo desde que o Pneumothorax subiu 8%, para 0.0106, passando
+  acima dele.)
 - **É a saída mais sensível ao contraste do conjunto.** Variação mediana entre
   renderizações da mesma anatomia:
 

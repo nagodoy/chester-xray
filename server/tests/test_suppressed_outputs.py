@@ -7,7 +7,10 @@ Pneumonia is the odd one: it fires on nothing it should not, and is withheld for
 swinging by a median factor of 20.5 across renderings of the same anatomy.
 
 That leaves thirteen reported. Infiltration, Pneumothorax and Lung Lesion, three
-of the six the CHESTER configuration blanked, are among them.
+of the six the CHESTER configuration blanked, are among them. Two of those three
+do not run on the published operating point: Infiltration and Pneumothorax are
+each set to 1.08x it, so the numbers are pinned here rather than only compared to
+themselves.
 
 The rule that matters here is that suppression reaches *stored* results too: a
 study analysed before the change still carries the output in its document, and a
@@ -17,10 +20,27 @@ longer stands behind.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 from chester import inference, report
 from chester.schemas import AnalysisResultSchema
+
+# The vendored TensorFlow.js config, which keeps the values published with the
+# weights. It is deliberately not edited when this node changes an operating
+# point, so it doubles as the record of what "published" means.
+LEGACY_CONFIG = (
+    Path(inference.__file__).resolve().parent.parent.parent
+    / "models"
+    / "xrv-all-45rot15trans15scale"
+    / "config.json"
+)
+
+RAISE_FACTOR = 1.08
+RAISED_INDICES = {2: "Infiltration", 3: "Pneumothorax"}
 
 
 class TestTheReportedSet:
@@ -168,3 +188,68 @@ class TestFreshResults:
             assert outcome["raw_scores"][name] == 0.5
             assert outcome["thresholds"][name] == inference.OPERATING_POINTS[index]
             assert name in outcome["above_threshold_findings"]
+
+
+class TestRaisedOperatingPoints:
+    """Infiltration and Pneumothorax run 8% above the point published with the
+    weights; the other sixteen run on it exactly.
+
+    Every other assertion about these two reads OPERATING_POINTS on both sides,
+    so it holds for any number at all. These are the tests that would notice a
+    threshold being changed, or the two copies of the eighteen values drifting
+    apart by accident.
+    """
+
+    def test_the_two_raised_points_are_eight_percent_over_published(self):
+        published = json.loads(LEGACY_CONFIG.read_text())["OP_POINT"]
+        for index, name in RAISED_INDICES.items():
+            assert inference.PATHOLOGIES[index] == name
+            assert inference.OPERATING_POINTS[index] == pytest.approx(
+                published[index] * RAISE_FACTOR, rel=1e-12
+            )
+
+    def test_the_raised_points_are_the_literal_values_in_use(self):
+        """Spelled out, so a diff that changes them has to change this too."""
+        assert inference.OPERATING_POINTS[2] == 0.1059993648
+        assert inference.OPERATING_POINTS[3] == 0.0105967953
+
+    def test_every_other_point_still_matches_the_vendored_config(self):
+        """The divergence is exactly two entries wide, and nothing else moved."""
+        published = json.loads(LEGACY_CONFIG.read_text())["OP_POINT"]
+        assert len(published) == inference.OUTPUT_COUNT
+        for index, value in enumerate(published):
+            if index in RAISED_INDICES:
+                continue
+            assert inference.OPERATING_POINTS[index] == value
+
+    def test_the_tuples_stay_aligned_with_the_models_outputs(self):
+        """Index alignment is load-bearing: a stray entry shifts every threshold."""
+        assert len(inference.OPERATING_POINTS) == inference.OUTPUT_COUNT
+        assert len(inference.PATHOLOGIES) == inference.OUTPUT_COUNT
+
+    def test_pneumothorax_now_sits_above_fibrosis(self):
+        """The raise reorders the low end, which the note in inference.py claims."""
+        fibrosis = inference.OPERATING_POINTS[inference.PATHOLOGIES.index("Fibrosis")]
+        assert inference.OPERATING_POINTS[3] > fibrosis
+
+    def test_a_score_between_the_old_and_new_point_no_longer_fires(self, monkeypatch):
+        """The whole effect of the change, at the boundary it moves."""
+        import numpy as np
+
+        published = json.loads(LEGACY_CONFIG.read_text())["OP_POINT"]
+        scores = np.zeros(inference.OUTPUT_COUNT, dtype=np.float32)
+        # Just above the published point, below the raised one.
+        scores[2] = np.float32(published[2] * 1.01)
+        scores[3] = np.float32(published[3] * 1.01)
+
+        class FakeSession:
+            def run(self, _outputs, _inputs):
+                return [scores.reshape(1, -1)]
+
+        monkeypatch.setattr(inference, "get_session", lambda: FakeSession())
+        outcome = inference.infer(np.full((256, 256), 128.0, dtype=np.float32))
+
+        for name in ("Infiltration", "Pneumothorax"):
+            assert outcome["raw_scores"][name] > published[inference.PATHOLOGIES.index(name)]
+            assert outcome["above_threshold"][name] is False
+            assert name not in outcome["above_threshold_findings"]
