@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Mapping
 from pathlib import Path
 
 import numpy as np
@@ -86,27 +87,33 @@ PATHOLOGIES: tuple[str, ...] = (
 # operating point of the eighteen, 0.0098, below Fibrosis's 0.0101, though on
 # the five real exams it was among the least render-sensitive at 2.1x.
 #
-# Both were raised to 1.08x their published point in September 2026. Re-running
-# the reference set at the new points says plainly what 8% buys, which is close
-# to nothing on this evidence:
+# Both were raised in September 2026, Infiltration twice. Re-running the
+# reference set at each new point says plainly what the raises buy, which on
+# this evidence is nothing:
 #
-#   Infiltration    fires on 6 of 7 before, 6 of 7 after -- the same six. Its
-#                   score on the No Finding image falls from 1.45x its threshold
-#                   to 1.34x, and the six it fires on sit at 0.118 to 0.216,
-#                   far enough above 0.106 that no plausible raise reaches them.
-#   Pneumothorax    fires on 0 of 7 before and after. It never fired here.
+#   Infiltration    fires on 6 of 7 at the published point, 6 of 7 at 1.08x,
+#                   and 6 of 7 at 1.242x -- the same six every time. They sit at
+#                   0.139 to 0.216, so the point would have to reach 0.139, or
+#                   1.42x published, before the first of them stops. Its score
+#                   on the No Finding image is 0.142: still over the line at
+#                   1.17x the threshold, down from 1.45x.
+#   Pneumothorax    fires on 0 of 7 at either point. It never fired here.
 #
-# Across all eleven images in examples/ exactly one verdict moves, and it is a
-# score that was already under the line: 0.0884 on Infiltration goes from
-# DUVIDOSO to ABAIXO. So the raise does not address the complaint that motivates
-# it. What it does change is the ranking: Pneumothorax at 0.0106 is no longer
-# the second lowest operating point of the eighteen, sitting just above
-# Fibrosis, which takes that position back; and Infiltration at 0.1060 passes
-# Effusion to become the second highest, behind only Lung Opacity.
+# Across all eleven images in examples/ the 8% moved exactly one verdict, a
+# score already under the line going from DUVIDOSO to ABAIXO; the further 15%
+# moves one more, an unlabelled image at 0.118 that stops firing. Neither raise
+# touches a false positive on a labelled exam, which is the complaint that
+# motivates them.
 #
-# The honest reading is that 8% is a judgement about a population these points
-# were not fitted on, and seven reference images cannot confirm or refute it.
-# The one thing they do establish is that it is not what would fix Infiltration.
+# What they do change is the ranking. Pneumothorax at 0.0106 is no longer the
+# second lowest operating point of the eighteen, sitting just above Fibrosis,
+# which takes that position back. Infiltration at 0.1219 passed Effusion at
+# 0.1032 to become the second highest, behind only Lung Opacity at 0.2020.
+#
+# The honest reading is that these factors are judgements about a population
+# these points were not fitted on, and seven reference images can neither
+# confirm nor refute them. The one thing they do establish is that raising the
+# point in these increments is not what would fix Infiltration.
 #
 # All of this rests on seven reference images and five uncalibrated exams. It
 # decides nothing about a population. It was enough for these withdrawals only
@@ -145,13 +152,26 @@ def is_reported(pathology: str) -> bool:
 # published with the model, verified identical to the retired TensorFlow.js
 # config to nine decimal places.
 #
-# Two are not. On 3 September 2026 Infiltration and Pneumothorax were each raised
-# to 1.08x their published point, aimed at the two outputs the note above leaves
-# unresolved. That factor is an operating decision, not a measurement: no
-# calibration set was fitted to produce it, and on the reference images it
-# changes neither what Infiltration fires on nor what Pneumothorax does, as the
-# note records. tools/calibrate_thresholds.py is what would price the trade it
-# is meant to make, over exams a radiologist has read.
+# Two are not, both aimed at the outputs the note above leaves unresolved:
+#
+#   Pneumothorax    1.08x the published point (3 September 2026)
+#   Infiltration    1.08x, then a further 1.15x on 7 September 2026, so 1.242x
+#                   the published value in total
+#
+# The 15% was asked for as raising Infiltration's upper and lower threshold
+# together. Those two edges are the doubt band in chester.report, which is a
+# fixed fraction of the operating point, so both move exactly when the point
+# does -- there is one number here, and raising it by 15% raises both edges by
+# 15%. The band itself is unchanged at +/-10%.
+#
+# Neither factor is a measurement: no calibration set was fitted to produce
+# them, and on the reference images they change neither what Infiltration fires
+# on nor what Pneumothorax does, as the note records.
+# tools/calibrate_thresholds.py is what would price the trade they mean to make,
+# over exams a radiologist has read.
+#
+# These are the defaults, not the last word: an organization may override any of
+# them from Settings, and chester.thresholds resolves what a given run uses.
 #
 # models/xrv-all-45rot15trans15scale/config.json keeps the published values
 # unchanged; it is the record of the model's lineage, not this node's config.
@@ -159,7 +179,7 @@ def is_reported(pathology: str) -> bool:
 OPERATING_POINTS: tuple[float, ...] = (
     0.07422872,
     0.038290843,
-    0.1059993648,  # Infiltration: 1.08 x the published 0.09814756
+    0.1218992695,  # Infiltration: 1.242 x the published 0.09814756
     0.0105967953,  # Pneumothorax: 1.08 x the published 0.0098118475
     0.023601074,
     0.0022490358,
@@ -266,8 +286,16 @@ def normalize_to_operating_point(raw: float, threshold: float) -> float:
     return min(1.0, max(0.0, normalized))
 
 
-def infer(pixels: np.ndarray) -> dict:
-    """Score one image and return raw, normalized and thresholded results."""
+def infer(pixels: np.ndarray, thresholds_in_force: Mapping[str, float] | None = None) -> dict:
+    """Score one image and return raw, normalized and thresholded results.
+
+    `thresholds_in_force` maps a pathology to the operating point this run should
+    judge it against, overriding OPERATING_POINTS for the names it carries. The
+    worker passes what chester.thresholds resolved for the study's organization;
+    a name it omits keeps the default, and None means every default. Nothing is
+    read from the database here -- this module stays free of one, and the caller
+    that already holds a session decides what the points are.
+    """
     prepared = preprocess(pixels).reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE)
     scores = get_session().run(["scores"], {"image": prepared})[0].reshape(-1)
 
@@ -285,6 +313,8 @@ def infer(pixels: np.ndarray) -> dict:
             continue
         raw = float(scores[index])
         threshold = float(OPERATING_POINTS[index])
+        if thresholds_in_force is not None and pathology in thresholds_in_force:
+            threshold = float(thresholds_in_force[pathology])
         raw_scores[pathology] = raw
         thresholds[pathology] = threshold
         normalized_scores[pathology] = normalize_to_operating_point(raw, threshold)

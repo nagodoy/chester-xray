@@ -278,6 +278,33 @@ export const ptBR = {
     confirmDelete: "Remover a conexão {name}?",
   },
 
+  thresholds: {
+    title: "Limiares do modelo",
+    subtitle:
+      "Ponto operacional de cada achado. A banda de dúvida é de ±{band}% em volta dele.",
+    pathology: "Achado",
+    default: "Padrão",
+    effective: "Em vigor",
+    lower: "Limiar inferior",
+    upper: "Limiar superior",
+    origin: "Origem",
+    builtIn: "Padrão",
+    adjusted: "Ajustado {factor}x",
+    adjust: "Ajustar",
+    reset: "Restaurar",
+    empty: "Nenhum achado é reportado por este nó.",
+    fieldLabel: "Limiar de {pathology}",
+    notANumber: "O limiar precisa ser um número.",
+    outOfRange: "O limiar de {pathology} precisa ficar entre {minimum} e {maximum}.",
+    confirmReset: "Restaurar o limiar de {pathology} para o padrão {value}?",
+    overriddenNotice:
+      "{count} achado(s) rodam fora do padrão. O valor padrão passou por revisão de código com a evidência ao lado; um ajuste feito aqui, não.",
+    footerAdmin:
+      "O ajuste vale para as próximas análises. Estudos já concluídos guardam o limiar em vigor no dia e não mudam. Rode tools/calibrate_thresholds.py sobre exames laudados antes de ajustar: nada nesta tela mede o custo em sensibilidade.",
+    footerReadOnly:
+      "Somente administradores alteram limiares. O ajuste vale para as próximas análises; estudos já concluídos guardam o limiar em vigor no dia.",
+  },
+
   networkLogs: {
     eyebrow: "Sistema / rede",
     title: "Logs de rede",

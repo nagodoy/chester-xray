@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import (
     Boolean,
+    Double,
     ForeignKey,
     Index,
     Integer,
@@ -522,3 +523,42 @@ class RetentionPolicy(TimestampMixin, Base):
     last_swept_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
 
     organization: Mapped[Organization] = relationship()
+
+
+class ThresholdOverride(TimestampMixin, Base):
+    """One operating point an organization has moved off the built-in default.
+
+    A table of its own for the reason ``RetentionPolicy`` gives, and a row per
+    pathology rather than one row of eighteen columns for the same reason: adding
+    an output later must not require a column on a live table.
+
+    Only the outputs that differ are stored. A pathology with no row runs on
+    ``chester.inference.OPERATING_POINTS``, so a fresh deployment needs no
+    backfill and "reset to default" is a delete rather than a value to keep in
+    step with the code.
+
+    This decides what a *future* analysis is judged against. It never rewrites a
+    stored result: ``AnalysisResult.thresholds`` holds the points that were in
+    force when the study ran, and a report built from it must keep reproducing
+    the verdict the radiologist saw.
+    """
+
+    __tablename__ = "threshold_overrides"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # One of chester.inference.REPORTED_PATHOLOGIES.
+    pathology: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Double, not Float: the defaults carry ten significant digits and a single
+    # precision column would silently round them.
+    threshold: Mapped[float] = mapped_column(Double, nullable=False)
+    # Who set it, for the trail the interface shows next to the value.
+    updated_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+
+    organization: Mapped[Organization] = relationship()
+
+    __table_args__ = (
+        UniqueConstraint("organization_id", "pathology", name="uq_threshold_overrides_org_output"),
+    )

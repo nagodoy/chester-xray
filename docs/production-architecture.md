@@ -121,7 +121,12 @@ rebuild and the report sheet.
 ### 4. AI Inference Worker
 
 - **Model**: `models/chester-all-224.onnx`, the torchxrayvision
-  `densenet121-res224-all` classifier; 12 of its 18 outputs are reported
+  `densenet121-res224-all` classifier; 13 of its 18 outputs are reported
+- **Thresholds**: `chester.inference.OPERATING_POINTS` holds the defaults;
+  `chester.thresholds` resolves them against any per-organization override set in
+  Settings, and the worker passes the result to `infer`. An override affects
+  future analyses only — `AnalysisResult.thresholds` snapshots what was in force,
+  so finished reports stay reproducible
 - **Runtime**: ONNX Runtime in the worker process. See `docs/onnx-parity.md` for
   the check that this reproduces the previously deployed TensorFlow.js runtime
 - **Preprocessing**: grayscale/windowed pixels → resize shorter side to 224 →
@@ -251,6 +256,7 @@ Worker process:
   → Retrieve the study's frontal instance from storage (oldest, absent a projection)
   → Decode and preprocess (pydicom/Pillow, then resize, crop, scale)
   → Run ONNX Runtime inference outside any transaction
+  → Resolve the organization's operating points (chester.thresholds)
   → Store AnalysisResult (raw_scores, op_normalized_scores, thresholds, above_threshold)
   → Update Study.status → completed, and release the lease
 ```

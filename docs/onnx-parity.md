@@ -38,9 +38,15 @@ authority on what this node surfaces.
 Nor is it the deployment's thresholds. The config keeps the published `OP_POINT`
 values, which is what makes the match above evidence of lineage, and it is not
 edited for operating decisions. `inference.py` diverges from it at two positions:
-2 (Infiltration) and 3 (Pneumothorax) are each set to 1.08x the published point.
-The other sixteen still agree to nine decimal places, and
+3 (Pneumothorax) is set to 1.08x the published point and 2 (Infiltration) to
+1.242x. The other sixteen still agree to nine decimal places, and
 `server/tests/test_suppressed_outputs.py` holds that to be true.
+
+Neither file is the last word at run time. An organization may override any
+reported output's point from Settings, and `server/chester/thresholds.py`
+resolves the two together; the worker hands the result to `infer`. So the config
+is what the model shipped with, `inference.py` is what this node defaults to, and
+the database is what a given organization actually ran.
 
 ## Method
 

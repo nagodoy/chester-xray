@@ -240,13 +240,21 @@ swinging by a median factor of 20.5 across renderings of the same anatomy.
 
 Three of the six labels that configuration blanked -- Infiltration, Pneumothorax
 and Lung Lesion -- are reported again. Lung Lesion runs on its published
-operating point; Infiltration and Pneumothorax run 8% above theirs, raised to
-tighten the two outputs the reference set leaves unresolved. That factor is an
-operating decision rather than a calibrated one: no labelled set was fitted to
-produce it, and on the reference images it changes nothing either output fires
-on. The note in `server/chester/inference.py` records what each decision does
-and does not establish, and `tools/calibrate_thresholds.py` is what would settle
-it on read exams.
+operating point; Pneumothorax runs 8% above its own, and Infiltration 24.2%
+above (1.08, then a further 1.15), raised to tighten the two outputs the
+reference set leaves unresolved. Those factors are operating decisions rather
+than calibrated ones: no labelled set was fitted to produce them, and on the
+reference images they change nothing either output fires on. The note in
+`server/chester/inference.py` records what each decision does and does not
+establish, and `tools/calibrate_thresholds.py` is what would settle it on read
+exams.
+
+Those are the defaults. An administrator can move any reported output's
+operating point for their organization from **Settings -> Model thresholds**,
+within a quarter to four times the default; `server/chester/thresholds.py`
+resolves what a given run uses and records every change to the audit trail. An
+override applies to future analyses only -- a finished study keeps the points
+that were in force when it ran, so a report stays reproducible.
 
 `tools/calibrate_thresholds.py` runs that measurement over exams a radiologist
 has read, and proposes a threshold per output:
