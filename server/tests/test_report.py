@@ -190,6 +190,30 @@ class TestFindingOrder:
         assert rows["Atelectasis"]["threshold"] == 0.074229
 
 
+def _fitted_size(pixels):
+    """The size the radiograph takes before IMAGE_SCALE is applied."""
+    from chester.imaging import report_image
+    from chester.imaging.dicom import to_pil_image
+
+    picture = to_pil_image(pixels).convert("RGB")
+    picture.thumbnail(
+        (report_image.WIDTH - 2 * report_image.MARGIN - 2, report_image.MAX_IMAGE_HEIGHT),
+        Image.LANCZOS,
+    )
+    return picture.size
+
+
+def _drawn_size(pixels):
+    """The size it is actually drawn at."""
+    from chester.imaging import report_image
+
+    width, height = _fitted_size(pixels)
+    return (
+        round(width * report_image.IMAGE_SCALE),
+        round(height * report_image.IMAGE_SCALE),
+    )
+
+
 class TestSheet:
     def test_the_sheet_renders_as_a_png(self, pixels, result):
         from chester.imaging.report_image import render_report
@@ -204,7 +228,44 @@ class TestSheet:
 
         assert data.startswith(b"\x89PNG\r\n\x1a\n")
 
-    def test_the_picture_keeps_seven_parts_to_the_table_s_three(self, pixels, result):
+    def test_the_sheet_is_exactly_as_tall_as_what_it_holds(self, pixels, result):
+        """The height follows the picture, so there is no band to letterbox into.
+
+        The sheet used to reserve the picture seven parts to the table's three
+        whatever shape the radiograph was. A chest film is roughly square and the
+        reserved frame was portrait, so the difference became black: 336px under
+        the picture on a 1024x1024 frontal, and as much again above it.
+        """
+        from chester.imaging import report_image
+
+        rows = report.finding_rows(result)
+        data = report_image.render_report(
+            pixels,
+            patient_name="A",
+            accession_number="1",
+            study_date="26/08/2026",
+            rows=rows,
+        )
+
+        sheet = Image.open(io.BytesIO(data))
+        drawn = _drawn_size(pixels)
+        table_height = (
+            report_image.TABLE_HEADER_HEIGHT
+            + report_image.ROW_HEIGHT * max(len(rows), 1)
+            + report_image.MARGIN
+        )
+        expected = (
+            report_image.HEADER_HEIGHT
+            + drawn[1]
+            + 2
+            + report_image.IMAGE_GAP
+            + report_image.IDENTITY_HEIGHT
+            + table_height
+            + report_image.MARGIN
+        )
+        assert sheet.height == expected
+
+    def test_nothing_separates_the_picture_from_the_cell_but_the_gap(self, pixels, result):
         from chester.imaging import report_image
 
         data = report_image.render_report(
@@ -215,10 +276,25 @@ class TestSheet:
             rows=report.finding_rows(result),
         )
 
-        _, height = Image.open(io.BytesIO(data)).size
-        body = height - report_image.HEADER_HEIGHT
-        image_part = body / (1 + 1 / report_image.IMAGE_SHARE)
-        assert abs((image_part / body) - 0.7) < 0.01
+        sheet = Image.open(io.BytesIO(data)).convert("RGB")
+        bottom = report_image.HEADER_HEIGHT + _drawn_size(pixels)[1] + 2
+        band = sheet.crop((0, bottom, sheet.width, bottom + report_image.IMAGE_GAP))
+        # One colour: the sheet background, and no reserved black.
+        assert set(band.getdata()) == {report_image.BACKGROUND}
+
+    def test_the_radiograph_is_drawn_at_three_quarters(self, pixels, result):
+        from chester.imaging import report_image
+
+        unscaled = _fitted_size(pixels)
+        drawn = _drawn_size(pixels)
+        assert drawn[0] == round(unscaled[0] * report_image.IMAGE_SCALE)
+        assert drawn[1] == round(unscaled[1] * report_image.IMAGE_SCALE)
+
+    def test_the_table_is_set_larger_than_the_rest_of_the_sheet(self):
+        """The finding is what the sheet is for, so it is the biggest text on it."""
+        from chester.imaging.report_image import _font
+
+        assert _font(30).size > _font(20).size
 
     def test_a_long_name_is_shortened_rather_than_run_over_its_neighbour(self):
         from PIL import ImageDraw
