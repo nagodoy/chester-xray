@@ -14,16 +14,31 @@ import numpy as np
 
 from chester.report import SIGNAL_ABOVE, SIGNAL_BELOW, SIGNAL_BORDERLINE
 
-# The picture keeps seven parts to the table's three, matching the study
-# detail screen, so the sheet and the application read the same way.
-IMAGE_SHARE = 7 / 3
+# The sheet used to reserve the picture seven parts to the table's three,
+# regardless of the radiograph's own shape. A chest film is roughly square and
+# the reserved frame was portrait, so the picture was centred in it and the
+# leftover became black: on a 1024x1024 frontal, 336px of it under the picture
+# and 336px above, a seventh of the sheet spent on nothing. The frame is now cut
+# to the picture, and IMAGE_GAP alone separates it from the identification cell.
+IMAGE_GAP = 16
+
+# The radiograph is drawn at three quarters of the size it would otherwise take.
+IMAGE_SCALE = 0.75
+
+# A ceiling for a very tall portrait film, so one cannot stretch the sheet
+# without limit now that the height follows the picture. Applied before
+# IMAGE_SCALE, and it never enlarges anything: a small image stays small.
+MAX_IMAGE_HEIGHT = 1600
 
 WIDTH = 1240
 MARGIN = 28
 HEADER_HEIGHT = 74
-IDENTITY_HEIGHT = 118
-TABLE_HEADER_HEIGHT = 46
-ROW_HEIGHT = 40
+IDENTITY_HEIGHT = 130
+# The table carries the finding, so it is set larger than anything else on the
+# sheet: a secondary capture is read on a viewer at whatever zoom the reader
+# happens to be at, often reduced to fit the pane.
+TABLE_HEADER_HEIGHT = 62
+ROW_HEIGHT = 56
 
 BACKGROUND = (8, 12, 22)
 PANEL = (17, 26, 46)
@@ -101,59 +116,72 @@ def render_report(
     """Draw the sheet and return it as PNG bytes."""
     from PIL import Image, ImageDraw
 
+    # The picture is measured before the canvas exists, because the sheet's
+    # height follows it. Sizing the canvas first is what produced the black
+    # letterbox this replaced.
+    picture = _to_grayscale_image(pixels).convert("RGB")
+    content_width = WIDTH - 2 * MARGIN - 2
+    picture.thumbnail((content_width, MAX_IMAGE_HEIGHT), Image.LANCZOS)
+    picture = picture.resize(
+        (
+            max(1, int(round(picture.width * IMAGE_SCALE))),
+            max(1, int(round(picture.height * IMAGE_SCALE))),
+        ),
+        Image.LANCZOS,
+    )
+
     table_height = TABLE_HEADER_HEIGHT + ROW_HEIGHT * max(len(rows), 1) + MARGIN
     bottom_height = IDENTITY_HEIGHT + table_height + MARGIN
-    image_height = int(round(bottom_height * IMAGE_SHARE))
-    height = HEADER_HEIGHT + image_height + bottom_height
+    # +2 for the frame's one-pixel outline on each side.
+    image_height = picture.height + 2
+    height = HEADER_HEIGHT + image_height + IMAGE_GAP + bottom_height
 
     canvas = Image.new("RGB", (WIDTH, height), BACKGROUND)
     draw = ImageDraw.Draw(canvas)
 
     title_font = _font(30, bold=True)
-    label_font = _font(17)
-    value_font = _font(21, bold=True)
-    head_font = _font(18, bold=True)
-    cell_font = _font(20)
+    label_font = _font(20)
+    value_font = _font(26, bold=True)
+    head_font = _font(26, bold=True)
+    cell_font = _font(30)
 
     draw.text((MARGIN, 24), title, font=title_font, fill=TEAL)
     draw.line(
         [(MARGIN, HEADER_HEIGHT - 1), (WIDTH - MARGIN, HEADER_HEIGHT - 1)], fill=LINE, width=1
     )
 
-    # --- the radiograph, fitted rather than stretched -----------------------
-    frame = (MARGIN, HEADER_HEIGHT, WIDTH - MARGIN, HEADER_HEIGHT + image_height - MARGIN)
+    # --- the radiograph, in a frame cut to it -------------------------------
+    # Centred across the sheet, but only horizontally: the frame is exactly as
+    # tall as the picture, so there is nothing to centre it against vertically.
+    left = (WIDTH - picture.width) // 2
+    frame = (left - 1, HEADER_HEIGHT, left + picture.width, HEADER_HEIGHT + picture.height + 1)
     draw.rectangle(frame, fill=(0, 0, 0), outline=LINE)
-    box_width = frame[2] - frame[0] - 2
-    box_height = frame[3] - frame[1] - 2
-    picture = _to_grayscale_image(pixels).convert("RGB")
-    picture.thumbnail((box_width, box_height), Image.LANCZOS)
-    canvas.paste(
-        picture,
-        (
-            frame[0] + 1 + (box_width - picture.width) // 2,
-            frame[1] + 1 + (box_height - picture.height) // 2,
-        ),
-    )
+    canvas.paste(picture, (left, HEADER_HEIGHT + 1))
 
     # --- who and when -------------------------------------------------------
-    top = HEADER_HEIGHT + image_height
+    top = HEADER_HEIGHT + image_height + IMAGE_GAP
     cell = (MARGIN, top, WIDTH - MARGIN, top + IDENTITY_HEIGHT - 14)
     draw.rectangle(cell, fill=PANEL, outline=LINE)
+    # Weighted rather than in equal thirds: a patient name is far longer than an
+    # accession number or a date, and at this size equal columns truncated names
+    # that used to fit.
     columns = [
-        ("PACIENTE", patient_name or "-"),
-        ("ACCESSION NUMBER", accession_number or "-"),
-        ("DATA DO EXAME", study_date or "-"),
+        ("PACIENTE", patient_name or "-", 0.5),
+        ("ACCESSION NUMBER", accession_number or "-", 0.25),
+        ("DATA DO EXAME", study_date or "-", 0.25),
     ]
-    column_width = (cell[2] - cell[0]) // len(columns)
-    for index, (label, value) in enumerate(columns):
-        x = cell[0] + 20 + index * column_width
-        draw.text((x, cell[1] + 22), label, font=label_font, fill=INK_SOFT)
+    available = cell[2] - cell[0]
+    x = cell[0] + 20
+    for label, value, share in columns:
+        column_width = int(available * share)
+        draw.text((x, cell[1] + 24), label, font=label_font, fill=INK_SOFT)
         draw.text(
-            (x, cell[1] + 52),
+            (x, cell[1] + 58),
             _fit_text(draw, str(value), value_font, column_width - 30),
             font=value_font,
             fill=INK,
         )
+        x += column_width
 
     # --- the findings -------------------------------------------------------
     top = cell[3] + 18
