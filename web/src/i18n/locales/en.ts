@@ -284,6 +284,32 @@ export const en: Dictionary = {
     confirmDelete: "Remove the connection {name}?",
   },
 
+  thresholds: {
+    title: "Model thresholds",
+    subtitle: "The operating point of each finding. The doubt band is ±{band}% around it.",
+    pathology: "Finding",
+    default: "Default",
+    effective: "In force",
+    lower: "Lower threshold",
+    upper: "Upper threshold",
+    origin: "Origin",
+    builtIn: "Default",
+    adjusted: "Adjusted {factor}x",
+    adjust: "Adjust",
+    reset: "Reset",
+    empty: "This node reports no findings.",
+    fieldLabel: "Threshold for {pathology}",
+    notANumber: "The threshold must be a number.",
+    outOfRange: "The threshold for {pathology} must be between {minimum} and {maximum}.",
+    confirmReset: "Reset the threshold for {pathology} to its default of {value}?",
+    overriddenNotice:
+      "{count} finding(s) run off their default. A default went through code review with its evidence beside it; an adjustment made here did not.",
+    footerAdmin:
+      "An adjustment applies to future analyses. Finished studies keep the threshold in force on the day and do not change. Run tools/calibrate_thresholds.py over read exams before adjusting: nothing on this screen measures the cost in sensitivity.",
+    footerReadOnly:
+      "Only administrators change thresholds. An adjustment applies to future analyses; finished studies keep the threshold in force on the day.",
+  },
+
   networkLogs: {
     eyebrow: "System / network",
     title: "Network logs",

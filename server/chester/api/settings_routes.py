@@ -16,10 +16,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from chester import destinations as destinations_module
+from chester import thresholds as thresholds_module
 from chester.api.deps import require_admin, require_page
 from chester.config import settings
 from chester.db import get_session
 from chester.models import SendDestination
+from chester.report import DOUBT_BAND
 from chester.security.access import AccessContext
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -340,3 +342,123 @@ def test_destination(
     except Exception as exc:
         return {"ok": False, "message": f"{row.ae_title}@{row.host}:{row.port}: {exc}"}
     return {"ok": True, "message": f"{row.ae_title}@{row.host}:{row.port}"}
+
+
+class ThresholdSchema(BaseModel):
+    """One output's operating point, and everything needed to judge a change."""
+
+    pathology: str
+    # What the code ships for this output.
+    default: float
+    # What this organization's next analysis will use.
+    effective: float
+    # Both edges of the doubt band around `effective`, which is what a report
+    # actually classifies against. Sent rather than derived in the browser so the
+    # band's definition lives in one place.
+    lower: float
+    upper: float
+    # None while the output is on its default.
+    factor: float | None
+    overridden: bool
+    updated_by: str | None
+    updated_at: str | None
+    minimum: float
+    maximum: float
+
+
+class ThresholdList(BaseModel):
+    items: list[ThresholdSchema]
+    # The fraction either side of the operating point that reads as DUVIDOSO.
+    doubt_band: float
+    editable: bool
+
+
+class ThresholdBody(BaseModel):
+    threshold: float = Field(gt=0.0, lt=1.0)
+
+
+def _threshold_payload(
+    pathology: str,
+    effective: float,
+    row=None,
+) -> ThresholdSchema:
+    default = thresholds_module.DEFAULTS[pathology]
+    low, high = thresholds_module.bounds(pathology)
+    return ThresholdSchema(
+        pathology=pathology,
+        default=default,
+        effective=effective,
+        lower=effective * (1.0 - DOUBT_BAND),
+        upper=effective * (1.0 + DOUBT_BAND),
+        factor=(effective / default) if row is not None and default else None,
+        overridden=row is not None,
+        updated_by=row.updated_by if row is not None else None,
+        updated_at=row.updated_at.isoformat() if row is not None else None,
+        minimum=low,
+        maximum=high,
+    )
+
+
+def _threshold_list(db: Session, access: AccessContext) -> ThresholdList:
+    rows = thresholds_module.stored(db, access.organization_id)
+    effective = thresholds_module.in_force(db, access.organization_id)
+    return ThresholdList(
+        items=[
+            _threshold_payload(name, effective[name], rows.get(name))
+            # The model's own order, not the database's: the same order the
+            # report sheet and the study page use.
+            for name in thresholds_module.DEFAULTS
+        ],
+        doubt_band=DOUBT_BAND,
+        editable=access.is_admin,
+    )
+
+
+@router.get("/thresholds", response_model=ThresholdList)
+def list_thresholds(
+    access: AccessContext = Depends(require_page("settings")),
+    db: Session = Depends(get_session),
+):
+    """Every reported output's operating point for the caller's organization."""
+    return _threshold_list(db, access)
+
+
+@router.put("/thresholds/{pathology}", response_model=ThresholdList)
+def set_threshold(
+    pathology: str,
+    body: ThresholdBody,
+    actor: AccessContext = Depends(require_admin),
+    db: Session = Depends(get_session),
+):
+    """Move one output's operating point for this organization.
+
+    Returns the whole table rather than the one row, so the interface cannot
+    drift from what was actually saved.
+    """
+    try:
+        thresholds_module.set_override(
+            db,
+            actor.organization_id,
+            pathology,
+            body.threshold,
+            actor=actor.email,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    db.commit()
+    return _threshold_list(db, actor)
+
+
+@router.delete("/thresholds/{pathology}", response_model=ThresholdList)
+def reset_threshold(
+    pathology: str,
+    actor: AccessContext = Depends(require_admin),
+    db: Session = Depends(get_session),
+):
+    """Return one output to the built-in default."""
+    try:
+        thresholds_module.clear_override(db, actor.organization_id, pathology, actor=actor.email)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    db.commit()
+    return _threshold_list(db, actor)

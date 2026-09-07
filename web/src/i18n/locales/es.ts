@@ -285,6 +285,32 @@ export const es: Dictionary = {
     confirmDelete: "¿Eliminar la conexión {name}?",
   },
 
+  thresholds: {
+    title: "Umbrales del modelo",
+    subtitle: "Punto operativo de cada hallazgo. La banda de duda es de ±{band}% a su alrededor.",
+    pathology: "Hallazgo",
+    default: "Predeterminado",
+    effective: "Vigente",
+    lower: "Umbral inferior",
+    upper: "Umbral superior",
+    origin: "Origen",
+    builtIn: "Predeterminado",
+    adjusted: "Ajustado {factor}x",
+    adjust: "Ajustar",
+    reset: "Restaurar",
+    empty: "Este nodo no reporta ningún hallazgo.",
+    fieldLabel: "Umbral de {pathology}",
+    notANumber: "El umbral debe ser un número.",
+    outOfRange: "El umbral de {pathology} debe estar entre {minimum} y {maximum}.",
+    confirmReset: "¿Restaurar el umbral de {pathology} a su valor predeterminado {value}?",
+    overriddenNotice:
+      "{count} hallazgo(s) corren fuera de su valor predeterminado. El valor predeterminado pasó por revisión de código con su evidencia al lado; un ajuste hecho aquí, no.",
+    footerAdmin:
+      "El ajuste rige para los próximos análisis. Los estudios ya concluidos conservan el umbral vigente ese día y no cambian. Ejecute tools/calibrate_thresholds.py sobre exámenes informados antes de ajustar: nada en esta pantalla mide el costo en sensibilidad.",
+    footerReadOnly:
+      "Solo los administradores cambian umbrales. El ajuste rige para los próximos análisis; los estudios ya concluidos conservan el umbral vigente ese día.",
+  },
+
   networkLogs: {
     eyebrow: "Sistema / red",
     title: "Registros de red",

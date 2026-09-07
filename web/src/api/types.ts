@@ -154,6 +154,32 @@ export interface SendConnectionList {
   editable: boolean;
 }
 
+/** One model output's operating point, as this organization runs it. */
+export interface ThresholdRow {
+  pathology: string;
+  /** The point the code ships for this output. */
+  default: number;
+  /** What the next analysis will judge it against. */
+  effective: number;
+  /** The edges of the doubt band around `effective`, computed server-side. */
+  lower: number;
+  upper: number;
+  /** `effective / default`, or null while the output is on its default. */
+  factor: number | null;
+  overridden: boolean;
+  updated_by: string | null;
+  updated_at: string | null;
+  minimum: number;
+  maximum: number;
+}
+
+export interface ThresholdList {
+  items: ThresholdRow[];
+  /** The fraction either side of the point that reads as DUVIDOSO. */
+  doubt_band: number;
+  editable: boolean;
+}
+
 export interface ManagedUser {
   id: string;
   email: string;

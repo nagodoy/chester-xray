@@ -13,6 +13,7 @@ import type {
   SendConnectionList,
   StudyDetail,
   StudyList,
+  ThresholdList,
   UploadOutcome,
 } from "./types";
 
@@ -187,6 +188,20 @@ export const api = {
     }),
   deleteDestination: (id: string) =>
     request<void>(`/api/settings/destinations/${encodeURIComponent(id)}`, { method: "DELETE" }),
+
+  listThresholds: () => request<ThresholdList>("/api/settings/thresholds"),
+  // Both of these return the whole table, so the panel never has to merge a
+  // single row into what it already had and risk showing something the server
+  // did not save.
+  setThreshold: (pathology: string, threshold: number) =>
+    request<ThresholdList>(`/api/settings/thresholds/${encodeURIComponent(pathology)}`, {
+      method: "PUT",
+      ...json({ threshold }),
+    }),
+  resetThreshold: (pathology: string) =>
+    request<ThresholdList>(`/api/settings/thresholds/${encodeURIComponent(pathology)}`, {
+      method: "DELETE",
+    }),
   testDestination: (id: string) =>
     request<{ ok: boolean; message: string }>(
       `/api/settings/destinations/${encodeURIComponent(id)}/test`,

@@ -192,7 +192,7 @@ class TestProcessing:
         _bind_worker_sessions(monkeypatch, session)
         worker.claim_job(session)
 
-        def _boom(_pixels):
+        def _boom(_pixels, _thresholds=None):
             raise RuntimeError("model exploded")
 
         monkeypatch.setattr("chester.inference.infer", _boom)

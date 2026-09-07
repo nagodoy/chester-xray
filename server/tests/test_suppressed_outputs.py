@@ -39,7 +39,9 @@ LEGACY_CONFIG = (
     / "config.json"
 )
 
-RAISE_FACTOR = 1.08
+# What each raised output is set to, as a multiple of its published point.
+# Infiltration was raised twice: 1.08 in September, then a further 1.15.
+RAISE_FACTORS = {2: 1.08 * 1.15, 3: 1.08}
 RAISED_INDICES = {2: "Infiltration", 3: "Pneumothorax"}
 
 
@@ -200,18 +202,24 @@ class TestRaisedOperatingPoints:
     apart by accident.
     """
 
-    def test_the_two_raised_points_are_eight_percent_over_published(self):
+    def test_the_raised_points_match_their_factor_over_published(self):
         published = json.loads(LEGACY_CONFIG.read_text())["OP_POINT"]
         for index, name in RAISED_INDICES.items():
             assert inference.PATHOLOGIES[index] == name
             assert inference.OPERATING_POINTS[index] == pytest.approx(
-                published[index] * RAISE_FACTOR, rel=1e-12
+                published[index] * RAISE_FACTORS[index], rel=1e-9
             )
 
     def test_the_raised_points_are_the_literal_values_in_use(self):
         """Spelled out, so a diff that changes them has to change this too."""
-        assert inference.OPERATING_POINTS[2] == 0.1059993648
+        assert inference.OPERATING_POINTS[2] == 0.1218992695
         assert inference.OPERATING_POINTS[3] == 0.0105967953
+
+    def test_infiltration_now_sits_above_effusion(self):
+        """The raise reorders the high end, which the note in inference.py claims."""
+        effusion = inference.OPERATING_POINTS[inference.PATHOLOGIES.index("Effusion")]
+        opacity = inference.OPERATING_POINTS[inference.PATHOLOGIES.index("Lung Opacity")]
+        assert effusion < inference.OPERATING_POINTS[2] < opacity
 
     def test_every_other_point_still_matches_the_vendored_config(self):
         """The divergence is exactly two entries wide, and nothing else moved."""

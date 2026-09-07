@@ -113,6 +113,7 @@ def load_pixels(db: Session, study: Study):
 
 def process_job(job_id: uuid.UUID) -> None:
     """Run one claimed job to completion, recording either a result or the error."""
+    from chester import thresholds
     from chester.inference import infer
 
     error: str | None = None
@@ -133,11 +134,15 @@ def process_job(job_id: uuid.UUID) -> None:
             logger.exception("Could not load pixels for job %s", job_id)
             _fail(db, job, study, str(exc))
             return
+        # Read while the session is open, since inference runs without one. The
+        # points are the study's organization's, not the node's: an override is
+        # set per organization, like its retention window and its destinations.
+        points = thresholds.in_force(db, study.organization_id)
 
     # Inference happens outside a transaction so a slow model does not hold a
     # database connection or row locks for its duration.
     try:
-        outcome = infer(pixels)
+        outcome = infer(pixels, points)
     except Exception as exc:
         logger.exception("Inference failed for job %s", job_id)
         error = str(exc)
