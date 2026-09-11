@@ -1,4 +1,4 @@
-import { ArrowLeft, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ClipboardEvent, KeyboardEvent } from "react";
 
@@ -134,11 +134,9 @@ export function VerifyCode({ email, onVerified, onBack }: Props) {
 
   return (
     <>
-      <div className="auth-card-title">
-        <ShieldCheck size={18} aria-hidden />
-        <h2>{t.auth.verifyTitle}</h2>
-      </div>
-      <p className="auth-subtitle">
+      <p className="auth-step">{t.auth.stepVerification}</p>
+      <h2 className="auth-display">{t.auth.verifyTitle}</h2>
+      <p className="auth-lede">
         {format(t.auth.verifySubtitle, { email: "" }).replace(/\s*\.\s*$/, "")}{" "}
         <strong>{maskEmail(email)}</strong>.
       </p>
@@ -197,6 +195,9 @@ export function VerifyCode({ email, onVerified, onBack }: Props) {
           {t.auth.useAnotherEmail}
         </button>
       </div>
+
+      <hr className="auth-rule" />
+      <p className="auth-fineprint">{t.auth.codeValidity}</p>
     </>
   );
 }

@@ -34,13 +34,13 @@ export const ptBR = {
   },
 
   auth: {
-    title: "Entrar no Torax AI",
-    subtitle: "Informe seu email para receber o código de acesso.",
-    emailLabel: "Seu e-mail",
-    emailPlaceholder: "Digite o endereço de e-mail",
-    sendCode: "Enviar código de acesso",
+    title: "Acesse seu espaço de trabalho.",
+    subtitle: "Informe seu e-mail profissional para receber um código de acesso.",
+    emailLabel: "E-mail profissional",
+    emailPlaceholder: "nome@instituicao.com.br",
+    sendCode: "Enviar código",
     sending: "Enviando…",
-    verifyTitle: "Verifique seu email",
+    verifyTitle: "Confirme o código enviado.",
     verifySubtitle: "Enviamos um código de 6 dígitos para {email}.",
     codeLabel: "Código de verificação",
     confirm: "Confirmar acesso",
@@ -51,6 +51,13 @@ export const ptBR = {
     codeResent: "Código reenviado.",
     digitLabel: "Dígito {n} de {total}",
     useAnotherEmail: "Usar outro email",
+    stepIdentification: "01 — Identificação",
+    stepVerification: "02 — Verificação",
+    protectedEnvironment: "Ambiente clínico protegido",
+    restrictedNote:
+      "O acesso é restrito a profissionais autorizados. Não compartilhe seu código de acesso.",
+    codeValidity:
+      "Código válido por 10 minutos. Somente e-mails autorizados podem acessar os exames compartilhados.",
     researchOnly: "Pesquisa somente · dados desidentificados",
     restricted: "Acesso restrito a usuários autorizados",
     accessDenied: "Acesso restrito",

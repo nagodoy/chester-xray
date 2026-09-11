@@ -41,13 +41,13 @@ export const es: Dictionary = {
   },
 
   auth: {
-    title: "Entrar en Torax AI",
-    subtitle: "Introduce tu correo para recibir el código de acceso.",
-    emailLabel: "Tu correo",
-    emailPlaceholder: "Escribe tu dirección de correo",
-    sendCode: "Enviar código de acceso",
+    title: "Accede a tu espacio de trabajo.",
+    subtitle: "Introduce tu correo profesional para recibir un código de acceso.",
+    emailLabel: "Correo profesional",
+    emailPlaceholder: "nombre@institucion.com",
+    sendCode: "Enviar código",
     sending: "Enviando…",
-    verifyTitle: "Verifica tu correo",
+    verifyTitle: "Confirma el código enviado.",
     verifySubtitle: "Enviamos un código de 6 dígitos a {email}.",
     codeLabel: "Código de verificación",
     confirm: "Confirmar acceso",
@@ -58,6 +58,13 @@ export const es: Dictionary = {
     codeResent: "Código reenviado.",
     digitLabel: "Dígito {n} de {total}",
     useAnotherEmail: "Usar otro correo",
+    stepIdentification: "01 — Identificación",
+    stepVerification: "02 — Verificación",
+    protectedEnvironment: "Entorno clínico protegido",
+    restrictedNote:
+      "El acceso está restringido a profesionales autorizados. No compartas tu código de acceso.",
+    codeValidity:
+      "El código es válido por 10 minutos. Solo los correos autorizados pueden acceder a los estudios compartidos.",
     researchOnly: "Solo investigación · datos anonimizados",
     restricted: "Acceso restringido a usuarios autorizados",
     accessDenied: "Acceso restringido",

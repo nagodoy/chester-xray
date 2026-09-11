@@ -1,4 +1,4 @@
-import { Loader2, Mail } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useLocation } from "wouter";
@@ -47,16 +47,14 @@ export function SignIn() {
     <AuthLayout>
       {step === "email" ? (
         <>
-          <div className="auth-card-title">
-            <h2>{t.auth.title}</h2>
-          </div>
-          <p className="auth-subtitle">{t.auth.subtitle}</p>
+          <p className="auth-step">{t.auth.stepIdentification}</p>
+          <h2 className="auth-display">{t.auth.title}</h2>
+          <p className="auth-lede">{t.auth.subtitle}</p>
 
           <form onSubmit={(event) => void submitEmail(event)}>
             <label className="auth-field">
               <span>{t.auth.emailLabel}</span>
               <div className="auth-input-wrap">
-                <Mail size={16} aria-hidden />
                 <input
                   className="auth-input"
                   type="email"
@@ -90,6 +88,9 @@ export function SignIn() {
               )}
             </button>
           </form>
+
+          <hr className="auth-rule" />
+          <p className="auth-fineprint">{t.auth.codeValidity}</p>
         </>
       ) : (
         <VerifyCode

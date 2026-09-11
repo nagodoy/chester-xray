@@ -42,13 +42,13 @@ export const en: Dictionary = {
   },
 
   auth: {
-    title: "Sign in to Torax AI",
-    subtitle: "Enter your email to receive an access code.",
-    emailLabel: "Your email",
-    emailPlaceholder: "Enter your email address",
-    sendCode: "Send access code",
+    title: "Access your workspace.",
+    subtitle: "Enter your work email to receive an access code.",
+    emailLabel: "Work email",
+    emailPlaceholder: "name@institution.com",
+    sendCode: "Send code",
     sending: "Sending…",
-    verifyTitle: "Check your email",
+    verifyTitle: "Confirm the code we sent.",
     verifySubtitle: "We sent a 6-digit code to {email}.",
     codeLabel: "Verification code",
     confirm: "Confirm access",
@@ -59,6 +59,13 @@ export const en: Dictionary = {
     codeResent: "Code resent.",
     digitLabel: "Digit {n} of {total}",
     useAnotherEmail: "Use a different email",
+    stepIdentification: "01 — Identification",
+    stepVerification: "02 — Verification",
+    protectedEnvironment: "Protected clinical environment",
+    restrictedNote:
+      "Access is restricted to authorized professionals. Never share your access code.",
+    codeValidity:
+      "The code is valid for 10 minutes. Only authorized emails can open the studies shared with them.",
     researchOnly: "Research only · de-identified data",
     restricted: "Restricted to authorized users",
     accessDenied: "Restricted",
