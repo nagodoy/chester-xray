@@ -2013,7 +2013,7 @@ td b {
 
 /* The mark carries the left half on its own, so it is sized as artwork
    rather than as an icon: the tile is the largest thing above the wordmark
-   and the trace inside it stays at the same optical weight it has in the
+   and the trace inside it keeps the optical weight it has in the
    application rail. */
 .auth-logo {
   display: grid;
@@ -2045,19 +2045,19 @@ td b {
 
 .auth-wordmark {
   margin: 0;
-  font-size: clamp(36px, 4.2vw, 58px);
+  font-size: clamp(40px, 5vw, 68px);
   font-weight: 800;
-  letter-spacing: -0.035em;
-  line-height: 1.04;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
   color: var(--ink);
 }
 
 .auth-aside-tagline {
-  margin: 16px 0 0;
-  max-width: 38ch;
+  margin: 14px 0 0;
+  max-width: 30ch;
   color: var(--ink-soft);
   font-size: var(--fs-md);
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
 .auth-aside-foot {
@@ -2439,7 +2439,7 @@ td b {
   }
 
   .auth-wordmark {
-    font-size: clamp(32px, 8vw, 44px);
+    font-size: clamp(34px, 9vw, 48px);
   }
 
   .auth-main {

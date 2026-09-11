@@ -7,11 +7,7 @@ import type { Dictionary } from "./pt-BR";
  * in English while everything around it was in Portuguese.
  */
 export const en: Dictionary = {
-  brand: {
-    name: "Telemetry MR\u00a0MSK",
-    tagline: "Musculoskeletal MRI",
-    subtitle: "Automated AI quality control for musculoskeletal MRI studies.",
-  },
+  brand: { name: "Torax AI", tagline: "Chest radiography" },
 
   common: {
     retry: "Try again",
@@ -108,7 +104,7 @@ export const en: Dictionary = {
 
   worklist: {
     eyebrow: "Chest X-ray / quality control",
-    title: "Telemetry MR MSK worklist",
+    title: "Torax AI worklist",
     subtitle: "Triage and analysis pipeline for de-identified chest studies.",
     analyse: "Analyse study",
     closeUpload: "Close upload",

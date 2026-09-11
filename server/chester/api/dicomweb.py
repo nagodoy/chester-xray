@@ -104,7 +104,7 @@ def echo_document(request: Request) -> dict:
     endpoint would not already tell them.
     """
     document = {
-        "service": "Telemetry MR MSK DICOMweb",
+        "service": "Torax AI DICOMweb",
         "status": "active",
         "endpoint": "/dicomweb/studies",
         "aeTitle": settings.dicom_scp_ae_title,

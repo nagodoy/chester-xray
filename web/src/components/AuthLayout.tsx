@@ -23,7 +23,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           </div>
           <p className="auth-eyebrow">{t.auth.protectedEnvironment}</p>
           <h1 className="auth-wordmark">{t.brand.name}</h1>
-          <p className="auth-aside-tagline">{t.brand.subtitle}</p>
+          <p className="auth-aside-tagline">{t.brand.tagline}</p>
         </div>
 
         <div className="auth-aside-foot">

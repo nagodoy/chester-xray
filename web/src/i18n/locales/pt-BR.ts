@@ -1,10 +1,5 @@
 export const ptBR = {
-  brand: {
-    name: "Telemetry MR\u00a0MSK",
-    tagline: "RM musculoesquelética",
-    subtitle:
-      "Controle de qualidade automático por IA de exames de ressonância magnética musculoesquelética.",
-  },
+  brand: { name: "Torax AI", tagline: "Radiografia torácica" },
 
   common: {
     retry: "Tentar novamente",
@@ -102,7 +97,7 @@ export const ptBR = {
 
   worklist: {
     eyebrow: "RX tórax / controle de qualidade",
-    title: "Worklist Telemetry MR MSK",
+    title: "Worklist Torax AI",
     subtitle: "Pipeline de triagem e análise para estudos torácicos desidentificados.",
     analyse: "Analisar estudo",
     closeUpload: "Fechar envio",
