@@ -1966,9 +1966,18 @@ td b {
 
 /* ---------- Sign in ---------- */
 
-/* The console's sign-in sits one step flatter than the application shell:
-   slate-950 ground, slate-900 card, solid slate-800 edge. Kept that way here
-   so the two products' front doors match. */
+/* A split front door: the brand holds the left half, the current step the
+   right, with one hairline between them. The step never moves the brand, so
+   email and code read as one screen advancing rather than two screens
+   swapping. No card -- the panel sits directly on the ground, and the only
+   rules on the page are the column divider and the one above the fine print.
+
+   Eyebrows and labels are white rather than tinted. Rank comes from weight,
+   size and uppercase tracking; colour is left to state (emerald, amber, red)
+   so nothing decorative competes with it. */
+
+/* Kept centred for the loading and access-denied states, which are a single
+   short message rather than a form. */
 .auth-shell {
   display: grid;
   place-items: center;
@@ -1977,9 +1986,128 @@ td b {
   background: var(--bg);
 }
 
-.auth-wrap {
+.auth-split {
+  display: grid;
+  grid-template-columns: minmax(0, 45fr) minmax(0, 55fr);
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.auth-aside {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(48px, 13vh, 140px);
+  padding: clamp(40px, 7vh, 80px) clamp(28px, 5.5vw, 88px);
+  border-right: 1px solid var(--line-strong);
+  background:
+    radial-gradient(115% 80% at 8% 18%, rgb(14 42 61 / 55%) 0%, transparent 62%),
+    var(--canvas);
+}
+
+.auth-aside-brand {
+  display: grid;
+  justify-items: start;
+  text-align: left;
+}
+
+/* The mark carries the left half on its own, so it is sized as artwork
+   rather than as an icon: the tile is the largest thing above the wordmark
+   and the trace inside it keeps the optical weight it has in the
+   application rail. */
+.auth-logo {
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 112px;
+  margin-bottom: 32px;
+  border-radius: 28px;
+  background: linear-gradient(140deg, var(--teal) 0%, var(--emerald) 100%);
+  color: #04211d;
+  box-shadow: 0 18px 40px rgb(19 78 74 / 35%);
+}
+
+/* Sized here rather than on the component, so the mark and its tile shrink
+   together at the breakpoint. */
+.auth-logo svg {
+  width: 56px;
+  height: 56px;
+}
+
+.auth-eyebrow {
+  margin: 0 0 14px;
+  color: var(--ink);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+.auth-wordmark {
+  margin: 0;
+  font-size: clamp(40px, 5vw, 68px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+  color: var(--ink);
+}
+
+.auth-aside-tagline {
+  margin: 14px 0 0;
+  max-width: 30ch;
+  color: var(--ink-soft);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+}
+
+.auth-aside-foot {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  max-width: 44ch;
+}
+
+.auth-aside-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+}
+
+/* The dot is the only mark carrying colour on this half: it reports state
+   (the environment is up and protected), so it earns it. */
+.auth-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--emerald);
+  box-shadow: 0 0 0 3px rgb(16 185 129 / 15%);
+}
+
+.auth-aside-fineprint {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-faint);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--track-caption);
+}
+
+.auth-main {
+  display: grid;
+  align-items: center;
+  padding: clamp(48px, 8vh, 96px) clamp(24px, 5vw, 80px);
+}
+
+.auth-panel {
   width: 100%;
-  max-width: 384px;
+  max-width: 420px;
+  margin-inline: auto;
+  text-align: left;
   animation: rise 0.4s ease-out both;
 }
 
@@ -1996,7 +2124,7 @@ td b {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .auth-wrap {
+  .auth-panel {
     animation: none;
   }
 
@@ -2005,36 +2133,35 @@ td b {
   }
 }
 
-.auth-brand {
-  display: grid;
-  justify-items: center;
-  margin-bottom: 40px;
-  text-align: center;
-}
-
-.auth-logo {
-  display: grid;
-  place-items: center;
-  width: 64px;
-  height: 64px;
-  margin-bottom: 16px;
-  border-radius: var(--radius-row);
-  background: linear-gradient(140deg, var(--teal) 0%, var(--emerald) 100%);
-  color: #04211d;
-  box-shadow: 0 10px 24px rgb(19 78 74 / 30%);
-}
-
-.auth-brand h1 {
-  font-size: var(--fs-2xl);
+.auth-step {
+  margin: 0 0 18px;
+  color: var(--ink);
+  font-size: var(--fs-xs);
   font-weight: 700;
-  letter-spacing: -0.025em;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+.auth-display {
+  margin: 0 0 16px;
+  font-size: clamp(30px, 3vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
   color: var(--ink);
 }
 
-.auth-brand p {
-  margin: 4px 0 0;
-  font-size: var(--fs-sm);
+.auth-lede {
+  margin: 0 0 32px;
+  max-width: 38ch;
   color: var(--ink-muted);
+  font-size: var(--fs-md);
+  line-height: 1.55;
+}
+
+.auth-lede strong {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 /* ---------- Locale switcher ---------- */
@@ -2044,8 +2171,8 @@ td b {
   gap: 6px;
 }
 
-.auth-brand .locale-switch {
-  margin-top: 16px;
+.auth-aside-foot .locale-switch {
+  margin: 6px 0 0 -6px;
 }
 
 /* Flags stay in colour even when inactive. Desaturating them defeats the point:
@@ -2082,76 +2209,41 @@ td b {
   font-size: var(--fs-lg);
 }
 
-.auth-card {
-  padding: 32px;
-  border: 1px solid var(--slate-800);
-  border-radius: var(--radius-row);
-  background: #0f172a;
-  text-align: left;
-  box-shadow: var(--shadow-lg);
-}
-
-.auth-card-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--emerald-bright);
-}
-
-.auth-card-title h2 {
-  font-size: var(--fs-lg);
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.auth-subtitle {
-  margin: 4px 0 24px;
-  color: var(--ink-muted);
-  font-size: var(--fs-sm);
-  line-height: 1.55;
-}
-
-.auth-subtitle strong {
-  color: var(--ink);
-  font-weight: 600;
-}
-
 .auth-field {
   display: block;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .auth-field > span {
   display: block;
-  margin-bottom: 6px;
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  letter-spacing: 0.025em;
-  text-transform: uppercase;
-  color: var(--ink-muted);
+  margin-bottom: 8px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--ink);
 }
 
 .auth-input-wrap {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 14px;
-  border: 1px solid var(--slate-700);
+  padding: 0 16px;
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-card);
-  background: var(--slate-800);
+  background: var(--surface-inset);
   color: var(--ink-faint);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .auth-input-wrap:focus-within {
   border-color: var(--emerald);
-  box-shadow: 0 0 0 2px rgb(16 185 129 / 50%);
+  box-shadow: 0 0 0 2px rgb(16 185 129 / 40%);
 }
 
 .auth-input {
   flex: 1;
   min-width: 0;
-  padding: 12px 0;
+  padding: 15px 0;
   border: 0;
   background: transparent;
   color: var(--ink);
@@ -2190,9 +2282,9 @@ td b {
   width: 100%;
   height: 56px;
   padding: 0;
-  border: 1px solid var(--slate-700);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-card);
-  background: var(--slate-800);
+  background: var(--surface-inset);
   color: var(--ink);
   font: inherit;
   font-size: var(--fs-2xl);
@@ -2209,7 +2301,7 @@ td b {
 .code-input:focus {
   border-color: var(--emerald);
   outline: none;
-  box-shadow: 0 0 0 2px rgb(16 185 129 / 50%);
+  box-shadow: 0 0 0 2px rgb(16 185 129 / 40%);
 }
 
 .code-input:disabled {
@@ -2223,7 +2315,7 @@ td b {
   justify-content: center;
   gap: 8px;
   width: 100%;
-  padding: 12px;
+  padding: 15px 12px;
   border: 0;
   border-radius: var(--radius-card);
   background: var(--emerald-strong);
@@ -2246,7 +2338,6 @@ td b {
 }
 
 .auth-submit:focus-visible,
-.auth-locale:focus-visible,
 .auth-link:focus-visible,
 .locale-option:focus-visible {
   outline: 2px solid var(--emerald);
@@ -2255,6 +2346,7 @@ td b {
 
 .auth-actions {
   display: grid;
+  justify-items: start;
   gap: 2px;
   margin-top: 6px;
 }
@@ -2262,9 +2354,8 @@ td b {
 .auth-link {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  padding: 9px;
+  padding: 9px 10px 9px 0;
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
@@ -2276,8 +2367,7 @@ td b {
 }
 
 .auth-link:not(:disabled):hover {
-  background: rgb(30 41 59 / 60%);
-  color: var(--emerald-bright);
+  color: var(--ink);
 }
 
 .auth-link:disabled {
@@ -2290,11 +2380,10 @@ td b {
 .auth-error {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 7px;
   margin: 0 0 16px;
   font-size: var(--fs-sm);
-  text-align: center;
+  text-align: left;
 }
 
 .auth-status,
@@ -2306,16 +2395,73 @@ td b {
   color: var(--red);
 }
 
-.auth-footnote {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  margin: 24px 0 0;
-  color: var(--slate-600);
-  font-size: var(--fs-sm);
+/* The one rule inside the panel: it closes the step and hands off to the
+   fine print, which is a condition of use rather than part of the form. */
+.auth-rule {
+  margin: 32px 0 16px;
+  border: 0;
+  border-top: 1px solid var(--line);
 }
 
+.auth-fineprint {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+}
+
+/* Below the split's breaking point the brand becomes a header: the wordmark
+   stays, the vertical rule becomes a horizontal one, and the step keeps the
+   full width. */
+@media (width <= 900px) {
+  .auth-split {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 100dvh;
+  }
+
+  .auth-aside {
+    gap: 28px;
+    padding: 40px clamp(20px, 6vw, 48px) 32px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line-strong);
+  }
+
+  .auth-logo {
+    width: 88px;
+    height: 88px;
+    margin-bottom: 24px;
+    border-radius: 22px;
+  }
+
+  .auth-logo svg {
+    width: 44px;
+    height: 44px;
+  }
+
+  .auth-wordmark {
+    font-size: clamp(34px, 9vw, 48px);
+  }
+
+  .auth-main {
+    padding: 40px clamp(20px, 6vw, 48px) 56px;
+  }
+
+  .auth-panel {
+    margin-inline: 0;
+    max-width: 480px;
+  }
+}
+
+@media (width <= 420px) {
+  .code-inputs {
+    gap: 6px;
+  }
+
+  .code-input {
+    height: 48px;
+    font-size: var(--fs-xl);
+  }
+}
 .spin {
   animation: spin 0.9s linear infinite;
 }
