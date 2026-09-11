@@ -19,11 +19,11 @@ export function AuthLayout({ children }: { children: ReactNode }) {
       <aside className="auth-aside">
         <div className="auth-aside-brand">
           <div className="auth-logo" aria-hidden>
-            <Activity size={26} strokeWidth={2.25} />
+            <Activity size={52} strokeWidth={2} />
           </div>
           <p className="auth-eyebrow">{t.auth.protectedEnvironment}</p>
           <h1 className="auth-wordmark">{t.brand.name}</h1>
-          <p className="auth-aside-tagline">{t.brand.tagline}</p>
+          <p className="auth-aside-tagline">{t.brand.subtitle}</p>
         </div>
 
         <div className="auth-aside-foot">

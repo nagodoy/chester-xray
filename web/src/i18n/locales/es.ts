@@ -6,7 +6,12 @@ import type { Dictionary } from "./pt-BR";
  * language at runtime.
  */
 export const es: Dictionary = {
-  brand: { name: "Torax AI", tagline: "Radiografía torácica" },
+  brand: {
+    name: "Telemetry MR\u00a0MSK",
+    tagline: "RM musculoesquelética",
+    subtitle:
+      "Control de calidad automático por IA de estudios de resonancia magnética musculoesquelética.",
+  },
 
   common: {
     retry: "Reintentar",
@@ -103,7 +108,7 @@ export const es: Dictionary = {
 
   worklist: {
     eyebrow: "RX tórax / control de calidad",
-    title: "Worklist Torax AI",
+    title: "Worklist Telemetry MR MSK",
     subtitle: "Flujo de triaje y análisis para estudios torácicos anonimizados.",
     analyse: "Analizar estudio",
     closeUpload: "Cerrar envío",

@@ -12,7 +12,7 @@ from chester.config import settings
 
 logger = logging.getLogger(__name__)
 
-SUBJECT = "Código de acesso — Torax AI"
+SUBJECT = "Código de acesso — Telemetry MR MSK"
 
 # The card sits on the same three-step stack as the sign-in screen it hands the
 # reader off to: #020617 ground, #0f172a card, #1e293b for the code itself, with
@@ -38,8 +38,8 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
     <table role="presentation" width="480" cellpadding="0" cellspacing="0"
            style="background:#0f172a;border-radius:16px;overflow:hidden;">
       <tr><td style="padding:32px 40px 20px;border-bottom:1px solid #1e293b;text-align:center;">
-        <h1 style="margin:0;color:#34d399;font-size:22px;font-weight:700;">Torax AI</h1>
-        <p style="margin:8px 0 0;color:#94a3b8;font-size:13px;">Radiografia torácica</p>
+        <h1 style="margin:0;color:#34d399;font-size:22px;font-weight:700;">Telemetry MR MSK</h1>
+        <p style="margin:8px 0 0;color:#94a3b8;font-size:13px;">RM musculoesquelética</p>
       </td></tr>
       <tr><td style="padding:36px 40px;text-align:center;">
         <p style="margin:0 0 8px;color:#94a3b8;font-size:14px;">Seu código de acesso é:</p>
@@ -62,7 +62,7 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
       </td></tr>
       <tr><td style="padding:16px 40px 28px;border-top:1px solid #1e293b;text-align:center;">
         <p style="margin:0;color:#475569;font-size:11px;">
-          Torax AI — pesquisa somente, dados de teste ou desidentificados.<br>
+          Telemetry MR MSK — pesquisa somente, dados de teste ou desidentificados.<br>
           Não é um dispositivo médico e não serve para diagnóstico.
         </p>
       </td></tr>
@@ -90,7 +90,7 @@ def _validity() -> str:
 def render_otp_text(code: str) -> str:
     """The plain-text part, and the whole message for text-only clients."""
     return (
-        "Seu código de acesso ao Torax AI é:\n\n"
+        "Seu código de acesso ao Telemetry MR MSK é:\n\n"
         f"{code}\n\n"
         f"O código vale por {_validity()} e só pode ser usado uma vez. "
         "Se você não solicitou este acesso, ignore esta mensagem."

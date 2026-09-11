@@ -76,7 +76,7 @@ def test_the_message_survives_a_round_trip_through_the_wire_format(monkeypatch):
 
     assert parsed["Subject"] == emailer.SUBJECT
     assert "código" in parsed.get_body(preferencelist=("plain",)).get_content()
-    assert "Torax AI" in parsed.get_body(preferencelist=("html",)).get_content()
+    assert "Telemetry MR MSK" in parsed.get_body(preferencelist=("html",)).get_content()
 
 
 def test_the_stated_validity_follows_the_configured_lifetime(monkeypatch):

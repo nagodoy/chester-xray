@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     application = FastAPI(
-        title="Torax AI",
+        title="Telemetry MR MSK",
         description="De-identified chest radiograph ingestion and analysis.",
         version="2.0.0",
         lifespan=lifespan,
