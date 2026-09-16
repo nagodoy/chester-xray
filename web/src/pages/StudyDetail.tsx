@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Send, X } from "lucide-react";
+import { ArrowLeft, Check, Eye, Send, X } from "lucide-react";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "wouter";
 
@@ -57,6 +57,10 @@ export function StudyDetail() {
   // A delivery outcome is reported beside the study, not by replacing it: the
   // study loaded fine, and a destination that refused is ordinary news.
   const [delivery, setDelivery] = useState<{ ok: boolean; detail: string } | null>(null);
+  // Which finding's evidence is on screen, if any. One at a time: two maps side by
+  // side invite comparing their brightness, and they are each normalized to their
+  // own peak, so that comparison would mean nothing.
+  const [explaining, setExplaining] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -201,10 +205,32 @@ export function StudyDetail() {
 
       <div className="detail-grid">
         <div className="detail-media">
-          <Panel title={t.detail.image} aside={<span>{study.modality ?? "XR"}</span>}>
+          <Panel
+            title={t.detail.image}
+            aside={<span>{study.modality ?? "XR"}</span>}
+          >
             <div className="detail-image">
-              <Thumbnail url={study.thumbnail_url} alt={t.detail.image} />
+              <Thumbnail
+                url={explaining ? api.explainUrl(study.id, explaining) : study.thumbnail_url}
+                alt={
+                  explaining
+                    ? format(t.explain.caption, { pathology: explaining })
+                    : t.detail.image
+                }
+              />
             </div>
+            {explaining && (
+              <div className="explain-caption">
+                <div className="explain-caption-head">
+                  <b>{format(t.explain.caption, { pathology: explaining })}</b>
+                  <button type="button" className="btn btn-subtle" onClick={() => setExplaining(null)}>
+                    <X size={14} aria-hidden />
+                    {t.explain.hide}
+                  </button>
+                </div>
+                <p>{t.explain.note}</p>
+              </div>
+            )}
           </Panel>
 
           <Panel title={t.detail.metadata} aside={<span>{t.detail.sourceRecord}</span>}>
@@ -253,9 +279,27 @@ export function StudyDetail() {
                 </thead>
                 <tbody>
                   {rows.map((row) => (
-                    <tr key={row.pathology}>
+                    <tr key={row.pathology} className={explaining === row.pathology ? "is-explained" : undefined}>
                       <td>
-                        <b>{row.pathology}</b>
+                        <button
+                          type="button"
+                          className="explain-link"
+                          aria-pressed={explaining === row.pathology}
+                          // Labelled rather than named by its contents: the visible
+                          // text is the pathology, and a screen reader announcing
+                          // "Mass Explain Mass" is what naming it twice sounds like.
+                          // The visible text is inside the label, as it must be.
+                          aria-label={format(t.explain.actionFor, { pathology: row.pathology })}
+                          title={format(t.explain.actionFor, { pathology: row.pathology })}
+                          onClick={() =>
+                            setExplaining((current) =>
+                              current === row.pathology ? null : row.pathology,
+                            )
+                          }
+                        >
+                          <Eye size={12} aria-hidden />
+                          <b>{row.pathology}</b>
+                        </button>
                       </td>
                       <td className="mono">{row.raw.toFixed(4)}</td>
                       <td>

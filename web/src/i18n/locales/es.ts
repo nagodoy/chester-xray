@@ -357,6 +357,16 @@ export const es: Dictionary = {
     updatedBy: "Definido por {who}",
   },
 
+  /** Mapas de evidencia. La advertencia importa tanto como la imagen; ver chester/saliency.py. */
+  explain: {
+    action: "Explicar",
+    actionFor: "Explicar {pathology}",
+    hide: "Volver a la imagen",
+    caption: "Regiones predictivas para {pathology}",
+    note: "Muestra las posiciones que más elevaron la puntuación de este modelo, sobre el recorte cuadrado que analizó. No es la ubicación de un hallazgo.",
+    unavailable: "Explicación no disponible para este estudio.",
+  },
+
   retention: {
     title: "Retención de datos",
     subtitle:

@@ -46,7 +46,7 @@ export function ErrorBox({
 }
 
 /**
- * Thumbnails need the session header, so they cannot be a plain <img src>. The
+ * Study images need the session header, so they cannot be a plain <img src>. The
  * blob URL is revoked when the component unmounts or the study changes.
  */
 export function Thumbnail({ url, alt }: { url: string | null; alt: string }) {
@@ -61,7 +61,7 @@ export function Thumbnail({ url, alt }: { url: string | null; alt: string }) {
     let cancelled = false;
 
     api
-      .fetchThumbnail(url)
+      .fetchImage(url)
       .then((blob) => {
         if (cancelled) return;
         created = URL.createObjectURL(blob);

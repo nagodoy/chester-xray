@@ -200,8 +200,21 @@ OPERATING_POINTS: tuple[float, ...] = (
 # Presentation-only boost applied above the midpoint, carried over from CHESTER.
 SCALE_UPPER = 1.3
 
+# The pre-pool activation, and the classifier matrix that reads it.
+#
+# The graph ends `... -> Relu -> GlobalAveragePool -> Gemm -> Sigmoid`, which is
+# what makes chester.saliency exact rather than an approximation: the pooled
+# vector the classifier sees is the spatial mean of this tensor, so the logit is
+# the spatial mean of the weighted activation. Both names come from the export in
+# tools/export_onnx.py; a model artifact that does not carry them still scores,
+# and only the explanation is unavailable.
+ACTIVATION_OUTPUT = "/Relu_output_0"
+CLASSIFIER_WEIGHT = "inner.classifier.weight"
+
 _session = None
 _session_lock = threading.Lock()
+_activation_available = False
+_classifier_weights = None
 
 
 def model_version() -> str:
@@ -215,9 +228,34 @@ def _model_path() -> Path:
     return path
 
 
+def _with_activation_output(path: Path) -> bytes | None:
+    """The model with its pre-pool activation added as a second graph output.
+
+    Returns None when the tensor is not in the graph, which is the one case where
+    scoring must carry on without an explanation rather than fail.
+
+    Adding the output changes nothing the classifier does: the tensor is already
+    computed to be pooled, so it costs no extra work, and the scores come back
+    bit-identical to the unmodified graph. tests/test_saliency.py holds both
+    claims to that standard rather than to float32 tolerance.
+    """
+    import onnx
+
+    model = onnx.load(str(path))
+    produced = {name for node in model.graph.node for name in node.output}
+    if ACTIVATION_OUTPUT not in produced:
+        return None
+    if any(out.name == ACTIVATION_OUTPUT for out in model.graph.output):
+        return model.SerializeToString()
+    model.graph.output.extend(
+        [onnx.helper.make_tensor_value_info(ACTIVATION_OUTPUT, onnx.TensorProto.FLOAT, None)]
+    )
+    return model.SerializeToString()
+
+
 def get_session():
     """Load the ONNX session once per process."""
-    global _session
+    global _session, _activation_available
     if _session is not None:
         return _session
     with _session_lock:
@@ -228,15 +266,71 @@ def get_session():
             if not path.is_file():
                 raise RuntimeError(f"Model artifact is missing: {path}")
             logger.info("Loading model from %s", path)
-            _session = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
+
+            serialized = None
+            try:
+                serialized = _with_activation_output(path)
+            except Exception:
+                # An explanation is worth nothing if it costs the diagnosis. Any
+                # failure reading or rewriting the graph falls back to the plain
+                # artifact, and only chester.saliency notices.
+                logger.exception("Could not expose %s; explanations disabled", ACTIVATION_OUTPUT)
+
+            if serialized is None:
+                logger.warning("Model has no %s output; explanations disabled", ACTIVATION_OUTPUT)
+                _session = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
+                _activation_available = False
+            else:
+                _session = ort.InferenceSession(serialized, providers=["CPUExecutionProvider"])
+                _activation_available = True
     return _session
+
+
+def activation_available() -> bool:
+    """Whether this artifact can be explained. Loads the session to find out."""
+    get_session()
+    return _activation_available
+
+
+def classifier_weights() -> np.ndarray:
+    """The classifier matrix, shaped (OUTPUT_COUNT, channels).
+
+    Read from the artifact's own initializers rather than kept as a copy here, so
+    it cannot drift from the weights the session is scoring with.
+    """
+    global _classifier_weights
+    if _classifier_weights is not None:
+        return _classifier_weights
+    with _session_lock:
+        if _classifier_weights is None:
+            import onnx
+            from onnx import numpy_helper
+
+            model = onnx.load(str(_model_path()))
+            for initializer in model.graph.initializer:
+                if initializer.name == CLASSIFIER_WEIGHT:
+                    _classifier_weights = numpy_helper.to_array(initializer)
+                    break
+            else:
+                raise RuntimeError(f"Model artifact has no {CLASSIFIER_WEIGHT} initializer")
+    return _classifier_weights
+
+
+def activation(prepared: np.ndarray) -> np.ndarray:
+    """The pre-pool activation for one prepared image, shaped (channels, h, w)."""
+    if not activation_available():
+        raise RuntimeError("This model artifact does not expose an activation to explain.")
+    maps = get_session().run([ACTIVATION_OUTPUT], {"image": prepared})[0]
+    return np.asarray(maps[0], dtype=np.float32)
 
 
 def reset_session() -> None:
     """Drop the loaded session. For tests and for reloading after a config change."""
-    global _session
+    global _session, _activation_available, _classifier_weights
     with _session_lock:
         _session = None
+        _activation_available = False
+        _classifier_weights = None
 
 
 def preprocess(pixels: np.ndarray) -> np.ndarray:

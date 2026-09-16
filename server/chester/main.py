@@ -14,6 +14,7 @@ from chester.api import (
     access_control,
     auth,
     dicomweb,
+    explanations,
     health,
     network_logs,
     settings_routes,
@@ -68,6 +69,7 @@ def create_app() -> FastAPI:
     application.include_router(auth.router)
     application.include_router(studies.router)
     application.include_router(thumbnails.router)
+    application.include_router(explanations.router)
     application.include_router(uploads.router)
     application.include_router(settings_routes.router)
     application.include_router(access_control.router)

@@ -7,6 +7,10 @@ dependencies = [
     "boto3>=1.35",
     "fastapi>=0.115",
     "numpy>=1.26",
+    # onnx, not only onnxruntime: chester.inference adds the pre-pool activation
+    # to the graph at load so chester.saliency can explain a score. Reading and
+    # rewriting the artifact needs the protobuf definitions, at runtime.
+    "onnx>=1.17",
     "onnxruntime>=1.20",
     "pillow>=10.4",
     "psycopg[binary]>=3.2",
