@@ -157,7 +157,7 @@ class TestPostgresDriftDetection:
             (
                 "ALTER TABLE studies ADD CONSTRAINT ck_studies_test_source "
                 "CHECK (source <> 'test-invalid')",
-                "studies: extra check constraint",
+                "studies: check constraints are",
             ),
             (
                 "DROP INDEX ix_studies_body_part",
@@ -200,6 +200,55 @@ class TestPostgresDriftDetection:
             connection.execute(text(mutation))
 
         assert any(expected_problem in problem for problem in drift())
+
+    def test_type_drift_reports_original_model_and_reflected_spellings(
+        self, postgres_schema_engine
+    ):
+        from chester.schema import drift
+
+        with postgres_schema_engine.begin() as connection:
+            connection.execute(text("ALTER TABLE studies DROP COLUMN body_part"))
+            connection.execute(text("ALTER TABLE studies ADD COLUMN body_part INTEGER"))
+
+        problem = next(problem for problem in drift() if "studies.body_part: type" in problem)
+        assert "type is 'INTEGER'" in problem
+        assert "expected 'VARCHAR(64)'" in problem
+
+    def test_default_drift_reports_original_model_and_reflected_expressions(
+        self, postgres_schema_engine
+    ):
+        from chester.schema import drift
+
+        with postgres_schema_engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE studies ALTER COLUMN source SET DEFAULT 'upload'")
+            )
+
+        problem = next(
+            problem for problem in drift() if "studies.source: server default" in problem
+        )
+        assert "'upload'::character varying" in problem
+        assert "expected None" in problem
+
+    def test_check_drift_reports_original_model_and_reflected_expressions(
+        self, postgres_schema_engine
+    ):
+        from chester.schema import drift
+
+        reflected = "source <> 'test-invalid'::character varying"
+        with postgres_schema_engine.begin() as connection:
+            connection.execute(
+                text(
+                    "ALTER TABLE studies ADD CONSTRAINT ck_studies_test_source "
+                    f"CHECK ({reflected})"
+                )
+            )
+
+        problem = next(
+            problem for problem in drift() if "studies: check constraints are" in problem
+        )
+        assert reflected in problem
+        assert "expected" in problem
 
 
 class TestDriftDetection:

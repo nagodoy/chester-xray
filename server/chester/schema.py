@@ -78,7 +78,7 @@ def add_missing_columns() -> list[str]:
 
 def _type_sql(column_type) -> str:
     """Return a canonical PostgreSQL spelling while retaining type parameters."""
-    sql = " ".join(str(column_type.compile(dialect=engine.dialect)).upper().split())
+    sql = " ".join(_type_sql_original(column_type).upper().split())
     aliases = (
         (r"\bCHARACTER VARYING\b", "VARCHAR"),
         (r"\bTIMESTAMP(\(\d+\))? WITHOUT TIME ZONE\b", r"TIMESTAMP\1"),
@@ -101,6 +101,11 @@ def _type_sql(column_type) -> str:
         sql = re.sub(r"^TIMESTAMP(?=\(|$)", "TIMESTAMPTZ", sql)
         sql = re.sub(r"^TIME(?=\(|$)", "TIMETZ", sql)
     return re.sub(r"\s*([(),])\s*", r"\1", sql)
+
+
+def _type_sql_original(column_type) -> str:
+    """Return the PostgreSQL spelling produced by the model or reflection."""
+    return str(column_type.compile(dialect=engine.dialect))
 
 
 def _strip_outer_parentheses(sql: str) -> str:
@@ -211,6 +216,13 @@ def _default_sql(value) -> str | None:
     return _expression_sql(value)
 
 
+def _expression_sql_original(value) -> str | None:
+    """Return an expression as supplied by the model or PostgreSQL reflection."""
+    if value is None:
+        return None
+    return str(getattr(value, "arg", value))
+
+
 def _column_tuple(columns) -> tuple[str, ...]:
     return tuple(column.name if hasattr(column, "name") else column for column in columns)
 
@@ -245,23 +257,37 @@ def _constraint_sets(table, inspector, name: str) -> dict[str, set[tuple]]:
         for constraint in inspector.get_foreign_keys(name)
     }
 
-    expected_checks = {
-        _expression_sql(constraint.sqltext)
-        for constraint in table.constraints
-        if isinstance(constraint, CheckConstraint)
-    }
-    actual_checks = {
-        _expression_sql(constraint["sqltext"])
-        for constraint in inspector.get_check_constraints(name)
-    }
     return {
         "unique constraint": expected_unique,
         "actual unique constraint": actual_unique,
         "foreign key": expected_foreign,
         "actual foreign key": actual_foreign,
-        "check constraint": expected_checks,
-        "actual check constraint": actual_checks,
     }
+
+
+def _check_expressions(
+    table, inspector, name: str
+) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
+    """Group original check expressions by the canonical form used for comparison."""
+
+    def grouped(values) -> dict[str, set[str]]:
+        result: dict[str, set[str]] = {}
+        for value in values:
+            canonical = _expression_sql(value)
+            original = _expression_sql_original(value)
+            if canonical is not None and original is not None:
+                result.setdefault(canonical, set()).add(original)
+        return result
+
+    expected = grouped(
+        constraint.sqltext
+        for constraint in table.constraints
+        if isinstance(constraint, CheckConstraint)
+    )
+    actual = grouped(
+        constraint["sqltext"] for constraint in inspector.get_check_constraints(name)
+    )
+    return expected, actual
 
 
 def _index_sets(table, inspector, name: str) -> tuple[set[tuple], set[tuple]]:
@@ -307,8 +333,11 @@ def drift() -> list[str]:
             expected_type = _type_sql(model_column.type)
             actual_type = _type_sql(actual_column["type"])
             if expected_type != actual_type:
+                expected_type_original = _type_sql_original(model_column.type)
+                actual_type_original = _type_sql_original(actual_column["type"])
                 problems.append(
-                    f"{name}.{column_name}: type is {actual_type}, expected {expected_type}"
+                    f"{name}.{column_name}: type is {actual_type_original!r}, "
+                    f"expected {expected_type_original!r}"
                 )
             if bool(model_column.nullable) != bool(actual_column["nullable"]):
                 problems.append(
@@ -318,9 +347,15 @@ def drift() -> list[str]:
             expected_default = _default_sql(model_column.server_default)
             actual_default = _default_sql(actual_column.get("default"))
             if expected_default != actual_default:
+                expected_default_original = _expression_sql_original(
+                    model_column.server_default
+                )
+                actual_default_original = _expression_sql_original(
+                    actual_column.get("default")
+                )
                 problems.append(
-                    f"{name}.{column_name}: server default is {actual_default!r}, "
-                    f"expected {expected_default!r}"
+                    f"{name}.{column_name}: server default is {actual_default_original!r}, "
+                    f"expected {expected_default_original!r}"
                 )
 
         expected_pk = _column_tuple(table.primary_key.columns)
@@ -329,13 +364,30 @@ def drift() -> list[str]:
             problems.append(f"{name}: primary key is {actual_pk}, expected {expected_pk}")
 
         constraints = _constraint_sets(table, inspector, name)
-        for label in ("unique constraint", "foreign key", "check constraint"):
+        for label in ("unique constraint", "foreign key"):
             wanted = constraints[label]
             found = constraints[f"actual {label}"]
             if wanted - found:
                 problems.append(f"{name}: missing {label}(s) {_describe(wanted - found)}")
             if found - wanted:
                 problems.append(f"{name}: extra {label}(s) {_describe(found - wanted)}")
+
+        expected_checks, actual_checks = _check_expressions(table, inspector, name)
+        if set(expected_checks) != set(actual_checks):
+            expected_originals = {
+                original
+                for canonical in expected_checks
+                for original in expected_checks[canonical]
+            }
+            actual_originals = {
+                original
+                for canonical in actual_checks
+                for original in actual_checks[canonical]
+            }
+            problems.append(
+                f"{name}: check constraints are {_describe(actual_originals)}, "
+                f"expected {_describe(expected_originals)}"
+            )
 
         expected_indexes, actual_indexes = _index_sets(table, inspector, name)
         if expected_indexes - actual_indexes:
