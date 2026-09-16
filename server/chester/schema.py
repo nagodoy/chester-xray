@@ -29,6 +29,7 @@ apply a reviewed migration or drop the affected tables and recreate them.
 from __future__ import annotations
 
 import logging
+import re
 import sys
 
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, inspect
@@ -76,19 +77,138 @@ def add_missing_columns() -> list[str]:
 
 
 def _type_sql(column_type) -> str:
-    """Return the backend-specific SQL spelling used for a column type."""
-    return " ".join(str(column_type.compile(dialect=engine.dialect)).upper().split())
+    """Return a canonical PostgreSQL spelling while retaining type parameters."""
+    sql = " ".join(str(column_type.compile(dialect=engine.dialect)).upper().split())
+    aliases = (
+        (r"\bCHARACTER VARYING\b", "VARCHAR"),
+        (r"\bTIMESTAMP(\(\d+\))? WITHOUT TIME ZONE\b", r"TIMESTAMP\1"),
+        (r"\bTIMESTAMP(\(\d+\))? WITH TIME ZONE\b", r"TIMESTAMPTZ\1"),
+        (r"\bTIME(\(\d+\))? WITHOUT TIME ZONE\b", r"TIME\1"),
+        (r"\bTIME(\(\d+\))? WITH TIME ZONE\b", r"TIMETZ\1"),
+        (r"\bDOUBLE PRECISION\b", "FLOAT(53)"),
+        (r"\bDECIMAL\b", "NUMERIC"),
+        (r"\bINT4\b", "INTEGER"),
+        (r"\bINT8\b", "BIGINT"),
+        (r"\bINT2\b", "SMALLINT"),
+        (r"\bBOOL\b", "BOOLEAN"),
+    )
+    for pattern, replacement in aliases:
+        sql = re.sub(pattern, replacement, sql)
+
+    # Some dialect compilers omit timezone even though reflected SQLAlchemy types
+    # retain it as metadata. Keep that semantic distinction in the comparison.
+    if getattr(column_type, "timezone", None) is True:
+        sql = re.sub(r"^TIMESTAMP(?=\(|$)", "TIMESTAMPTZ", sql)
+        sql = re.sub(r"^TIME(?=\(|$)", "TIMETZ", sql)
+    return re.sub(r"\s*([(),])\s*", r"\1", sql)
 
 
-def _default_sql(value) -> str | None:
-    """Normalize reflected/default SQL without trying to prove expressions equivalent."""
+def _strip_outer_parentheses(sql: str) -> str:
+    """Remove only parentheses that enclose the complete expression."""
+    while sql.startswith("(") and sql.endswith(")"):
+        depth = 0
+        encloses_all = True
+        for index, character in enumerate(sql):
+            if character == "(":
+                depth += 1
+            elif character == ")":
+                depth -= 1
+                if depth == 0 and index != len(sql) - 1:
+                    encloses_all = False
+                    break
+        if not encloses_all or depth != 0:
+            break
+        sql = sql[1:-1].strip()
+    return sql
+
+
+def _protect_sql_tokens(sql: str) -> tuple[str, list[str]]:
+    """Replace quoted PostgreSQL tokens with inert placeholders."""
+    tokens: list[str] = []
+    protected: list[str] = []
+    index = 0
+    while index < len(sql):
+        start = index
+        delimiter = None
+        character = sql[index]
+        if character in {"'", '"'}:
+            delimiter = character
+            index += 1
+            while index < len(sql):
+                if sql[index] == "\\" and delimiter == "'" and index + 1 < len(sql):
+                    index += 2
+                    continue
+                if sql[index] == delimiter:
+                    if index + 1 < len(sql) and sql[index + 1] == delimiter:
+                        index += 2
+                        continue
+                    index += 1
+                    break
+                index += 1
+        elif character == "$":
+            match = re.match(r"\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$", sql[index:])
+            if match:
+                delimiter = match.group(0)
+                index += len(delimiter)
+                closing = sql.find(delimiter, index)
+                index = len(sql) if closing < 0 else closing + len(delimiter)
+
+        if delimiter is None:
+            protected.append(character)
+            index += 1
+            continue
+
+        token = sql[start:index]
+        token_index = len(tokens)
+        tokens.append(token)
+        token_kind = "q" if delimiter == '"' else "s"
+        protected.append(f"\x00{token_kind}{token_index}\x00")
+    return "".join(protected), tokens
+
+
+def _restore_sql_tokens(sql: str, tokens: list[str]) -> str:
+    for index, token in enumerate(tokens):
+        sql = sql.replace(f"\x00s{index}\x00", token)
+        sql = sql.replace(f"\x00q{index}\x00", token)
+    return sql
+
+
+def _expression_sql(value) -> str | None:
+    """Canonicalize PostgreSQL expression syntax without evaluating the SQL."""
     if value is None:
         return None
     argument = getattr(value, "arg", value)
-    text = " ".join(str(argument).strip().split())
-    while len(text) > 1 and text.startswith("(") and text.endswith(")"):
-        text = text[1:-1].strip()
-    return text.replace("::character varying", "").replace("::text", "")
+    sql, tokens = _protect_sql_tokens(str(argument).strip())
+    sql = _strip_outer_parentheses(" ".join(sql.split()))
+
+    # PostgreSQL commonly adds these no-op coercions to reflected string literals.
+    # Casts on identifiers or other expressions remain significant because their
+    # equivalence cannot be established without evaluating the expression's type.
+    sql = re.sub(
+        r"(\x00s\d+\x00)\s*::\s*(?:character varying|varchar|text)\b",
+        r"\1",
+        sql,
+        flags=re.I,
+    )
+
+    # Quoted tokens are placeholders here, so only keywords and unquoted
+    # identifiers are case-folded and only structural whitespace is changed.
+    sql = sql.lower()
+    sql = re.sub(r"\s*([(),=<>+\-*/])\s*", r"\1", sql)
+    sql = re.sub(r"\s+", " ", sql).strip()
+
+    # Reflection often wraps a column or literal independently.
+    previous = None
+    while sql != previous:
+        previous = sql
+        sql = re.sub(r"(?<![\w.])\(([\w.\x00]+)\)", r"\1", sql)
+        sql = _strip_outer_parentheses(sql)
+    return _restore_sql_tokens(sql, tokens)
+
+
+def _default_sql(value) -> str | None:
+    """Return the canonical PostgreSQL expression used for a server default."""
+    return _expression_sql(value)
 
 
 def _column_tuple(columns) -> tuple[str, ...]:
@@ -126,12 +246,12 @@ def _constraint_sets(table, inspector, name: str) -> dict[str, set[tuple]]:
     }
 
     expected_checks = {
-        " ".join(str(constraint.sqltext).split())
+        _expression_sql(constraint.sqltext)
         for constraint in table.constraints
         if isinstance(constraint, CheckConstraint)
     }
     actual_checks = {
-        " ".join(str(constraint["sqltext"]).split())
+        _expression_sql(constraint["sqltext"])
         for constraint in inspector.get_check_constraints(name)
     }
     return {

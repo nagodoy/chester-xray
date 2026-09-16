@@ -6,6 +6,7 @@ import asyncio
 
 import pytest
 from sqlalchemy import DefaultClause, inspect, text
+from sqlalchemy.dialects import postgresql
 
 EXPECTED_TABLES = {
     "access_control_audit_log",
@@ -21,6 +22,68 @@ EXPECTED_TABLES = {
     "studies",
     "users",
 }
+
+
+class SpelledType:
+    """Minimal reflected-type stand-in for PostgreSQL spelling variants."""
+
+    def __init__(self, sql):
+        self.sql = sql
+
+    def compile(self, dialect):
+        return self.sql
+
+
+@pytest.mark.parametrize(
+    ("left", "right"),
+    [
+        (postgresql.VARCHAR(64), SpelledType("CHARACTER VARYING (64)")),
+        (postgresql.TIMESTAMP(), SpelledType("TIMESTAMP WITHOUT TIME ZONE")),
+        (postgresql.DOUBLE_PRECISION(), SpelledType("FLOAT(53)")),
+        (postgresql.NUMERIC(10, 2), SpelledType("DECIMAL(10, 2)")),
+    ],
+)
+def test_equivalent_postgresql_type_spellings_match(left, right):
+    from chester.schema import _type_sql
+
+    assert _type_sql(left) == _type_sql(right)
+
+
+def test_type_parameters_remain_significant():
+    from chester.schema import _type_sql
+
+    assert _type_sql(postgresql.VARCHAR(64)) != _type_sql(postgresql.VARCHAR(128))
+    assert _type_sql(postgresql.NUMERIC(10, 2)) != _type_sql(postgresql.NUMERIC(12, 2))
+    assert _type_sql(postgresql.TIMESTAMP()) != _type_sql(postgresql.TIMESTAMP(timezone=True))
+
+
+@pytest.mark.parametrize(
+    ("left", "right"),
+    [
+        ("(('upload'::character varying))", "'upload'"),
+        ("source = 'upload'::text", "source='upload'"),
+        ("CHAR_LENGTH(source) > 0", "char_length(source)>0"),
+    ],
+)
+def test_equivalent_postgresql_expressions_match(left, right):
+    from chester.schema import _expression_sql
+
+    assert _expression_sql(left) == _expression_sql(right)
+
+
+def test_incompatible_postgresql_expressions_remain_distinct():
+    from chester.schema import _expression_sql
+
+    assert _expression_sql("status = 'ready'") != _expression_sql("status = 'failed'")
+    assert _expression_sql("amount::integer > 0") != _expression_sql("amount::bigint > 0")
+    assert _expression_sql("'a + b'") != _expression_sql("'a+b'")
+    assert _expression_sql("'a  b'") != _expression_sql("'a b'")
+    assert _expression_sql("'foo::text'") != _expression_sql("'foo'")
+    assert _expression_sql('"Status" = 1') != _expression_sql('"status" = 1')
+    assert _expression_sql("$$a + b$$") != _expression_sql("$$a+b$$")
+    assert _expression_sql("lower(status)") != _expression_sql("lowerstatus")
+    assert _expression_sql("amount::text") != _expression_sql("amount")
+    assert _expression_sql("(amount)::varchar") != _expression_sql("amount")
 
 
 def test_every_table_is_created(schema_engine):
