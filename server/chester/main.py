@@ -47,12 +47,13 @@ async def lifespan(app: FastAPI):
     settings.require_production_secrets()
     problems = schema_drift()
     if problems:
-        logger.error(
+        message = (
             "The database does not match the models. Run `python -m chester.schema`; "
             "if it still reports this, the affected tables must be dropped and "
-            "recreated. Found: %s",
-            "; ".join(problems),
+            f"recreated. Found: {'; '.join(problems)}"
         )
+        logger.error(message)
+        raise RuntimeError(message)
     with session_scope() as session:
         bootstrap_env_admins(session)
     yield

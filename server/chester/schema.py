@@ -9,19 +9,21 @@ table that already exists. So a model change made against a live database applie
 to new tables and silently not at all to existing ones, and the mismatch surfaces
 much later as a confusing query error.
 
-`drift()` looks for exactly that, and `main()` refuses to finish while any is
-present. Run it once before starting the application -- not from inside the API or
-the worker, which start in parallel and would race each other issuing DDL.
+`drift()` compares tables, columns, types, nullability, server defaults, primary
+keys, foreign keys, unique/check constraints, and indexes. `main()` refuses to
+finish while any difference is present. Run it once before starting the
+application -- not from inside the API or the worker, which start in parallel and
+would race each other issuing DDL.
 
     python -m chester.schema
 
 One shape of change it can fix in place: a *nullable* column added to a table
 that already exists. `add_missing_columns()` issues the `ALTER TABLE ... ADD
-COLUMN` for those, which is the one DDL that cannot lose a row or rewrite a
-value -- every existing row reads the new column as NULL, which is what a
-nullable column means. Anything else -- a dropped column, a changed type, a new
-NOT NULL column, a renamed table -- is still reported by `drift()` and still has
-no in-place upgrade path: drop the affected tables and let this recreate them.
+COLUMN` for those, which is the one DDL that cannot invent or rewrite a value --
+every existing row reads the new column as NULL. Anything else -- a dropped
+column, a changed type, a new NOT NULL column (even with a default), a renamed
+table -- is still reported by `drift()` and still has no in-place upgrade path:
+apply a reviewed migration or drop the affected tables and recreate them.
 """
 
 from __future__ import annotations
@@ -29,7 +31,7 @@ from __future__ import annotations
 import logging
 import sys
 
-from sqlalchemy import inspect
+from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint, inspect
 
 import chester.models  # noqa: F401  -- registers every mapping on Base.metadata
 from chester.db import Base, engine
@@ -46,9 +48,8 @@ def add_missing_columns() -> list[str]:
     """Add nullable columns the models declare and the database lacks.
 
     Returns what it added, as "table.column", so the caller can log it. Deliberately
-    narrow: a column that is NOT NULL without a server default cannot be added to a
-    table with rows in it, and a column whose type changed is not something DDL can
-    settle without knowing what the values mean. Both stay drift.
+    narrow: a NOT NULL column would assign or require a value for existing rows,
+    and a changed type requires knowing what the values mean. Both stay drift.
     """
     from sqlalchemy import text
     from sqlalchemy.schema import CreateColumn
@@ -65,7 +66,7 @@ def add_missing_columns() -> list[str]:
             for column in table.columns:
                 if column.name in actual:
                     continue
-                if not column.nullable and column.server_default is None:
+                if not column.nullable or column.server_default is not None:
                     continue
                 clause = CreateColumn(column).compile(bind=connection.engine)
                 connection.execute(text(f"ALTER TABLE {name} ADD COLUMN {clause}"))
@@ -74,12 +75,94 @@ def add_missing_columns() -> list[str]:
     return added
 
 
+def _type_sql(column_type) -> str:
+    """Return the backend-specific SQL spelling used for a column type."""
+    return " ".join(str(column_type.compile(dialect=engine.dialect)).upper().split())
+
+
+def _default_sql(value) -> str | None:
+    """Normalize reflected/default SQL without trying to prove expressions equivalent."""
+    if value is None:
+        return None
+    argument = getattr(value, "arg", value)
+    text = " ".join(str(argument).strip().split())
+    while len(text) > 1 and text.startswith("(") and text.endswith(")"):
+        text = text[1:-1].strip()
+    return text.replace("::character varying", "").replace("::text", "")
+
+
+def _column_tuple(columns) -> tuple[str, ...]:
+    return tuple(column.name if hasattr(column, "name") else column for column in columns)
+
+
+def _constraint_sets(table, inspector, name: str) -> dict[str, set[tuple]]:
+    expected_unique = {
+        _column_tuple(constraint.columns)
+        for constraint in table.constraints
+        if isinstance(constraint, UniqueConstraint)
+    }
+    actual_unique = {
+        tuple(constraint["column_names"]) for constraint in inspector.get_unique_constraints(name)
+    }
+
+    expected_foreign = {
+        (
+            _column_tuple(constraint.columns),
+            constraint.referred_table.name,
+            _column_tuple(constraint.elements[i].column for i in range(len(constraint.elements))),
+            (constraint.ondelete or "").upper(),
+        )
+        for constraint in table.constraints
+        if isinstance(constraint, ForeignKeyConstraint)
+    }
+    actual_foreign = {
+        (
+            tuple(constraint["constrained_columns"]),
+            constraint["referred_table"],
+            tuple(constraint["referred_columns"]),
+            (constraint.get("options", {}).get("ondelete") or "").upper(),
+        )
+        for constraint in inspector.get_foreign_keys(name)
+    }
+
+    expected_checks = {
+        " ".join(str(constraint.sqltext).split())
+        for constraint in table.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+    actual_checks = {
+        " ".join(str(constraint["sqltext"]).split())
+        for constraint in inspector.get_check_constraints(name)
+    }
+    return {
+        "unique constraint": expected_unique,
+        "actual unique constraint": actual_unique,
+        "foreign key": expected_foreign,
+        "actual foreign key": actual_foreign,
+        "check constraint": expected_checks,
+        "actual check constraint": actual_checks,
+    }
+
+
+def _index_sets(table, inspector, name: str) -> tuple[set[tuple], set[tuple]]:
+    expected = {(_column_tuple(index.columns), bool(index.unique)) for index in table.indexes}
+    actual = {
+        (tuple(index["column_names"]), bool(index.get("unique")))
+        for index in inspector.get_indexes(name)
+        if not index.get("duplicates_constraint")
+    }
+    return expected, actual
+
+
+def _describe(values: set[tuple] | set[str]) -> str:
+    return ", ".join(sorted(map(str, values)))
+
+
 def drift() -> list[str]:
     """Return the differences between the ORM and the live database.
 
-    Read-only, so it is safe to call from a running process. Reports tables the
-    database is missing entirely and columns missing from tables it does have --
-    the two shapes `create_all` leaves behind.
+    Read-only, so it is safe to call from a running process. The comparison is
+    intentionally strict: unexplained extra database objects are drift too.
     """
     inspector = inspect(engine)
     present = set(inspector.get_table_names())
@@ -89,10 +172,60 @@ def drift() -> list[str]:
         if name not in present:
             problems.append(f"{name}: table missing")
             continue
-        actual = {column["name"] for column in inspector.get_columns(name)}
-        missing = {column.name for column in table.columns} - actual
+        reflected = {column["name"]: column for column in inspector.get_columns(name)}
+        expected = {column.name: column for column in table.columns}
+        missing = set(expected) - set(reflected)
         if missing:
             problems.append(f"{name}: missing column(s) {', '.join(sorted(missing))}")
+        extra = set(reflected) - set(expected)
+        if extra:
+            problems.append(f"{name}: extra column(s) {', '.join(sorted(extra))}")
+
+        for column_name in sorted(set(expected) & set(reflected)):
+            model_column = expected[column_name]
+            actual_column = reflected[column_name]
+            expected_type = _type_sql(model_column.type)
+            actual_type = _type_sql(actual_column["type"])
+            if expected_type != actual_type:
+                problems.append(
+                    f"{name}.{column_name}: type is {actual_type}, expected {expected_type}"
+                )
+            if bool(model_column.nullable) != bool(actual_column["nullable"]):
+                problems.append(
+                    f"{name}.{column_name}: nullable is {actual_column['nullable']}, "
+                    f"expected {model_column.nullable}"
+                )
+            expected_default = _default_sql(model_column.server_default)
+            actual_default = _default_sql(actual_column.get("default"))
+            if expected_default != actual_default:
+                problems.append(
+                    f"{name}.{column_name}: server default is {actual_default!r}, "
+                    f"expected {expected_default!r}"
+                )
+
+        expected_pk = _column_tuple(table.primary_key.columns)
+        actual_pk = tuple(inspector.get_pk_constraint(name).get("constrained_columns") or ())
+        if expected_pk != actual_pk:
+            problems.append(f"{name}: primary key is {actual_pk}, expected {expected_pk}")
+
+        constraints = _constraint_sets(table, inspector, name)
+        for label in ("unique constraint", "foreign key", "check constraint"):
+            wanted = constraints[label]
+            found = constraints[f"actual {label}"]
+            if wanted - found:
+                problems.append(f"{name}: missing {label}(s) {_describe(wanted - found)}")
+            if found - wanted:
+                problems.append(f"{name}: extra {label}(s) {_describe(found - wanted)}")
+
+        expected_indexes, actual_indexes = _index_sets(table, inspector, name)
+        if expected_indexes - actual_indexes:
+            problems.append(
+                f"{name}: missing index(es) {_describe(expected_indexes - actual_indexes)}"
+            )
+        if actual_indexes - expected_indexes:
+            problems.append(
+                f"{name}: extra index(es) {_describe(actual_indexes - expected_indexes)}"
+            )
 
     return problems
 

@@ -34,6 +34,7 @@ from chester.models import (
     Study,
     utcnow,
 )
+from chester.schema import drift as schema_drift
 
 logger = logging.getLogger(__name__)
 
@@ -431,6 +432,13 @@ def run(stop: threading.Event | None = None) -> None:
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     settings.require_production_secrets()
+    problems = schema_drift()
+    if problems:
+        logger.error(
+            "The database does not match the models; worker startup refused. Found: %s",
+            "; ".join(problems),
+        )
+        return 1
 
     stop = threading.Event()
 
