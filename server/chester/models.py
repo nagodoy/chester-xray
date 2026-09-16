@@ -164,7 +164,15 @@ class Study(TimestampMixin, Base):
         ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False, index=True
     )
 
+    # The pseudonym, which is what the worklist shows and searches by default.
     patient_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # The identity behind it, as the source instance carried it. Kept apart from
+    # the pseudonym rather than replacing it: the pseudonym is what links two
+    # rows to one person on a screen anyone may be looking at, and these three
+    # are served only to a caller whose role may reveal them.
+    patient_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    patient_id_source: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    accession_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
     patient_age: Mapped[str | None] = mapped_column(String(16), nullable=True)
     patient_sex: Mapped[str | None] = mapped_column(String(8), nullable=True)
     study_date: Mapped[str | None] = mapped_column(String(16), nullable=True)

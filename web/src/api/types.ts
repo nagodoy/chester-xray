@@ -47,7 +47,15 @@ export interface Finding {
 
 export interface Study {
   id: string;
+  /** The pseudonym. Always present; it is what links two rows to one person. */
   patient_id: string | null;
+  /**
+   * The identity behind the pseudonym. Null for a caller whose role may not
+   * reveal it -- the server omits these rather than sending them to be masked.
+   */
+  patient_name: string | null;
+  patient_id_source: string | null;
+  accession_number: string | null;
   patient_age: string | null;
   patient_sex: string | null;
   study_date: string | null;

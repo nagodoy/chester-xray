@@ -64,10 +64,22 @@ class AnalysisResultSchema(BaseModel):
 
 
 class StudySchema(BaseModel):
+    """A study as the worklist reads it.
+
+    `patient_name` and `patient_id_source` are the identity behind the pseudonym
+    and are omitted, not masked, for a caller whose role may not reveal them --
+    masking happens in the browser, so a field that arrives is a field that can be
+    read out of the response. `chester.api.studies._hide_identity` is what drops
+    them, which is why they default to None here rather than being required.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     patient_id: str | None
+    patient_name: str | None = None
+    patient_id_source: str | None = None
+    accession_number: str | None = None
     patient_age: str | None
     patient_sex: str | None
     study_date: str | None

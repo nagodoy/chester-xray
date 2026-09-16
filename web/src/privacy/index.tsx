@@ -94,6 +94,19 @@ export function SensitiveDataProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * What to call the patient a study belongs to.
+ *
+ * The name when the server sent one, which it does only for a caller whose role
+ * may see it, and the pseudonym otherwise -- a study filed from a de-identified
+ * image has no name to show, and neither does a row a consultant is reading. The
+ * value still goes through the mask; this only chooses what the mask is hiding.
+ */
+export const patientLabel = (study: {
+  patient_name: string | null;
+  patient_id: string | null;
+}): string | null => study.patient_name || study.patient_id;
+
 export function useSensitiveData(): SensitiveDataValue {
   const value = useContext(SensitiveDataContext);
   if (value === null) {

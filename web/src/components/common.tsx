@@ -48,8 +48,22 @@ export function ErrorBox({
 /**
  * Study images need the session header, so they cannot be a plain <img src>. The
  * blob URL is revoked when the component unmounts or the study changes.
+ *
+ * `onError` exists because a failure here used to be indistinguishable from a
+ * study that simply has no picture: the tile fell back to its placeholder icon
+ * and said nothing. That is fine for a missing thumbnail and wrong for an
+ * explanation someone just asked for, where the server has a reason and the
+ * person is owed it.
  */
-export function Thumbnail({ url, alt }: { url: string | null; alt: string }) {
+export function Thumbnail({
+  url,
+  alt,
+  onError,
+}: {
+  url: string | null;
+  alt: string;
+  onError?: (message: string) => void;
+}) {
   const [objectUrl, setObjectUrl] = useState<string>("");
 
   useEffect(() => {
@@ -67,14 +81,20 @@ export function Thumbnail({ url, alt }: { url: string | null; alt: string }) {
         created = URL.createObjectURL(blob);
         setObjectUrl(created);
       })
-      .catch(() => {
-        if (!cancelled) setObjectUrl("");
+      .catch((caught: unknown) => {
+        if (cancelled) return;
+        setObjectUrl("");
+        onError?.(caught instanceof Error ? caught.message : String(caught));
       });
 
     return () => {
       cancelled = true;
       if (created) URL.revokeObjectURL(created);
     };
+    // The url alone. `onError` is a reporting channel, not an input to the
+    // fetch, and listing it would refetch the image whenever a caller rendered
+    // a fresh closure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);
 
   return (

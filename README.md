@@ -29,6 +29,13 @@ considering any clinical deployment.
 - Studies, jobs, results and audit trails in PostgreSQL
 - Background inference in a separate worker process
 - Raw scores, operating-point normalization, thresholds and recorded versions
+- An evidence map per finding: the positions that raised that output's score,
+  read out of the model's own pre-pool activation and drawn over the square it
+  scored. Needs only `onnxruntime`, which is the point -- see
+  `server/chester/onnx_graph.py`
+- Patient name and accession number carried from the source instance, shown to
+  the roles allowed to reveal identifying fields and omitted from the response
+  for every other role
 
 ## Layout
 

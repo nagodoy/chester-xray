@@ -1579,6 +1579,29 @@ td b {
   font-size: var(--fs-xs);
 }
 
+/* An explanation that could not be drawn, said in the place the picture would
+   have been. Amber rather than red: nothing is broken about the study, and the
+   scores beside it stand. */
+.explain-caption-error {
+  border: 1px solid var(--amber-edge);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  color: var(--amber-bright);
+}
+
+.explain-caption-error p {
+  margin: 0;
+  color: var(--ink-muted);
+}
+
+/* The same news on a worklist row, where there is no room for a box. */
+.explain-error {
+  margin-top: 4px;
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  color: var(--amber);
+}
+
 /* The pathology cell doubles as the control that explains it. Styled as the text
    it replaced plus an affordance, so the table does not turn into a row of buttons. */
 .explain-link {

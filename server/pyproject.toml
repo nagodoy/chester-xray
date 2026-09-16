@@ -7,10 +7,13 @@ dependencies = [
     "boto3>=1.35",
     "fastapi>=0.115",
     "numpy>=1.26",
-    # onnx, not only onnxruntime: chester.inference adds the pre-pool activation
-    # to the graph at load so chester.saliency can explain a score. Reading and
-    # rewriting the artifact needs the protobuf definitions, at runtime.
-    "onnx>=1.17",
+    # onnxruntime alone. chester.inference adds the pre-pool activation to the
+    # graph at load so chester.saliency can explain a score, and reads that
+    # rewrite out of the artifact itself through chester.onnx_graph -- because a
+    # deployment that installs what it needs to score gets onnxruntime, which
+    # does not depend on onnx, and explanations were silently off as a result.
+    # The onnx package stays a dev dependency, where tests check the hand-rolled
+    # read against it byte for byte.
     "onnxruntime>=1.20",
     "pillow>=10.4",
     "psycopg[binary]>=3.2",
@@ -32,7 +35,7 @@ dependencies = [
 gateway = ["requests>=2.32"]
 # torch is needed only to regenerate models/chester-all-224.onnx, never at runtime.
 export = ["torch>=2.4", "torchxrayvision>=1.3", "onnx>=1.17", "onnxscript>=0.1"]
-dev = ["httpx>=0.27", "moto[s3]>=5.0", "pytest>=8.3", "ruff>=0.8"]
+dev = ["httpx>=0.27", "moto[s3]>=5.0", "onnx>=1.17", "pytest>=8.3", "ruff>=0.8"]
 
 [build-system]
 requires = ["setuptools>=68"]

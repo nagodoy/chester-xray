@@ -26,7 +26,7 @@ import { ErrorBox, Skeleton, StatusPill, Thumbnail } from "../components/common"
 import { useI18n } from "../i18n";
 import type { Dictionary } from "../i18n";
 import { validationReason } from "../i18n/validation";
-import { Sensitive, useSensitiveData } from "../privacy";
+import { Sensitive, patientLabel, useSensitiveData } from "../privacy";
 import { UploadPanel } from "./UploadPanel";
 
 const ACTIVE_STATUSES: StudyStatus[] = ["received", "validating", "queued", "processing"];
@@ -84,12 +84,17 @@ function StudyRow({
   // explain any of them.
   const leading = study.top_findings[0]?.pathology ?? null;
   const [explaining, setExplaining] = useState(false);
+  // Why the map did not arrive, if it did not. Shown on the row rather than
+  // swallowed: the tile falling back to the thumbnail looks like a button that
+  // does nothing.
+  const [explainError, setExplainError] = useState("");
   const explained = explaining && leading !== null;
-  // The pseudonym is not a name, but it is stable: it is what links two rows on
-  // this screen to one person, and with the date, age and sex beside it that is
-  // most of a re-identification. The masked form is also what the delete and
-  // select labels announce, so the control does not read out what the row hides.
-  const label = reveal(study.patient_id, t.worklist.unidentified);
+  // The name where this caller may be shown one, and the pseudonym otherwise: not
+  // a name, but stable, and what links two rows on this screen to one person --
+  // with the date, age and sex beside it, most of a re-identification either way.
+  // The masked form is also what the delete and select labels announce, so the
+  // control does not read out what the row hides.
+  const label = reveal(patientLabel(study), t.worklist.unidentified);
 
   const card = (
     <>
@@ -100,15 +105,29 @@ function StudyRow({
             ? format(t.explain.caption, { pathology: leading })
             : t.worklist.headers.image
         }
+        onError={
+          explained
+            ? (message) => {
+                setExplaining(false);
+                setExplainError(message);
+              }
+            : undefined
+        }
       />
       <div className="study-primary">
         <strong>
-          <Sensitive value={study.patient_id} fallback={t.worklist.unidentified} />
+          <Sensitive value={patientLabel(study)} fallback={t.worklist.unidentified} />
         </strong>
         <div className="meta-row">
           {study.description ?? t.worklist.defaultDescription} · {study.modality ?? "XR"}
           {study.view_position ? ` · ${study.view_position}` : ""}
+          {study.accession_number ? ` · ${t.worklist.accession} ${study.accession_number}` : ""}
         </div>
+        {explainError && (
+          <div className="explain-error" role="alert">
+            {t.explain.unavailable} {explainError}
+          </div>
+        )}
       </div>
       <div className="study-cell">
         <b>
@@ -171,7 +190,10 @@ function StudyRow({
           aria-pressed={explained}
           aria-label={format(t.explain.actionFor, { pathology: leading })}
           title={format(t.explain.actionFor, { pathology: leading })}
-          onClick={() => setExplaining((current) => !current)}
+          onClick={() => {
+            setExplainError("");
+            setExplaining((current) => !current);
+          }}
         >
           <Eye size={15} />
         </button>

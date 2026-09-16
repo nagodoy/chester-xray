@@ -17,6 +17,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from chester import onnx_graph
 from chester.config import settings
 from chester.imaging import PREPROCESSING_VERSION
 
@@ -238,10 +239,33 @@ def _with_activation_output(path: Path) -> bytes | None:
     computed to be pooled, so it costs no extra work, and the scores come back
     bit-identical to the unmodified graph. tests/test_saliency.py holds both
     claims to that standard rather than to float32 tolerance.
-    """
-    import onnx
 
-    model = onnx.load(str(path))
+    Done through `chester.onnx_graph` rather than the `onnx` package, and that is
+    the point: `onnxruntime` does not depend on `onnx`, so an environment with
+    everything needed to *score* would otherwise have explanations silently
+    disabled -- which is exactly how they went missing in this deployment. The
+    package is still used if it is installed and the direct read fails, which is
+    the only case where it would know something the wire format does not say.
+    """
+    data = path.read_bytes()
+    try:
+        return onnx_graph.with_extra_output(data, ACTIVATION_OUTPUT)
+    except Exception:
+        logger.exception("Could not read %s directly; trying the onnx package", path.name)
+        return _with_activation_output_via_onnx(data)
+
+
+def _with_activation_output_via_onnx(data: bytes) -> bytes | None:
+    """The same rewrite through the `onnx` package, for an artifact this cannot read.
+
+    None where the package is not installed, which is the ordinary case at runtime.
+    """
+    try:
+        import onnx
+    except ImportError:
+        return None
+
+    model = onnx.load_from_string(data)
     produced = {name for node in model.graph.node for name in node.output}
     if ACTIVATION_OUTPUT not in produced:
         return None
@@ -303,17 +327,29 @@ def classifier_weights() -> np.ndarray:
         return _classifier_weights
     with _session_lock:
         if _classifier_weights is None:
-            import onnx
-            from onnx import numpy_helper
-
-            model = onnx.load(str(_model_path()))
-            for initializer in model.graph.initializer:
-                if initializer.name == CLASSIFIER_WEIGHT:
-                    _classifier_weights = numpy_helper.to_array(initializer)
-                    break
-            else:
-                raise RuntimeError(f"Model artifact has no {CLASSIFIER_WEIGHT} initializer")
+            data = _model_path().read_bytes()
+            weights = onnx_graph.initializer(data, CLASSIFIER_WEIGHT)
+            if weights is None:
+                weights = _initializer_via_onnx(data, CLASSIFIER_WEIGHT)
+            if weights is None:
+                raise RuntimeError(f"Model artifact has no readable {CLASSIFIER_WEIGHT}")
+            _classifier_weights = weights
     return _classifier_weights
+
+
+def _initializer_via_onnx(data: bytes, name: str) -> np.ndarray | None:
+    """One initializer through the `onnx` package, where it is installed."""
+    try:
+        import onnx
+        from onnx import numpy_helper
+    except ImportError:
+        return None
+
+    model = onnx.load_from_string(data)
+    for initializer in model.graph.initializer:
+        if initializer.name == name:
+            return numpy_helper.to_array(initializer)
+    return None
 
 
 def activation(prepared: np.ndarray) -> np.ndarray:
