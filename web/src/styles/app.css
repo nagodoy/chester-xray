@@ -1255,6 +1255,28 @@ td b {
   transition: color 0.15s, background 0.15s;
 }
 
+/* The evidence toggle on a row: the delete button's shape, so the two read as one
+   column of controls, with the affirmative colour rather than the destructive one. */
+.study-explain {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--slate-600);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.study-explain:hover,
+.study-explain.is-explained {
+  color: var(--teal-bright);
+  background: var(--teal-faint);
+}
+
 .study-select[aria-pressed="true"] {
   color: var(--teal-bright);
 }
@@ -1531,6 +1553,64 @@ td b {
 .detail-media .metadata {
   min-height: 0;
   overflow-y: auto;
+}
+
+/* The caveat under an evidence map. Not a Notice: it belongs to the picture above
+   it, and a boxed warning beside every explanation would train people past it. */
+.explain-caption {
+  margin-top: 10px;
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.explain-caption-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+  color: var(--ink);
+  font-size: var(--fs-sm);
+}
+
+.explain-caption-head .btn {
+  padding: 4px 9px;
+  font-size: var(--fs-xs);
+}
+
+/* The pathology cell doubles as the control that explains it. Styled as the text
+   it replaced plus an affordance, so the table does not turn into a row of buttons. */
+.explain-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  /* Half the icon is taken out of the cell's own left padding rather than added
+     to the column. This table already scrolls sideways at every width; a new
+     affordance should not buy its space from the columns to the right of it. */
+  margin-left: -8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.explain-link svg {
+  flex-shrink: 0;
+  color: var(--slate-600);
+  transition: color 0.15s;
+}
+
+.explain-link:hover svg,
+.explain-link[aria-pressed="true"] svg {
+  color: var(--teal-bright);
+}
+
+tr.is-explained {
+  background: var(--teal-faint);
 }
 
 .detail-image {

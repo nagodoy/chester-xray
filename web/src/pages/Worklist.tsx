@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ClipboardList,
   CloudUpload,
+  Eye,
   Filter,
   RotateCcw,
   Search,
@@ -76,8 +77,14 @@ function StudyRow({
   onToggle: () => void;
   onDelete: (() => void) | null;
 }) {
-  const { t } = useI18n();
+  const { t, format } = useI18n();
   const { reveal } = useSensitiveData();
+  // The leading finding is the one worth a picture in a list: it is the reason the
+  // row is where it is. Anything else is a question for the study page, which can
+  // explain any of them.
+  const leading = study.top_findings[0]?.pathology ?? null;
+  const [explaining, setExplaining] = useState(false);
+  const explained = explaining && leading !== null;
   // The pseudonym is not a name, but it is stable: it is what links two rows on
   // this screen to one person, and with the date, age and sex beside it that is
   // most of a re-identification. The masked form is also what the delete and
@@ -86,7 +93,14 @@ function StudyRow({
 
   const card = (
     <>
-      <Thumbnail url={study.thumbnail_url} alt={t.worklist.headers.image} />
+      <Thumbnail
+        url={explained ? api.explainUrl(study.id, leading) : study.thumbnail_url}
+        alt={
+          explained
+            ? format(t.explain.caption, { pathology: leading })
+            : t.worklist.headers.image
+        }
+      />
       <div className="study-primary">
         <strong>
           <Sensitive value={study.patient_id} fallback={t.worklist.unidentified} />
@@ -149,6 +163,18 @@ function StudyRow({
         <Link href={`/studies/${study.id}`} className="study-card">
           {card}
         </Link>
+      )}
+      {leading && (
+        <button
+          type="button"
+          className={explained ? "study-explain is-explained" : "study-explain"}
+          aria-pressed={explained}
+          aria-label={format(t.explain.actionFor, { pathology: leading })}
+          title={format(t.explain.actionFor, { pathology: leading })}
+          onClick={() => setExplaining((current) => !current)}
+        >
+          <Eye size={15} />
+        </button>
       )}
       {onDelete && (
         <button

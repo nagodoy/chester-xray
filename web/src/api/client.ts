@@ -162,15 +162,23 @@ export const api = {
     return request<UploadOutcome>("/api/uploads", { method: "POST", body });
   },
 
-  /** Thumbnails need the session header, so they are fetched as blobs. */
-  fetchThumbnail: async (url: string): Promise<Blob> => {
+  /** Study images need the session header, so they are fetched as blobs. */
+  fetchImage: async (url: string): Promise<Blob> => {
     const headers = new Headers();
     const token = getSessionToken();
     if (token) headers.set("X-Session-Token", token);
     const response = await fetch(url, { headers, credentials: "same-origin" });
-    if (!response.ok) throw new ApiError("Thumbnail unavailable", response.status);
+    if (!response.ok) throw new ApiError("Image unavailable", response.status);
     return response.blob();
   },
+
+  /**
+   * Where a finding's score came from, as a picture. A URL rather than a fetch:
+   * it is handed to the same component that renders the thumbnail, and the
+   * pathology travels in the path, so it has to be encoded.
+   */
+  explainUrl: (studyId: string, pathology: string) =>
+    `/api/studies/${encodeURIComponent(studyId)}/explain/${encodeURIComponent(pathology)}`,
 
   getSettings: () => request<DicomwebSettings>("/api/settings/dicomweb"),
 

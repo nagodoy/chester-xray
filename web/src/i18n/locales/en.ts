@@ -356,6 +356,16 @@ export const en: Dictionary = {
     updatedBy: "Set by {who}",
   },
 
+  /** Evidence maps. The caveat matters as much as the picture; see chester/saliency.py. */
+  explain: {
+    action: "Explain",
+    actionFor: "Explain {pathology}",
+    hide: "Back to the image",
+    caption: "Predictive regions for {pathology}",
+    note: "Shows the positions that most raised this model's score, over the square crop it analysed. It is not the location of a finding.",
+    unavailable: "No explanation available for this study.",
+  },
+
   retention: {
     title: "Data retention",
     subtitle:

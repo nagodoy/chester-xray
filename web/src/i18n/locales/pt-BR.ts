@@ -351,6 +351,16 @@ export const ptBR = {
     updatedBy: "Definido por {who}",
   },
 
+  /** Mapas de evidência. A ressalva importa tanto quanto a imagem; ver chester/saliency.py. */
+  explain: {
+    action: "Explicar",
+    actionFor: "Explicar {pathology}",
+    hide: "Voltar à imagem",
+    caption: "Regiões preditivas para {pathology}",
+    note: "Mostra as posições que mais elevaram o escore deste modelo, sobre o recorte quadrado que ele analisou. Não é a localização de um achado.",
+    unavailable: "Explicação indisponível para este estudo.",
+  },
+
   retention: {
     title: "Retenção de dados",
     subtitle:
