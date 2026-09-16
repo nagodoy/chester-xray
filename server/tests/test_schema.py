@@ -56,6 +56,81 @@ def test_creating_the_schema_twice_is_harmless(schema_engine):
     assert drift() == []
 
 
+class TestPostgresDriftDetection:
+    """Destructive coverage against a disposable PostgreSQL schema."""
+
+    def test_a_fresh_schema_has_no_drift(self, postgres_schema_engine):
+        from chester.schema import drift
+
+        assert drift() == []
+
+    @pytest.mark.parametrize(
+        ("mutation", "expected_problem"),
+        [
+            (
+                "ALTER TABLE studies ALTER COLUMN source SET DEFAULT 'upload'",
+                "studies.source: server default",
+            ),
+            (
+                'ALTER TABLE organizations DROP CONSTRAINT "{organizations_pk}" CASCADE',
+                "organizations: primary key",
+            ),
+            (
+                'ALTER TABLE users DROP CONSTRAINT "{users_organization_fk}"',
+                "users: missing foreign key",
+            ),
+            (
+                "ALTER TABLE instances DROP CONSTRAINT uq_instances_org_sop_uid",
+                "instances: missing unique constraint",
+            ),
+            (
+                "ALTER TABLE studies ADD CONSTRAINT ck_studies_test_source "
+                "CHECK (source <> 'test-invalid')",
+                "studies: extra check constraint",
+            ),
+            (
+                "DROP INDEX ix_studies_body_part",
+                "studies: missing index",
+            ),
+            (
+                "ALTER TABLE studies ADD COLUMN unexpected_test_column TEXT",
+                "studies: extra column(s) unexpected_test_column",
+            ),
+        ],
+        ids=[
+            "server-default",
+            "primary-key",
+            "foreign-key",
+            "unique-constraint",
+            "check-constraint",
+            "index",
+            "extra-column",
+        ],
+    )
+    def test_each_incompatible_mutation_is_reported(
+        self, postgres_schema_engine, mutation, expected_problem
+    ):
+        from sqlalchemy import ForeignKeyConstraint
+
+        from chester.db import Base
+        from chester.schema import drift
+
+        users_organization_fk = next(
+            constraint.name
+            for constraint in Base.metadata.tables["users"].constraints
+            if isinstance(constraint, ForeignKeyConstraint)
+            and tuple(constraint.column_keys) == ("organization_id",)
+        )
+        mutation = mutation.format(
+            organizations_pk=Base.metadata.tables["organizations"].primary_key.name,
+            users_organization_fk=users_organization_fk,
+        )
+        with postgres_schema_engine.begin() as connection:
+            connection.execute(text(mutation))
+
+        assert any(expected_problem in problem for problem in drift())
+
+
 class TestDriftDetection:
     """Without a migration tool, drift is only caught if something looks for it.
 

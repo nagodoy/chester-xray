@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import os
 import tempfile
+import uuid
 from collections.abc import Generator
 from pathlib import Path
 
 import pytest
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 
 # Configure the environment before anything imports chester. chester.config reads
 # these once at import time and chester.db builds its engine from them, so the
@@ -20,6 +23,7 @@ import pytest
 # outset -- including the engine the application's own lifespan uses.
 _TEST_DB_DIR = tempfile.mkdtemp(prefix="chester-tests-")
 DATABASE_URL = f"sqlite+pysqlite:///{Path(_TEST_DB_DIR) / 'test.db'}"
+_APPLICATION_DATABASE_URL = os.environ.get("DATABASE_URL")
 
 os.environ["DATABASE_URL"] = DATABASE_URL
 os.environ.setdefault("TESTING", "1")
@@ -46,6 +50,54 @@ def schema_engine(database_url: str):
 
     yield engine
     engine.dispose()
+
+
+@pytest.fixture
+def postgres_schema_engine(monkeypatch):
+    """A fresh, isolated PostgreSQL schema, enabled only by an explicit test URL."""
+    postgres_url = os.environ.get("CHESTER_TEST_POSTGRES_URL")
+    if not postgres_url:
+        pytest.skip("CHESTER_TEST_POSTGRES_URL is not configured")
+    from chester.db import Base, _engine_kwargs
+
+    normalized_url, engine_kwargs = _engine_kwargs(postgres_url)
+    if _APPLICATION_DATABASE_URL:
+        normalized_application_url, _ = _engine_kwargs(_APPLICATION_DATABASE_URL)
+        if make_url(normalized_url) == make_url(normalized_application_url):
+            pytest.fail("CHESTER_TEST_POSTGRES_URL must not be the application DATABASE_URL")
+
+    admin_engine = create_engine(normalized_url, **engine_kwargs)
+    if admin_engine.dialect.name != "postgresql":
+        admin_engine.dispose()
+        pytest.fail("CHESTER_TEST_POSTGRES_URL must use PostgreSQL")
+
+    schema_name = f"chester_test_{uuid.uuid4().hex}"
+    with admin_engine.begin() as connection:
+        connection.execute(text(f'CREATE SCHEMA "{schema_name}"'))
+
+    test_engine = create_engine(
+        normalized_url,
+        **{
+            **engine_kwargs,
+            "connect_args": {
+                **engine_kwargs.get("connect_args", {}),
+                "options": f"-csearch_path={schema_name}",
+            },
+        },
+    )
+
+    import chester.models  # noqa: F401
+    import chester.schema as schema
+
+    monkeypatch.setattr(schema, "engine", test_engine)
+    Base.metadata.create_all(test_engine)
+    try:
+        yield test_engine
+    finally:
+        test_engine.dispose()
+        with admin_engine.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA "{schema_name}" CASCADE'))
+        admin_engine.dispose()
 
 
 @pytest.fixture
