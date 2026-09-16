@@ -48,6 +48,20 @@ affected tables. Required columns are never added automatically, even with a
 server default. The API and worker repeat the read-only check and refuse startup
 on drift.
 
+### Existing JSON columns
+
+Databases created before `JsonDocument` used PostgreSQL JSONB may have nine legacy
+columns stored as `json`. Convert and verify them before publishing:
+
+```bash
+python -m chester.json_migration upgrade
+python -m chester.schema
+```
+
+The migration runs in one transaction, uses a short lock timeout, and compares
+every document before committing. It is safe to rerun. To reverse it, run
+`python -m chester.json_migration downgrade`.
+
 ## Running
 
 The API and the worker are separate processes:

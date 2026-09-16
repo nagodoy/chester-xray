@@ -118,6 +118,14 @@ def test_creating_the_schema_twice_is_harmless(schema_engine):
     create()
     assert drift() == []
 
+def test_json_migration_declares_the_nine_legacy_columns():
+    from chester.json_migration import JSON_COLUMNS
+
+    assert len(JSON_COLUMNS) == 9
+    assert len(set(JSON_COLUMNS)) == 9
+    assert ("analysis_results", "raw_scores") in JSON_COLUMNS
+    assert ("users", "allowed_pages") in JSON_COLUMNS
+
 
 class TestPostgresDriftDetection:
     """Destructive coverage against a disposable PostgreSQL schema."""
@@ -342,3 +350,13 @@ def test_worker_startup_refuses_schema_drift(monkeypatch):
     monkeypatch.setattr(worker, "schema_drift", lambda: ["studies.body_part: incompatible"])
 
     assert worker.main() == 1
+
+def test_json_migration_refuses_non_postgresql(schema_engine):
+    from chester.json_migration import column_types, migrate
+
+    if schema_engine.dialect.name == "postgresql":
+        pytest.skip("This assertion specifically covers the SQLite safety guard.")
+    with pytest.raises(RuntimeError, match="only supports PostgreSQL"):
+        column_types(schema_engine)
+    with pytest.raises(RuntimeError, match="only supports PostgreSQL"):
+        migrate("upgrade", schema_engine)
