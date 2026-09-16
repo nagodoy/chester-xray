@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from chester import destinations as destinations_module
+from chester import sensitive_data as sensitive_data_module
 from chester import thresholds as thresholds_module
 from chester.api.deps import require_admin, require_page
 from chester.config import settings
@@ -23,6 +24,7 @@ from chester.db import get_session
 from chester.models import SendDestination
 from chester.report import DOUBT_BAND
 from chester.security.access import AccessContext
+from chester.security.roles import ROLE_ADMIN, ROLE_LABELS, VALID_ROLES
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -462,3 +464,85 @@ def reset_threshold(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.commit()
     return _threshold_list(db, actor)
+
+
+class SensitiveRoleSchema(BaseModel):
+    """One role, and whether it may reveal identifying fields on screen."""
+
+    value: str
+    label: str
+    allowed: bool
+    # False for the administrator row, which is always allowed and never stored.
+    selectable: bool
+
+
+class SensitiveDataPolicySchema(BaseModel):
+    roles: list[SensitiveRoleSchema]
+    editable: bool
+    updated_by: str | None
+
+
+class SensitiveDataBody(BaseModel):
+    roles: list[str]
+
+
+def _sensitive_payload(db: Session, access: AccessContext) -> SensitiveDataPolicySchema:
+    allowed = sensitive_data_module.roles_in_force(db, access.organization_id)
+    policy = sensitive_data_module.stored_policy(db, access.organization_id)
+    return SensitiveDataPolicySchema(
+        roles=[
+            SensitiveRoleSchema(
+                value=role,
+                label=ROLE_LABELS[role],
+                # The administrator row is always allowed and never stored, so the
+                # panel can render it fixed rather than as a box that will not stay
+                # unticked.
+                allowed=role == ROLE_ADMIN or role in allowed,
+                selectable=role != ROLE_ADMIN,
+            )
+            # VALID_ROLES, not SELECTABLE_ROLES: the administrator belongs in the
+            # answer even though it cannot be sent in the request.
+            for role in VALID_ROLES
+        ],
+        editable=access.is_admin,
+        updated_by=policy.updated_by if policy is not None else None,
+    )
+
+
+@router.get("/sensitive-data", response_model=SensitiveDataPolicySchema)
+def sensitive_data_policy(
+    access: AccessContext = Depends(require_page("settings")),
+    db: Session = Depends(get_session),
+):
+    """Which roles may reveal identifying fields, for the caller's organization.
+
+    Readable by anyone who can open the page: the list is what explains why a
+    colleague has the toggle and you do not. Only an administrator may change it.
+    """
+    return _sensitive_payload(db, access)
+
+
+@router.put("/sensitive-data", response_model=SensitiveDataPolicySchema)
+def set_sensitive_data_policy(
+    body: SensitiveDataBody,
+    actor: AccessContext = Depends(require_admin),
+    db: Session = Depends(get_session),
+):
+    """Choose which roles reveal.
+
+    Returns the whole policy rather than the roles that were sent, for the reason
+    `set_threshold` gives: the interface must not drift from what was saved. The
+    administrator row is absent from the request and present in the answer, which
+    is exactly the kind of difference that would otherwise go unnoticed.
+    """
+    try:
+        sensitive_data_module.set_roles(
+            db,
+            actor.organization_id,
+            body.roles,
+            actor=actor.email,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    db.commit()
+    return _sensitive_payload(db, actor)
