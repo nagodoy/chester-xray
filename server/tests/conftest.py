@@ -106,6 +106,8 @@ def make_dicom():
         body_part: str = "CHEST",
         view_position: str = "PA",
         patient_id: str = "TEST001",
+        patient_name: str = "DEIDENTIFIED",
+        accession_number: str = "",
         bits_allocated: int = 16,
         photometric: str = "MONOCHROME2",
         frame_count: int = 1,
@@ -140,7 +142,9 @@ def make_dicom():
 
         ds = FileDataset("", {}, file_meta=file_meta, preamble=b"\x00" * 128)
         ds.PatientID = patient_id
-        ds.PatientName = "DEIDENTIFIED"
+        ds.PatientName = patient_name
+        if accession_number:
+            ds.AccessionNumber = accession_number
         ds.PatientAge = "045Y"
         ds.PatientSex = "M"
         ds.StudyInstanceUID = study_uid

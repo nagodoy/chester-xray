@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from chester import sensitive_data
 from chester.api.deps import require_admin, require_page
 from chester.db import get_session
 from chester.inference import is_reported
@@ -64,19 +65,39 @@ def top_findings(study: Study, limit: int = 5) -> list[dict]:
     ]
 
 
-def _to_summary(study: Study) -> StudySchema:
-    schema = StudySchema.model_validate(study)
-    schema.top_findings = top_findings(study)
-    schema.owner_email = study.owner.email if study.owner else None
+def may_reveal(db: Session, access: AccessContext) -> bool:
+    """Whether this caller's role may see the identity behind the pseudonym."""
+    return sensitive_data.may_reveal(db, access.organization_id, access.role)
+
+
+def _hide_identity(schema: StudySchema) -> StudySchema:
+    """Drop the identifying fields from a response that must not carry them.
+
+    Omitted rather than masked. The interface masks on screen, which is screen
+    privacy and nothing more -- a value that reaches the browser is a value the
+    browser can be made to print. The accession number stays: it names the order,
+    not the person, and it is what the report sheet is filed under downstream.
+    """
+    schema.patient_name = None
+    schema.patient_id_source = None
     return schema
 
 
-def _to_detail(study: Study) -> StudyDetailSchema:
+def _to_summary(study: Study, reveal: bool) -> StudySchema:
+    schema = StudySchema.model_validate(study)
+    schema.top_findings = top_findings(study)
+    schema.owner_email = study.owner.email if study.owner else None
+    return schema if reveal else _hide_identity(schema)
+
+
+def _to_detail(study: Study, reveal: bool) -> StudyDetailSchema:
     detail = StudyDetailSchema.model_validate(study)
     detail.top_findings = top_findings(study)
     detail.owner_email = study.owner.email if study.owner else None
     detail.instances = [InstanceSchema.model_validate(item) for item in study.instances]
     detail.results = [AnalysisResultSchema.model_validate(item) for item in study.results]
+    if not reveal:
+        _hide_identity(detail)
     return detail
 
 
@@ -101,13 +122,23 @@ def list_studies(
     """List studies this caller may see."""
     query = visible_studies(db.query(Study), access)
 
+    reveal = may_reveal(db, access)
+
     if search:
         pattern = f"%{search}%"
-        query = query.filter(
+        matches = (
             Study.description.ilike(pattern)
             | Study.patient_id.ilike(pattern)
             | Study.modality.ilike(pattern)
+            | Study.accession_number.ilike(pattern)
         )
+        if reveal:
+            # Searching a name is only offered to a caller who may be shown one.
+            # Matching on a field this response would then omit would turn the
+            # worklist itself into a lookup for the identity it is hiding.
+            matches = matches | Study.patient_name.ilike(pattern)
+            matches = matches | Study.patient_id_source.ilike(pattern)
+        query = query.filter(matches)
 
     if study_status:
         if study_status not in STATUS_VALUES:
@@ -126,7 +157,7 @@ def list_studies(
     )
 
     return StudyListResponse(
-        items=[_to_summary(study) for study in items], total=total, counts=counts
+        items=[_to_summary(study, reveal) for study in items], total=total, counts=counts
     )
 
 
@@ -136,7 +167,7 @@ def get_study(
     access: AccessContext = Depends(require_page("study-detail")),
     db: Session = Depends(get_session),
 ):
-    return _to_detail(_load(db, access, study_id))
+    return _to_detail(_load(db, access, study_id), may_reveal(db, access))
 
 
 @router.post("/{study_id}/retry", response_model=StudyDetailSchema)
@@ -172,7 +203,7 @@ def retry_study(
     )
     db.commit()
     db.refresh(study)
-    return _to_detail(study)
+    return _to_detail(study, may_reveal(db, access))
 
 
 @router.post("/{study_id}/review", response_model=StudyDetailSchema)
@@ -209,7 +240,7 @@ def review_study(
 
     db.commit()
     db.refresh(study)
-    return _to_detail(study)
+    return _to_detail(study, may_reveal(db, access))
 
 
 @router.post("/{study_id}/send-report", response_model=StudyDetailSchema)
@@ -241,7 +272,7 @@ def send_report(
         )
 
     db.refresh(study)
-    return _to_detail(study)
+    return _to_detail(study, may_reveal(db, access))
 
 
 def _purge_objects(db: Session, study: Study) -> None:

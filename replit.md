@@ -49,6 +49,17 @@ attempts are retried and every one of them is recorded in `network_logs`.
 Sending needs `pynetdicom`, which is a runtime dependency for that reason -- the
 gateway extra now only carries `requests`.
 
+## Evidence maps
+
+The map under each finding is the model's own pre-pool activation weighted by the
+classifier row, so it needs the artifact read and rewritten at load. That used to
+go through the `onnx` package, which `onnxruntime` does not depend on and this
+environment did not have: every score was right and every explanation answered
+503, which on screen looks like a feature that was never built. `chester.onnx_graph`
+now does both reads against the wire format directly, so the runtime needs nothing
+beyond `onnxruntime`. When a map cannot be drawn, the interface says why instead of
+falling back to the thumbnail in silence.
+
 ## Schema
 
 The ORM in `server/chester/models.py` is the schema. There is no migration tool:
@@ -59,8 +70,14 @@ deployment and the dev workflow run it once before starting the API and worker.
 cd server && python -m chester.schema
 ```
 
-**`create_all` only creates whole tables. It never adds a column to a table that
-already exists.** So a model change made against a live database applies to
+One exception, added when `patient_name` and `accession_number` had to reach a
+live database: `chester.schema.add_missing_columns` issues `ALTER TABLE ... ADD
+COLUMN` for *nullable* columns the models declare and the database lacks, which
+is the one DDL that cannot lose a row. The schema step runs it, so shipping a new
+optional field no longer means dropping the table that holds every study.
+
+**Beyond that, `create_all` only creates whole tables. It never adds a column to a
+table that already exists.** So a model change made against a live database applies to
 nothing, and there is no in-place upgrade path -- the fix is to drop the affected
 tables and let the schema step recreate them. Because that gap is invisible on its
 own, `chester.schema.drift()` reports it: the schema command exits non-zero, CI

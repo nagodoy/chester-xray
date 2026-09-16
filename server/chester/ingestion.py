@@ -206,6 +206,9 @@ def _ingest_dicom(
             owner_user_id=owner.id,
             organization_id=owner.organization_id,
             patient_id=pseudonymize_patient_id(meta.get("raw_patient_id", "")) or None,
+            patient_name=meta.get("raw_patient_name") or None,
+            patient_id_source=meta.get("raw_patient_id") or None,
+            accession_number=meta.get("accession_number") or None,
             patient_age=meta.get("patient_age") or None,
             patient_sex=meta.get("patient_sex") or None,
             study_date=meta.get("study_date") or None,
@@ -413,6 +416,9 @@ def _awaiting_a_frontal(study: Study) -> bool:
 
 def _fill_missing_metadata(study: Study, meta: dict) -> None:
     """Fill gaps only. The first instance's pseudonym is never overwritten."""
+    study.patient_name = study.patient_name or meta.get("raw_patient_name") or None
+    study.patient_id_source = study.patient_id_source or meta.get("raw_patient_id") or None
+    study.accession_number = study.accession_number or meta.get("accession_number") or None
     study.patient_age = study.patient_age or meta.get("patient_age") or None
     study.patient_sex = study.patient_sex or meta.get("patient_sex") or None
     study.study_date = study.study_date or meta.get("study_date") or None

@@ -197,3 +197,31 @@ def test_a_study_you_cannot_see_is_not_explained(client, signed_in, make_user, a
 
     response = client.get(f"/api/studies/{analysed_study.id}/explain/Cardiomegaly", headers=headers)
     assert response.status_code == 404
+
+
+def test_explanations_survive_without_the_onnx_package(monkeypatch, chest):
+    """The environment this feature was actually absent in.
+
+    `onnxruntime` does not depend on `onnx`, so a deployment can score every study
+    correctly and have no way to read or rewrite the artifact. It used to mean the
+    session loaded without the activation output and every explanation answered
+    503 -- which looks, from the worklist, like a feature nobody built.
+    """
+    import sys
+
+    monkeypatch.setitem(sys.modules, "onnx", None)  # `import onnx` now raises ImportError
+    inference.reset_session()
+    try:
+        assert inference.activation_available()
+
+        prepared = inference.preprocess(chest).reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE)
+        channels = inference.activation(prepared).shape[0]
+        assert inference.classifier_weights().shape == (len(PATHOLOGIES), channels)
+
+        overlay = saliency.overlay_png(chest, EXCITED)
+        with Image.open(io.BytesIO(overlay)) as image:
+            assert image.size == (saliency.RENDER_SIZE, saliency.RENDER_SIZE)
+    finally:
+        # The session cached above holds a graph built without the package; the
+        # next test should load it the way the application does.
+        inference.reset_session()

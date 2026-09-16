@@ -10,6 +10,7 @@ from __future__ import annotations
 import io
 import logging
 
+from chester.imaging.dicom import person_name
 from chester.imaging.report_image import render_report
 from chester.report import SIGNAL_BELOW, finding_rows
 
@@ -94,7 +95,7 @@ def build_report_dataset(
         io.BytesIO(
             render_report(
                 pixels,
-                patient_name=str(source.get("PatientName", "") or ""),
+                patient_name=person_name(str(source.get("PatientName", "") or "")),
                 accession_number=str(source.get("AccessionNumber", "") or ""),
                 study_date=_format_date(str(source.get("StudyDate", "") or "")),
                 rows=rows,

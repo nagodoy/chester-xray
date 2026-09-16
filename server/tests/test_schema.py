@@ -79,6 +79,47 @@ class TestDriftDetection:
             connection.execute(text("ALTER TABLE studies ADD COLUMN body_part VARCHAR(64)"))
         assert drift() == []
 
+    def test_a_nullable_column_is_added_in_place(self, schema_engine):
+        """The one repair that is safe without a migration tool.
+
+        A nullable column added to a live table is what shipping a new optional
+        field looks like -- patient_name and accession_number were exactly that --
+        and the alternative on offer was dropping the studies table.
+        """
+        from chester.schema import add_missing_columns, drift
+
+        with schema_engine.begin() as connection:
+            connection.execute(text("ALTER TABLE studies DROP COLUMN accession_number"))
+
+        assert any("accession_number" in problem for problem in drift())
+        assert add_missing_columns() == ["studies.accession_number"]
+        assert drift() == []
+
+        # Nothing to do the second time: the step runs on every start.
+        assert add_missing_columns() == []
+
+    def test_a_not_null_column_is_left_as_drift(self, schema_engine):
+        """Narrow on purpose.
+
+        A NOT NULL column with no server default cannot be added to a table that
+        has rows, so guessing a value for them is the alternative -- and a guess
+        about what a row means is exactly what this project has no migration tool
+        in order not to make.
+        """
+        from chester.schema import add_missing_columns, drift
+
+        with schema_engine.begin() as connection:
+            connection.execute(text("ALTER TABLE studies DROP COLUMN source"))
+
+        assert add_missing_columns() == []
+        assert any("source" in problem for problem in drift())
+
+        with schema_engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE studies ADD COLUMN source VARCHAR(32) NOT NULL DEFAULT 'upload'")
+            )
+        assert drift() == []
+
     def test_a_missing_table_is_reported(self, schema_engine):
         from chester.schema import create, drift
 

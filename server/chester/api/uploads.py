@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from chester.api.deps import client_ip, require_page
-from chester.api.studies import _to_summary
+from chester.api.studies import _to_summary, may_reveal
 from chester.config import settings
 from chester.db import get_session
 from chester.ingestion import ingest_file
@@ -105,4 +105,5 @@ async def upload_files(
         logger.exception("Upload commit failed")
         raise HTTPException(status_code=500, detail="Database error") from exc
 
-    return UploadResponse(studies=[_to_summary(study) for study in accepted], errors=errors)
+    reveal = may_reveal(db, access)
+    return UploadResponse(studies=[_to_summary(study, reveal) for study in accepted], errors=errors)

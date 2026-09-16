@@ -36,6 +36,22 @@ def _tag_str(dataset: Any, tag: str, default: str = "") -> str:
         return default
 
 
+def person_name(value: str) -> str:
+    """A PS3.5 person name as something to read.
+
+    DICOM writes a name as caret-separated components, family name first, and a
+    dataset that filled none of the later ones leaves the carets behind:
+    `SILVA^JOAO^^^` is a common thing to receive. The component order is kept --
+    a reading room reads names family-first, and reordering them would be this
+    module guessing which component is which for every locale that sends here.
+    The `=` between an alphabetic, ideographic and phonetic writing of the same
+    name is treated as another separator: all three name the same person, and a
+    worklist row has space for one of them.
+    """
+    parts = [part.strip() for part in value.replace("=", "^").split("^")]
+    return " ".join(part for part in parts if part)
+
+
 def _tag_int(dataset: Any, tag: str, default: int | None = None) -> int | None:
     try:
         value = dataset.get(tag)
@@ -146,6 +162,11 @@ def extract_metadata(dataset: Any) -> dict:
             str(transfer_syntax) if transfer_syntax else DEFAULT_TRANSFER_SYNTAX
         ),
         "raw_patient_id": _tag_str(dataset, "PatientID", ""),
+        # The identity the worklist shows only to a caller allowed to see it, and
+        # the number the order is known by in the RIS. Read here with everything
+        # else so no other module has to open the dataset to find them.
+        "raw_patient_name": person_name(_tag_str(dataset, "PatientName", "")),
+        "accession_number": _tag_str(dataset, "AccessionNumber", ""),
         "patient_age": _tag_str(dataset, "PatientAge", ""),
         "patient_sex": _tag_str(dataset, "PatientSex", ""),
         "study_date": _tag_str(dataset, "StudyDate", ""),

@@ -8,7 +8,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { AppShell } from "../components/AppShell";
 import { ErrorBox, Notice, Panel, Skeleton, StatusPill, Thumbnail } from "../components/common";
 import { useI18n } from "../i18n";
-import { useSensitiveData } from "../privacy";
+import { patientLabel, useSensitiveData } from "../privacy";
 
 // Charting is a large dependency reachable only from this screen.
 const ScoreChart = lazy(() => import("../components/ScoreChart"));
@@ -61,6 +61,10 @@ export function StudyDetail() {
   // side invite comparing their brightness, and they are each normalized to their
   // own peak, so that comparison would mean nothing.
   const [explaining, setExplaining] = useState<string | null>(null);
+  // Why the last explanation did not arrive. A map that cannot be drawn used to
+  // leave the tile on its placeholder icon and say nothing, which reads as a
+  // feature that was never built rather than as a server with a reason.
+  const [explainError, setExplainError] = useState("");
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -104,6 +108,16 @@ export function StudyDetail() {
       setBusy(false);
     }
   };
+
+  const explain = useCallback((pathology: string | null) => {
+    setExplainError("");
+    setExplaining(pathology);
+  }, []);
+
+  const failedToExplain = useCallback((message: string) => {
+    setExplainError(message);
+    setExplaining(null);
+  }, []);
 
   const rows = useMemo(() => latestRows(study?.results ?? []), [study]);
   const chartData = rows.map((row) => ({ name: row.pathology, score: row.normalized }));
@@ -217,13 +231,30 @@ export function StudyDetail() {
                     ? format(t.explain.caption, { pathology: explaining })
                     : t.detail.image
                 }
+                onError={explaining ? failedToExplain : undefined}
               />
             </div>
+            {explainError && (
+              <div className="explain-caption explain-caption-error" role="alert">
+                <div className="explain-caption-head">
+                  <b>{t.explain.unavailable}</b>
+                  <button
+                    type="button"
+                    className="btn btn-subtle"
+                    onClick={() => setExplainError("")}
+                  >
+                    <X size={14} aria-hidden />
+                    {t.common.dismiss}
+                  </button>
+                </div>
+                <p>{explainError}</p>
+              </div>
+            )}
             {explaining && (
               <div className="explain-caption">
                 <div className="explain-caption-head">
                   <b>{format(t.explain.caption, { pathology: explaining })}</b>
-                  <button type="button" className="btn btn-subtle" onClick={() => setExplaining(null)}>
+                  <button type="button" className="btn btn-subtle" onClick={() => explain(null)}>
                     <X size={14} aria-hidden />
                     {t.explain.hide}
                   </button>
@@ -237,7 +268,16 @@ export function StudyDetail() {
             <dl className="metadata">
               {(
                 [
-                  [t.detail.patient, reveal(study.patient_id, t.worklist.unidentified)],
+                  [t.detail.patient, reveal(patientLabel(study), t.worklist.unidentified)],
+                  [
+                    t.detail.patientIdentifier,
+                    reveal(study.patient_id_source ?? study.patient_id, t.common.none),
+                  ],
+                  // Not masked. It names the order rather than the person, it is
+                  // what the report sheet is filed under downstream, and it is the
+                  // number someone reads back to the RIS while looking at this
+                  // screen.
+                  [t.detail.accession, study.accession_number ?? t.common.none],
                   [
                     t.detail.ageSex,
                     `${reveal(study.patient_age, t.common.none)} / ${reveal(
@@ -292,9 +332,7 @@ export function StudyDetail() {
                           aria-label={format(t.explain.actionFor, { pathology: row.pathology })}
                           title={format(t.explain.actionFor, { pathology: row.pathology })}
                           onClick={() =>
-                            setExplaining((current) =>
-                              current === row.pathology ? null : row.pathology,
-                            )
+                            explain(explaining === row.pathology ? null : row.pathology)
                           }
                         >
                           <Eye size={12} aria-hidden />
