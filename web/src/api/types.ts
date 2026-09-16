@@ -29,6 +29,12 @@ export interface Access {
   allowed_pages: Page[] | null;
   organization_id: string;
   source: string;
+  /**
+   * Whether this caller's role may unmask identifying fields on screen. Resolved
+   * by the server from the organization's policy, never inferred here from the
+   * role, so one place decides it.
+   */
+  may_reveal_sensitive: boolean;
 }
 
 export interface Finding {
@@ -178,6 +184,21 @@ export interface ThresholdList {
   /** The fraction either side of the point that reads as DUVIDOSO. */
   doubt_band: number;
   editable: boolean;
+}
+
+/** One role, and whether it may unmask identifying fields on screen. */
+export interface SensitiveRole {
+  value: string;
+  label: string;
+  allowed: boolean;
+  /** False for the administrator row, which is always allowed and never stored. */
+  selectable: boolean;
+}
+
+export interface SensitiveDataPolicy {
+  roles: SensitiveRole[];
+  editable: boolean;
+  updated_by: string | null;
 }
 
 export interface ManagedUser {

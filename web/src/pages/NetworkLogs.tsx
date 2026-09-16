@@ -7,6 +7,7 @@ import { AppShell, PageHeading } from "../components/AppShell";
 import { ErrorBox, Pagination, Skeleton } from "../components/common";
 import { RetentionPanel } from "../components/RetentionPanel";
 import { useI18n } from "../i18n";
+import { useSensitiveData } from "../privacy";
 
 /** Reuses the worklist pills: a delivery either landed or it did not. */
 const STATUS_CLASS: Record<NetworkLogEntry["status"], string> = {
@@ -81,6 +82,7 @@ function StudyLink({ id, label }: { id: string | null; label: string }) {
 
 export function NetworkLogs() {
   const { t, locale } = useI18n();
+  const { reveal } = useSensitiveData();
 
   const received = useNetworkLogPage("received");
   const sent = useNetworkLogPage("sent");
@@ -144,14 +146,14 @@ export function NetworkLogs() {
                   <td className="mono">{when(entry.created_at)}</td>
                   <td className="mono">{entry.peer ?? t.common.none}</td>
                   <td>{channel(entry.channel)}</td>
-                  <td className="cell-clip" title={entry.actor ?? ""}>
-                    {entry.actor ?? t.common.none}
+                  <td className="cell-clip" title={reveal(entry.actor, "")}>
+                    {reveal(entry.actor, t.common.none)}
                   </td>
                   <td>
                     <StudyLink id={entry.study_id} label={t.networkLogs.openStudy} />
                   </td>
-                  <td className="mono cell-clip" title={entry.reference ?? ""}>
-                    {entry.reference ?? t.common.none}
+                  <td className="mono cell-clip" title={reveal(entry.reference, "")}>
+                    {reveal(entry.reference, t.common.none)}
                   </td>
                   <td>{situation(entry)}</td>
                   <td className="cell-clip" title={entry.message ?? ""}>
@@ -198,14 +200,14 @@ export function NetworkLogs() {
                 <tr key={entry.id}>
                   <td className="mono">{when(entry.created_at)}</td>
                   <td className="mono">{entry.peer ?? t.common.none}</td>
-                  <td className="cell-clip" title={entry.actor ?? ""}>
-                    {entry.actor ?? t.common.none}
+                  <td className="cell-clip" title={reveal(entry.actor, "")}>
+                    {reveal(entry.actor, t.common.none)}
                   </td>
                   <td>
                     <StudyLink id={entry.study_id} label={t.networkLogs.openStudy} />
                   </td>
-                  <td className="mono cell-clip" title={entry.reference ?? ""}>
-                    {entry.reference ?? t.common.none}
+                  <td className="mono cell-clip" title={reveal(entry.reference, "")}>
+                    {reveal(entry.reference, t.common.none)}
                   </td>
                   <td>{situation(entry)}</td>
                   <td className="cell-clip" title={entry.message ?? ""}>

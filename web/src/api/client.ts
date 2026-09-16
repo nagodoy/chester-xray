@@ -11,6 +11,7 @@ import type {
   RetentionPurgeOutcome,
   SendConnection,
   SendConnectionList,
+  SensitiveDataPolicy,
   StudyDetail,
   StudyList,
   ThresholdList,
@@ -202,6 +203,15 @@ export const api = {
     request<ThresholdList>(`/api/settings/thresholds/${encodeURIComponent(pathology)}`, {
       method: "DELETE",
     }),
+  getSensitiveDataPolicy: () =>
+    request<SensitiveDataPolicy>("/api/settings/sensitive-data"),
+
+  setSensitiveDataPolicy: (roles: string[]) =>
+    request<SensitiveDataPolicy>("/api/settings/sensitive-data", {
+      method: "PUT",
+      ...json({ roles }),
+    }),
+
   testDestination: (id: string) =>
     request<{ ok: boolean; message: string }>(
       `/api/settings/destinations/${encodeURIComponent(id)}/test`,

@@ -341,6 +341,21 @@ export const en: Dictionary = {
     },
   },
 
+  /** Hiding identifiers on screen. Not access control; see web/src/privacy. */
+  privacy: {
+    sidebar: "Sensitive data",
+    show: "Show sensitive data",
+    hide: "Hide sensitive data",
+    hidden: "Hidden",
+    title: "Sensitive data",
+    subtitle:
+      "The selected roles may show identifiers on screen. Everyone else always sees them hidden. This hides the fields on screen; it does not change what the API sends.",
+    subtitleReadOnly:
+      "The selected roles may show identifiers on screen. Only an administrator can change the list.",
+    alwaysAllowed: "Always",
+    updatedBy: "Set by {who}",
+  },
+
   retention: {
     title: "Data retention",
     subtitle:

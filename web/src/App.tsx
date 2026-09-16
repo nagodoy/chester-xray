@@ -11,6 +11,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { SignIn } from "./pages/SignIn";
 import { StudyDetail } from "./pages/StudyDetail";
 import { Worklist } from "./pages/Worklist";
+import { SensitiveDataProvider } from "./privacy";
 import "./styles/app.css";
 
 /** Pages a redirect may land on, in the order they are tried. */
@@ -117,7 +118,11 @@ export default function App() {
   return (
     <I18nProvider>
       <AuthProvider>
-        <Routes />
+        {/* Inside AuthProvider: whether the toggle exists at all comes from the
+            signed-in caller's access payload. */}
+        <SensitiveDataProvider>
+          <Routes />
+        </SensitiveDataProvider>
       </AuthProvider>
     </I18nProvider>
   );

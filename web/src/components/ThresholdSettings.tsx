@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import type { ThresholdList, ThresholdRow } from "../api/types";
 import { ErrorBox } from "./common";
 import { useI18n } from "../i18n";
+import { useSensitiveData } from "../privacy";
 
 /** Enough digits to show a change the model can actually act on. */
 const precise = (value: number) => value.toFixed(6);
@@ -23,6 +24,7 @@ const precise = (value: number) => value.toFixed(6);
  */
 export function ThresholdSettings() {
   const { t, format } = useI18n();
+  const { reveal } = useSensitiveData();
 
   const [data, setData] = useState<ThresholdList | null>(null);
   const [error, setError] = useState("");
@@ -142,7 +144,12 @@ export function ThresholdSettings() {
                 <td className="mono">{precise(row.upper)}</td>
                 <td>
                   {row.overridden ? (
-                    <span className="pill pill-needs_review" title={row.updated_by ?? undefined}>
+                    <span
+                      className="pill pill-needs_review"
+                      // Who moved the point is an address, and a tooltip is a
+                      // reveal like any other.
+                      title={reveal(row.updated_by, "") || undefined}
+                    >
                       {format(t.thresholds.adjusted, {
                         factor: (row.factor ?? 1).toFixed(2),
                       })}
