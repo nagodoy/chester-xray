@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
+from chester import sensitive_data as sensitive_data_module
 from chester.api.deps import SESSION_HEADER, client_ip, get_current_access
 from chester.config import settings
 from chester.db import get_session
@@ -42,7 +43,14 @@ class VerifyCodeBody(BaseModel):
     code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
 
 
-def _access_payload(access: AccessContext) -> dict:
+def _access_payload(db: Session, access: AccessContext) -> dict:
+    """What the interface is told about the caller.
+
+    `may_reveal_sensitive` is resolved here rather than on `AccessContext` because
+    it is a per-organization policy row, and that dataclass is built from a `User`
+    with no session in hand -- a property that reached for the database would be a
+    trap at every other call site.
+    """
     return {
         "email": access.email,
         "role": access.role,
@@ -50,6 +58,9 @@ def _access_payload(access: AccessContext) -> dict:
         "allowed_pages": access.allowed_pages,
         "organization_id": str(access.organization_id),
         "source": access.source,
+        "may_reveal_sensitive": sensitive_data_module.may_reveal(
+            db, access.organization_id, access.role
+        ),
     }
 
 
@@ -211,7 +222,10 @@ def verify_code(
         )
     )
     db.commit()
-    return {"session_token": token, "access": _access_payload(AccessContext.from_user(user))}
+    return {
+        "session_token": token,
+        "access": _access_payload(db, AccessContext.from_user(user)),
+    }
 
 
 def _spend_attempt(db: Session, challenge: AuthChallenge, now, *, consume: bool = False) -> int:
@@ -236,8 +250,11 @@ def _spend_attempt(db: Session, challenge: AuthChallenge, now, *, consume: bool 
 
 
 @router.get("/validate-session")
-def validate_session(access: AccessContext = Depends(get_current_access)):
-    return {"authenticated": True, "access": _access_payload(access)}
+def validate_session(
+    access: AccessContext = Depends(get_current_access),
+    db: Session = Depends(get_session),
+):
+    return {"authenticated": True, "access": _access_payload(db, access)}
 
 
 @router.post("/logout")

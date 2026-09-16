@@ -301,6 +301,67 @@ a {
   color: var(--ink);
 }
 
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: transparent;
+  color: var(--ink-faint);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-toggle:hover {
+  border-color: var(--line-hover);
+  color: var(--ink);
+}
+
+.sidebar-toggle.is-revealed {
+  border-color: var(--line-hover);
+  background: rgb(255 255 255 / 5%);
+  color: var(--ink);
+}
+
+/* A hidden value: bullets to look at, "oculto" to listen to. The tracking keeps
+   the run of bullets from reading as a single smudge at small sizes. */
+.masked {
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
+
+.sensitive-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* The chosen role is teal, not the red `.window-option.is-chosen` carries. That
+   red is deliberate where it is defined -- it marks the window of a routine that
+   deletes -- and granting a role permission to read its own screen is not that. */
+.sensitive-roles .window-option.is-chosen {
+  border-color: var(--teal-edge);
+  background: var(--teal-soft);
+  color: var(--teal-bright);
+}
+
+/* Same heading shape as the retention panel, without its red icon: that red
+   belongs to a routine that deletes. */
+.sensitive-data .retention-heading svg {
+  color: var(--ink-muted);
+}
+
+.sensitive-fixed {
+  color: var(--ink-faint);
+}
+
 .sidebar > .btn-subtle {
   margin-top: 12px;
   padding-top: 14px;
@@ -2412,6 +2473,11 @@ td b {
 
   .stats {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .sidebar-toggle {
+    margin: 0;
+    padding: 6px 10px;
   }
 
   .sidebar > .btn-subtle {

@@ -13,7 +13,9 @@ import type { ReactNode } from "react";
 
 import { useAuth } from "../auth/AuthProvider";
 import { useI18n } from "../i18n";
+import { useSensitiveData } from "../privacy";
 import { LocaleSwitch } from "./LocaleSwitch";
+import { SensitiveDataToggle } from "./SensitiveDataToggle";
 
 function Brand() {
   const { t } = useI18n();
@@ -108,6 +110,8 @@ function Sidebar() {
         <span>{t.nav.controlledNote}</span>
       </div>
 
+      <SensitiveDataToggle />
+
       <button type="button" className="btn btn-subtle" onClick={() => void signOut()}>
         <LogOut size={15} aria-hidden />
         <span>{t.nav.signOut}</span>
@@ -119,6 +123,7 @@ function Sidebar() {
 export function AppShell({ children }: { children: ReactNode }) {
   const { access } = useAuth();
   const { t, locale } = useI18n();
+  const { reveal } = useSensitiveData();
   const today = new Date().toLocaleDateString(locale, {
     day: "2-digit",
     month: "short",
@@ -136,9 +141,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="topbar-right">
             <LocaleSwitch compact />
             <div className="user-chip">
-              <span>{access?.email}</span>
+              <span>{reveal(access?.email, t.common.none)}</span>
               <div className="avatar" aria-hidden>
-                {(access?.email ?? "?").slice(0, 1).toUpperCase()}
+                {/* The initial is masked with the address: one letter and a role
+                    is enough to name a colleague in a small reading room. */}
+                {reveal(access?.email, "?").slice(0, 1).toUpperCase()}
               </div>
             </div>
           </div>

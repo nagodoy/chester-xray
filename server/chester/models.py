@@ -562,3 +562,40 @@ class ThresholdOverride(TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("organization_id", "pathology", name="uq_threshold_overrides_org_output"),
     )
+
+
+class SensitiveDataPolicy(TimestampMixin, Base):
+    """Which roles may reveal identifying fields on screen, per organization.
+
+    A table of its own for the reason ``RetentionPolicy`` gives: ``create_all``
+    builds whole tables and never adds a column to one that already exists, so a
+    column on ``organizations`` would apply to new deployments and silently not at
+    all to running ones.
+
+    A missing row means ``chester.sensitive_data.DEFAULT_ROLES``, so nothing has to
+    backfill and an organization that never opened the panel is still governed by a
+    policy. ``roles`` never carries ``admin``: an administrator may always reveal,
+    the same way ``AccessContext.can_access_page`` short-circuits on the role, and
+    storing it would let one be edited out of their own configuration.
+
+    This decides what the *interface* hides, not what the API sends. The values are
+    already in the response the browser fetched, so the policy is about who sees
+    them on a screen someone else may be looking at -- not about access.
+    """
+
+    __tablename__ = "sensitive_data_policies"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    # Roles from chester.security.roles.VALID_ROLES, minus admin. An empty list is
+    # meaningful -- it means only administrators reveal -- so it is not "no policy".
+    roles: Mapped[list] = mapped_column(JsonDocument, nullable=False, default=list)
+    # Who last set it, for the trail the panel shows.
+    updated_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+
+    organization: Mapped[Organization] = relationship()

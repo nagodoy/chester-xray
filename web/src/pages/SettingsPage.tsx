@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import type { DicomwebSettings } from "../api/types";
 import { AppShell, PageHeading } from "../components/AppShell";
 import { SendConnections } from "../components/SendConnections";
+import { SensitiveDataSettings } from "../components/SensitiveDataSettings";
 import { ThresholdSettings } from "../components/ThresholdSettings";
 import { ErrorBox, Skeleton } from "../components/common";
 import { useI18n } from "../i18n";
@@ -58,6 +59,8 @@ export function SettingsPage() {
       <SendConnections />
 
       <ThresholdSettings />
+
+      <SensitiveDataSettings />
 
       <div className="section-heading">
         <h2>{t.settings.ingestionTitle}</h2>

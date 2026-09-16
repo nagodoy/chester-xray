@@ -336,6 +336,21 @@ export const ptBR = {
     },
   },
 
+  /** Ocultar identificadores na tela. Não é controle de acesso; ver web/src/privacy. */
+  privacy: {
+    sidebar: "Dados Sensíveis",
+    show: "Mostrar dados sensíveis",
+    hide: "Ocultar dados sensíveis",
+    hidden: "Oculto",
+    title: "Dados sensíveis",
+    subtitle:
+      "Os perfis marcados podem exibir identificadores na tela. Os demais veem sempre ocultos. Isto esconde os campos na tela; não altera o que a API envia.",
+    subtitleReadOnly:
+      "Os perfis marcados podem exibir identificadores na tela. Só um administrador pode alterar a lista.",
+    alwaysAllowed: "Sempre",
+    updatedBy: "Definido por {who}",
+  },
+
   retention: {
     title: "Retenção de dados",
     subtitle:

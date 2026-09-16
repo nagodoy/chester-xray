@@ -8,6 +8,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { AppShell } from "../components/AppShell";
 import { ErrorBox, Notice, Panel, Skeleton, StatusPill, Thumbnail } from "../components/common";
 import { useI18n } from "../i18n";
+import { useSensitiveData } from "../privacy";
 
 // Charting is a large dependency reachable only from this screen.
 const ScoreChart = lazy(() => import("../components/ScoreChart"));
@@ -48,6 +49,7 @@ export function StudyDetail() {
   const { id } = useParams<{ id: string }>();
   const { access } = useAuth();
   const { t, format } = useI18n();
+  const { reveal } = useSensitiveData();
 
   const [study, setStudy] = useState<StudyDetailType | null>(null);
   const [error, setError] = useState("");
@@ -209,12 +211,15 @@ export function StudyDetail() {
             <dl className="metadata">
               {(
                 [
-                  [t.detail.patient, study.patient_id ?? t.worklist.unidentified],
+                  [t.detail.patient, reveal(study.patient_id, t.worklist.unidentified)],
                   [
                     t.detail.ageSex,
-                    `${study.patient_age ?? t.common.none} / ${study.patient_sex ?? t.common.none}`,
+                    `${reveal(study.patient_age, t.common.none)} / ${reveal(
+                      study.patient_sex,
+                      t.common.none,
+                    )}`,
                   ],
-                  [t.detail.studyDate, study.study_date ?? t.common.none],
+                  [t.detail.studyDate, reveal(study.study_date, t.common.none)],
                   [t.detail.viewPosition, study.view_position ?? t.common.none],
                   [t.detail.modelVersion, study.model_version ?? t.common.none],
                   [t.detail.preprocessing, study.preprocessing_version ?? t.common.none],

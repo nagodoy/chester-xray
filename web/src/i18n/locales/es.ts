@@ -342,6 +342,21 @@ export const es: Dictionary = {
     },
   },
 
+  /** Ocultar identificadores en pantalla. No es control de acceso; ver web/src/privacy. */
+  privacy: {
+    sidebar: "Datos sensibles",
+    show: "Mostrar datos sensibles",
+    hide: "Ocultar datos sensibles",
+    hidden: "Oculto",
+    title: "Datos sensibles",
+    subtitle:
+      "Los perfiles marcados pueden mostrar identificadores en pantalla. Los demás los ven siempre ocultos. Esto oculta los campos en pantalla; no cambia lo que envía la API.",
+    subtitleReadOnly:
+      "Los perfiles marcados pueden mostrar identificadores en pantalla. Solo un administrador puede cambiar la lista.",
+    alwaysAllowed: "Siempre",
+    updatedBy: "Definido por {who}",
+  },
+
   retention: {
     title: "Retención de datos",
     subtitle:

@@ -25,6 +25,7 @@ import { ErrorBox, Skeleton, StatusPill, Thumbnail } from "../components/common"
 import { useI18n } from "../i18n";
 import type { Dictionary } from "../i18n";
 import { validationReason } from "../i18n/validation";
+import { Sensitive, useSensitiveData } from "../privacy";
 import { UploadPanel } from "./UploadPanel";
 
 const ACTIVE_STATUSES: StudyStatus[] = ["received", "validating", "queued", "processing"];
@@ -76,13 +77,20 @@ function StudyRow({
   onDelete: (() => void) | null;
 }) {
   const { t } = useI18n();
-  const label = study.patient_id ?? t.worklist.unidentified;
+  const { reveal } = useSensitiveData();
+  // The pseudonym is not a name, but it is stable: it is what links two rows on
+  // this screen to one person, and with the date, age and sex beside it that is
+  // most of a re-identification. The masked form is also what the delete and
+  // select labels announce, so the control does not read out what the row hides.
+  const label = reveal(study.patient_id, t.worklist.unidentified);
 
   const card = (
     <>
       <Thumbnail url={study.thumbnail_url} alt={t.worklist.headers.image} />
       <div className="study-primary">
-        <strong>{label}</strong>
+        <strong>
+          <Sensitive value={study.patient_id} fallback={t.worklist.unidentified} />
+        </strong>
         <div className="meta-row">
           {study.description ?? t.worklist.defaultDescription} · {study.modality ?? "XR"}
           {study.view_position ? ` · ${study.view_position}` : ""}
@@ -90,9 +98,15 @@ function StudyRow({
       </div>
       <div className="study-cell">
         <b>
-          {displayAge(study.patient_age, t.common.none)} / {study.patient_sex ?? t.common.none}
+          {reveal(
+            study.patient_age && displayAge(study.patient_age, t.common.none),
+            t.common.none,
+          )}{" "}
+          / {reveal(study.patient_sex, t.common.none)}
         </b>
-        <span className="mono">{study.study_date ?? t.common.none}</span>
+        <span className="mono">
+          <Sensitive value={study.study_date} fallback={t.common.none} />
+        </span>
       </div>
       <div className="study-cell">
         <b>{study.source ?? t.worklist.manualUpload}</b>
