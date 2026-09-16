@@ -66,3 +66,7 @@ STOW_URL = "https://rx.nelsongodoy.com.br"
 DICOM_WADO_ANONYMOUS_INGEST = "true"
 DICOM_INGEST_OWNER_EMAIL = "nelsonagodoy@gmail.com"
 ADMIN_USERS = "nelsonagodoy@gmail.com"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 300000
