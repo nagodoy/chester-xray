@@ -1155,6 +1155,12 @@ td b {
   border-radius: var(--radius-control);
 }
 
+/* The accession field only exists while identifiers are showing, so the row has
+   to hold three inputs sometimes and two the rest of the time. */
+.filter-grid.has-accession {
+  grid-template-columns: 2fr 1.4fr 1fr auto;
+}
+
 .filter-grid label {
   display: flex;
   flex-direction: column;

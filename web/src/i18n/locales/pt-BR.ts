@@ -109,6 +109,8 @@ export const ptBR = {
     filters: "Filtros da worklist",
     search: "Busca",
     searchPlaceholder: "Paciente ou descrição…",
+    accessionLabel: "Accession Number",
+    accessionPlaceholder: "Parte do accession number…",
     statusLabel: "Status",
     allStatuses: "Todos",
     clearFilters: "Limpar filtros",
