@@ -186,3 +186,46 @@ class _Result:
     thresholds: dict = {}
     above_threshold: dict = {}
     above_threshold_findings: list = []
+
+
+def test_the_accession_filter_matches_a_fragment_in_any_case(client, signed_in, make_user, filed):
+    """Typed by hand off a paper request, so a fragment is what a user has."""
+    owner = make_user("tech@example.com", ROLE_TECHNICIAN)
+    study = filed(owner=owner)
+    headers = signed_in("tech@example.com")[0]
+
+    def found(value: str) -> list[str]:
+        body = client.get("/api/studies", params={"accession": value}, headers=headers).json()
+        return [item["id"] for item in body["items"]]
+
+    assert found("ACC-99120") == [str(study.id)]  # the whole number
+    assert found("991") == [str(study.id)]  # a fragment from the middle
+    assert found("120") == [str(study.id)]  # its tail
+    assert found("acc-99") == [str(study.id)]  # case-insensitive
+    assert found("  991  ") == [str(study.id)]  # surrounding whitespace is trimmed
+    assert found("ACC-00000") == []
+
+
+def test_the_accession_filter_narrows_rather_than_replaces_the_other_filters(
+    client, signed_in, make_user, filed
+):
+    owner = make_user("tech@example.com", ROLE_TECHNICIAN)
+    filed(owner=owner)
+    headers = signed_in("tech@example.com")[0]
+
+    body = client.get(
+        "/api/studies", params={"accession": "991", "status": "completed"}, headers=headers
+    ).json()
+    # The study is filed, not analysed, so the two filters together match nothing.
+    assert body["items"] == []
+    assert body["total"] == 0
+
+
+def test_a_blank_accession_filter_is_no_filter_at_all(client, signed_in, make_user, filed):
+    """An empty field must not be read as 'match the studies with no accession'."""
+    owner = make_user("tech@example.com", ROLE_TECHNICIAN)
+    study = filed(owner=owner)
+    headers = signed_in("tech@example.com")[0]
+
+    body = client.get("/api/studies", params={"accession": "   "}, headers=headers).json()
+    assert [item["id"] for item in body["items"]] == [str(study.id)]

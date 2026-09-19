@@ -116,6 +116,8 @@ export const en: Dictionary = {
     filters: "Worklist filters",
     search: "Search",
     searchPlaceholder: "Patient or description…",
+    accessionLabel: "Accession number",
+    accessionPlaceholder: "Part of the accession number…",
     statusLabel: "Status",
     allStatuses: "All",
     clearFilters: "Clear filters",

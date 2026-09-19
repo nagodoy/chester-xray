@@ -113,6 +113,7 @@ def _load(db: Session, access: AccessContext, study_id: uuid.UUID) -> Study:
 @router.get("", response_model=StudyListResponse)
 def list_studies(
     search: str | None = Query(None),
+    accession: str | None = Query(None),
     study_status: str | None = Query(None, alias="status"),
     limit: int = Query(20, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -139,6 +140,17 @@ def list_studies(
             matches = matches | Study.patient_name.ilike(pattern)
             matches = matches | Study.patient_id_source.ilike(pattern)
         query = query.filter(matches)
+
+    if accession and accession.strip():
+        # A partial match, deliberately: the number is read off a paper request or
+        # a RIS screen and typed by hand, so the tail of it, or a fragment from the
+        # middle, is what a user actually has. Case-insensitive for the same reason.
+        #
+        # Not gated on `reveal`, unlike the name search above: the accession number
+        # names the order rather than the person, so it is sent to every role and is
+        # already reachable through the general search. Gating it here would hide a
+        # filter for a value the same response carries.
+        query = query.filter(Study.accession_number.ilike(f"%{accession.strip()}%"))
 
     if study_status:
         if study_status not in STATUS_VALUES:

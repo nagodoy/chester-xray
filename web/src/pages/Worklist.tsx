@@ -7,6 +7,7 @@ import {
   CloudUpload,
   Eye,
   Filter,
+  Hash,
   RotateCcw,
   Search,
   Square,
@@ -217,8 +218,13 @@ export function Worklist() {
   const { access, can } = useAuth();
   const { t, format } = useI18n();
   const search = useSearch();
+  // The accession filter rides with the sensitive-data switch: it is offered only
+  // while identifiers are showing, so a screen someone has just hidden does not
+  // keep a field inviting them to type an order number into it.
+  const { revealed } = useSensitiveData();
 
   const [query, setQuery] = useState("");
+  const [accession, setAccession] = useState("");
   const [status, setStatus] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -238,15 +244,22 @@ export function Worklist() {
   const load = useCallback(async () => {
     try {
       setError("");
-      setData(await api.listStudies({ search: query, status }));
+      setData(await api.listStudies({ search: query, accession, status }));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     }
-  }, [query, status]);
+  }, [accession, query, status]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Hiding identifiers takes the field away, so the term it held has to go with
+  // it: a filter that is still narrowing the list from behind a control nobody
+  // can see is a worklist that looks like it has lost studies.
+  useEffect(() => {
+    if (!revealed) setAccession("");
+  }, [revealed]);
 
   // Poll only while something is actually in flight.
   const hasActiveWork = useMemo(
@@ -269,7 +282,7 @@ export function Worklist() {
   const total = Object.values(counts).reduce<number>((sum, value) => sum + (value ?? 0), 0);
   const completedRate = total > 0 ? Math.round((completed / total) * 100) : 0;
   const attentionRate = total > 0 ? Math.round((attention / total) * 100) : 0;
-  const hasFilters = Boolean(query || status);
+  const hasFilters = Boolean(query || accession || status);
   const canDelete = Boolean(access?.is_admin);
 
   const toggle = (id: string) =>
@@ -430,7 +443,7 @@ export function Worklist() {
           <ChevronRight size={15} aria-hidden />
         </button>
         {filtersOpen && (
-          <div className="filter-grid">
+          <div className={revealed ? "filter-grid has-accession" : "filter-grid"}>
             <label className="filter-search">
               <span>{t.worklist.search}</span>
               <div className="search">
@@ -443,6 +456,20 @@ export function Worklist() {
                 />
               </div>
             </label>
+            {revealed && (
+              <label>
+                <span>{t.worklist.accessionLabel}</span>
+                <div className="search">
+                  <Hash size={15} aria-hidden />
+                  <input
+                    className="input"
+                    placeholder={t.worklist.accessionPlaceholder}
+                    value={accession}
+                    onChange={(event) => setAccession(event.target.value)}
+                  />
+                </div>
+              </label>
+            )}
             <label>
               <span>{t.worklist.statusLabel}</span>
               <select
@@ -466,6 +493,7 @@ export function Worklist() {
               disabled={!hasFilters}
               onClick={() => {
                 setQuery("");
+                setAccession("");
                 setStatus("");
               }}
             >

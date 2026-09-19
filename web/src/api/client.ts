@@ -121,9 +121,16 @@ export const api = {
     }
   },
 
-  listStudies: (params: { search?: string; status?: string; limit?: number; offset?: number }) => {
+  listStudies: (params: {
+    search?: string;
+    accession?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }) => {
     const query = new URLSearchParams();
     if (params.search) query.set("search", params.search);
+    if (params.accession) query.set("accession", params.accession);
     if (params.status) query.set("status", params.status);
     query.set("limit", String(params.limit ?? 40));
     query.set("offset", String(params.offset ?? 0));
