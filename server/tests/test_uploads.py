@@ -204,6 +204,91 @@ def test_the_frontal_reopens_a_study_whose_lateral_arrived_first(upload, make_di
     assert second["view_position"] == "PA"
 
 
+def test_a_portuguese_two_view_exam_is_scored_from_its_frontal(upload, make_dicom, session):
+    """The exam as a Brazilian CR sends it: no ViewPosition, the view in the series."""
+    import uuid
+
+    from pydicom.uid import generate_uid
+
+    from chester.imaging.dicom import compute_sha256
+    from chester.instances import representative_instance
+    from chester.models import Study
+
+    study_uid = generate_uid()
+    common = {
+        "study_uid": study_uid,
+        "modality": "CR",
+        "body_part": "TORAX",
+        "view_position": "",
+        "study_description": "RX TORAX 2 INCIDENCIAS",
+    }
+    lateral = make_dicom(series_description="PERFIL", **common)
+    frontal = make_dicom(series_description="PA", **common)
+
+    first = upload([("files", ("perfil.dcm", lateral, "application/dicom"))]).json()["studies"][0]
+    assert first["status"] == "rejected"
+    assert first["validation_reason_code"] == "lateral_view"
+
+    second = upload([("files", ("pa.dcm", frontal, "application/dicom"))]).json()["studies"][0]
+
+    assert second["id"] == first["id"]
+    assert second["status"] == "queued"
+    assert second["validation_state"] == "chest"
+
+    study = session.get(Study, uuid.UUID(second["id"]))
+    assert representative_instance(session, study).sha256 == compute_sha256(frontal)
+
+
+def test_both_films_in_one_request_are_scored_from_the_frontal(upload, make_dicom):
+    """A STOW or an upload carrying the lateral first must not decide the exam."""
+    from pydicom.uid import generate_uid
+
+    study_uid = generate_uid()
+    common = {"study_uid": study_uid, "modality": "CR", "body_part": "TORAX", "view_position": ""}
+    lateral = make_dicom(series_description="PERFIL", **common)
+    frontal = make_dicom(series_description="FRENTE", **common)
+
+    body = upload(
+        [
+            ("files", ("perfil.dcm", lateral, "application/dicom")),
+            ("files", ("frente.dcm", frontal, "application/dicom")),
+        ]
+    ).json()
+
+    statuses = {study["status"] for study in body["studies"]}
+    assert statuses == {"queued"}
+
+
+def test_an_unconfirmed_film_takes_a_lateral_refusal_to_review(upload, make_dicom):
+    """Maybe the frontal, maybe not: a human decides, the exam is not discarded."""
+    from pydicom.uid import generate_uid
+
+    study_uid = generate_uid()
+    lateral = make_dicom(study_uid=study_uid, view_position="LL")
+    unnamed = make_dicom(
+        study_uid=study_uid, modality="", body_part="", view_position="", study_description=""
+    )
+
+    first = upload([("files", ("perfil.dcm", lateral, "application/dicom"))]).json()["studies"][0]
+    second = upload([("files", ("outra.dcm", unnamed, "application/dicom"))]).json()["studies"][0]
+
+    assert second["id"] == first["id"]
+    assert second["status"] == "needs_review"
+
+
+def test_a_second_lateral_leaves_the_study_refused(upload, make_dicom):
+    from pydicom.uid import generate_uid
+
+    study_uid = generate_uid()
+    first = make_dicom(study_uid=study_uid, view_position="LL")
+    upload([("files", ("ll.dcm", first, "application/dicom"))])
+    again = make_dicom(study_uid=study_uid, view_position="RL")
+    study = upload([("files", ("rl.dcm", again, "application/dicom"))]).json()["studies"][0]
+
+    assert study["status"] == "rejected"
+    assert study["validation_reason_code"] == "lateral_view"
+
+
 def test_a_lateral_arriving_second_leaves_a_queued_study_alone(upload, make_dicom, session):
     from pydicom.uid import generate_uid
 
