@@ -259,20 +259,8 @@ def _ingest_dicom(
 
     if is_new_study:
         _finalize_status(db, study, validation.state)
-    elif validation.state == CHEST and _awaiting_a_frontal(study):
-        # A later instance supplied the evidence the first one lacked -- often
-        # the frontal film of an exam whose lateral was sent first, which is
-        # also the image the study should be represented by from here on.
-        study.validation_state = validation.state
-        study.validation_reason_code = validation.code
-        study.validation_reason = validation.reason
-        # The row describes the image the study is scored from, so the view of
-        # the instance that reopened it replaces whatever the earlier one wrote.
-        study.view_position = meta.get("view_position") or study.view_position
-        if pixels is not None and not drew_thumbnail:
-            # The study was pictured by the film it is no longer scored from.
-            _store_thumbnail(db, study, pixels)
-        _finalize_status(db, study, validation.state)
+    else:
+        reopen_with(db, study, validation, meta, pixels, redraw=not drew_thumbnail)
 
     _audit(
         db,
@@ -400,6 +388,39 @@ def _ingest_image(
     )
 
 
+def reopen_with(db: Session, study: Study, validation, meta: dict, pixels, *, redraw=True) -> bool:
+    """Let an instance of an existing study decide it again. Returns whether it did.
+
+    A later instance can supply the evidence the first one lacked -- often the
+    frontal film of an exam whose lateral was sent first, which is also the
+    image the study should be represented by from here on. A frontal that is
+    confidently chest queues the study. One that is not lateral but cannot be
+    confirmed still takes a lateral refusal off the study and hands it to a
+    human: an exam holding a film that may well be the frontal must not stay
+    discarded because its lateral happened to arrive first.
+    """
+    confirmed = validation.state == CHEST and _awaiting_a_frontal(study)
+    possibly_frontal = validation.state == UNCERTAIN and _refused_as_lateral(study)
+    if not (confirmed or possibly_frontal):
+        return False
+
+    study.validation_state = validation.state
+    study.validation_reason_code = validation.code
+    study.validation_reason = validation.reason
+    # The row describes the image the study is scored from, so the view of
+    # the instance that reopened it replaces whatever the earlier one wrote.
+    study.view_position = meta.get("view_position") or study.view_position
+    if pixels is not None and redraw:
+        # The study was pictured by the film it is no longer scored from.
+        _store_thumbnail(db, study, pixels)
+    _finalize_status(db, study, validation.state)
+    return True
+
+
+def _refused_as_lateral(study: Study) -> bool:
+    return study.status == STATUS_REJECTED and study.validation_reason_code == CODE_LATERAL_VIEW
+
+
 def _awaiting_a_frontal(study: Study) -> bool:
     """Whether a study can still be turned into one worth analysing.
 
@@ -409,9 +430,7 @@ def _awaiting_a_frontal(study: Study) -> bool:
     way. Nothing else is reopened by an arriving instance: a study refused for
     its modality or its body part stays refused.
     """
-    if study.status == STATUS_NEEDS_REVIEW:
-        return True
-    return study.status == STATUS_REJECTED and study.validation_reason_code == CODE_LATERAL_VIEW
+    return study.status == STATUS_NEEDS_REVIEW or _refused_as_lateral(study)
 
 
 def _fill_missing_metadata(study: Study, meta: dict) -> None:

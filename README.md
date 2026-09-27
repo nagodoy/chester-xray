@@ -89,6 +89,20 @@ Each study is committed on its own, so the run is safe to interrupt, and one
 already carrying the current thumbnail is skipped, so it is safe to repeat.
 Studies whose bytes are gone are reported and passed over.
 
+A two-film exam whose lateral arrived first was refused, and stayed refused when
+its frontal could not be confirmed on its own -- typically a frontal whose body
+part reads "TORAX" and whose view is named only in its series ("PA", "FRENTE").
+Re-read every stored film of the studies still refused as lateral: a confirmed
+frontal queues the study for analysis (scored from the frontal, never the
+lateral), and a film that is not lateral but cannot be confirmed sends the study
+to review:
+
+```bash
+cd server
+python -m chester.revalidate --dry-run    # report, change nothing
+python -m chester.revalidate              # write
+```
+
 ## ANALISADA report series
 
 Turns a completed analysis into a Secondary Capture instance and, optionally,

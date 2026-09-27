@@ -91,8 +91,22 @@ def outcome(state: str, code: str, **params: str) -> Validation:
 CHEST_MODALITIES = frozenset({"DX", "CR", "RG"})
 NON_CHEST_MODALITIES = frozenset({"CT", "MR", "US", "NM", "PT", "MG", "OT", "XA", "RF", "SC"})
 
+# BodyPartExamined is a defined term, but Portuguese- and Spanish-speaking sites
+# routinely write their own word for the chest there, so those are accepted too.
 CHEST_BODY_PARTS = frozenset(
-    {"CHEST", "THORAX", "LUNG", "HEART", "RIBCAGE", "STERNUM", "MEDIASTINUM", "TRACHEA", "BRONCHUS"}
+    {
+        "CHEST",
+        "THORAX",
+        "TORAX",
+        "TÓRAX",
+        "LUNG",
+        "HEART",
+        "RIBCAGE",
+        "STERNUM",
+        "MEDIASTINUM",
+        "TRACHEA",
+        "BRONCHUS",
+    }
 )
 NON_CHEST_BODY_PARTS = frozenset(
     {
@@ -138,16 +152,20 @@ LATERAL_VIEWS = frozenset(
     {"LL", "RL", "L", "LAT", "LATERAL", "LLAT", "RLAT", "XTABLE LATERAL", "LATERAL DECUBITUS"}
 )
 
-CHEST_DESCRIPTION_HINTS = ("CHEST", "THORAX", "CXR", "LUNG", "PA", "AP VIEW")
+CHEST_DESCRIPTION_HINTS = ("CHEST", "THORAX", "TORAX", "TÓRAX", "CXR", "LUNG", "PA", "AP VIEW")
 
 # Words that name a projection when no ViewPosition does. Matched as whole words
-# against the study, series and protocol descriptions, never as substrings: "LL"
+# against the series and protocol names first -- they describe the film -- and
+# only then against the study description, which often covers the whole exam.
+# Never as substrings: "LL"
 # inside another word is not a lateral film, and a report that discards a frontal
 # exam by accident is worse than one that holds it for review.
 FRONTAL_WORDS = frozenset({"PA", "AP", "FRONTAL", "FRENTE"})
 LATERAL_WORDS = frozenset({"LAT", "LATERAL", "PERFIL", "LL", "RL", "LLAT", "RLAT"})
 
-DESCRIPTION_FIELDS = ("description", "series_description", "protocol_name")
+# Named for the series the film belongs to, which in radiography is the film.
+SERIES_FIELDS = ("series_description", "protocol_name")
+DESCRIPTION_FIELDS = ("description", *SERIES_FIELDS)
 _WORDS = re.compile(r"[^A-Z0-9]+")
 
 MIN_DIMENSION = 64
@@ -157,10 +175,10 @@ MIN_ENTROPY = 0.5
 MAX_ENTROPY = 7.5
 
 
-def _words(meta: dict) -> set[str]:
-    """Every whole word the descriptive fields of a study carry, upper-cased."""
+def _words(meta: dict, fields: tuple[str, ...] = DESCRIPTION_FIELDS) -> set[str]:
+    """Every whole word the given descriptive fields carry, upper-cased."""
     found: set[str] = set()
-    for field in DESCRIPTION_FIELDS:
+    for field in fields:
         text = (meta.get(field) or "").upper()
         found.update(token for token in _WORDS.split(text) if token)
     return found
@@ -174,6 +192,10 @@ def projection(meta: dict) -> str:
     it is absent or unrecognised do the words get a say, and a description naming
     both projections -- "TORAX PA E PERFIL", one string covering two films --
     settles nothing, so it is reported as ambiguous rather than guessed.
+
+    The series and protocol names are asked before the study description. An
+    exam described as "TORAX PA E PERFIL" arrives as two films whose series say
+    "PA" and "PERFIL"; each film is what its own series says it is.
     """
     view_position = (meta.get("view_position") or "").upper().strip()
     if view_position in FRONTAL_VIEWS:
@@ -181,7 +203,13 @@ def projection(meta: dict) -> str:
     if view_position in LATERAL_VIEWS:
         return LATERAL
 
-    words = _words(meta)
+    from_series = _named_projection(_words(meta, SERIES_FIELDS))
+    if from_series != UNKNOWN_PROJECTION:
+        return from_series
+    return _named_projection(_words(meta))
+
+
+def _named_projection(words: set[str]) -> str:
     frontal = bool(words & FRONTAL_WORDS)
     lateral = bool(words & LATERAL_WORDS)
     if frontal and lateral:
@@ -191,6 +219,11 @@ def projection(meta: dict) -> str:
     if frontal:
         return FRONTAL
     return UNKNOWN_PROJECTION
+
+
+def _series_says_frontal(meta: dict) -> bool:
+    """Whether the film's own series or protocol names it frontal, and nothing else."""
+    return _named_projection(_words(meta, SERIES_FIELDS)) == FRONTAL
 
 
 def validate_study(meta: dict, image: np.ndarray | None = None) -> Validation:
@@ -216,10 +249,11 @@ def validate_study(meta: dict, image: np.ndarray | None = None) -> Validation:
 
     is_chest_modality = modality in CHEST_MODALITIES
     is_chest_body = body_part in CHEST_BODY_PARTS
-    # Ruling a study in still needs the tag. A word in a description can say a
-    # film is lateral, which refuses it, but "PA" written in an exam description
-    # is not evidence that this instance is the frontal one.
-    is_frontal = view_position in FRONTAL_VIEWS
+    # Ruling a study in needs the tag or the film's own series. A word in a
+    # description can say a film is lateral, which refuses it, but "PA" written
+    # in an exam description is not evidence that this instance is the frontal
+    # one. A series named "PA" or "FRENTE" is: the series is the film.
+    is_frontal = view_position in FRONTAL_VIEWS or _series_says_frontal(meta)
     described_as_chest = any(hint in description for hint in CHEST_DESCRIPTION_HINTS)
 
     if is_chest_modality and (is_chest_body or is_frontal or described_as_chest):

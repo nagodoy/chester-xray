@@ -208,3 +208,50 @@ def test_a_lateral_refusal_beats_every_chest_indicator():
 def test_the_projection_is_read_the_same_way_everywhere(fields, expected):
     """The instance selector shares this classifier, so it is tested directly."""
     assert projection(meta(**fields)) == expected
+
+
+@pytest.mark.parametrize("body_part", ["TORAX", "TÓRAX"])
+def test_a_chest_body_part_written_in_portuguese_is_the_chest(body_part):
+    """Brazilian modalities write their own word in BodyPartExamined."""
+    assert validate_study(meta(modality="CR", body_part=body_part)).state == CHEST
+
+
+def test_a_portuguese_exam_description_is_a_chest_description():
+    result = validate_study(meta(modality="CR", description="RX TORAX 2 INCIDENCIAS"))
+
+    assert result.state == CHEST
+
+
+@pytest.mark.parametrize("series", ["PA", "TORAX PA", "FRENTE", "TORAX AP"])
+def test_a_series_naming_the_frontal_is_frontal_evidence(series):
+    """The series is the film: without the tag, it still says which one this is."""
+    result = validate_study(meta(body_part="CHEST", series_description=series))
+
+    assert result.state == CHEST
+    assert result.code == "chest_frontal"
+
+
+def test_a_frontal_named_only_in_the_study_description_still_needs_the_tag():
+    """'PA' in the exam's description covers the exam, not this film."""
+    assert validate_study(meta(body_part="CHEST", description="TORAX PA")).state == UNCERTAIN
+
+
+@pytest.mark.parametrize(
+    ("series", "expected"),
+    [("PA", FRONTAL), ("FRENTE", FRONTAL), ("PERFIL", LATERAL), ("LAT", LATERAL)],
+)
+def test_each_film_of_a_two_view_exam_is_what_its_series_says(series, expected):
+    """An exam described as both views arrives as two films, each named by its series."""
+    fields = meta(description="TORAX PA E PERFIL", series_description=series)
+
+    assert projection(fields) == expected
+
+
+def test_the_frontal_film_of_a_two_view_exam_is_analysed():
+    fields = meta(
+        modality="CR",
+        body_part="TORAX",
+        description="TORAX PA E PERFIL",
+        series_description="PA",
+    )
+    assert validate_study(fields).state == CHEST
