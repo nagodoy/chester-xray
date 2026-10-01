@@ -284,9 +284,7 @@ def _check_expressions(
         for constraint in table.constraints
         if isinstance(constraint, CheckConstraint)
     )
-    actual = grouped(
-        constraint["sqltext"] for constraint in inspector.get_check_constraints(name)
-    )
+    actual = grouped(constraint["sqltext"] for constraint in inspector.get_check_constraints(name))
     return expected, actual
 
 
@@ -347,12 +345,8 @@ def drift() -> list[str]:
             expected_default = _default_sql(model_column.server_default)
             actual_default = _default_sql(actual_column.get("default"))
             if expected_default != actual_default:
-                expected_default_original = _expression_sql_original(
-                    model_column.server_default
-                )
-                actual_default_original = _expression_sql_original(
-                    actual_column.get("default")
-                )
+                expected_default_original = _expression_sql_original(model_column.server_default)
+                actual_default_original = _expression_sql_original(actual_column.get("default"))
                 problems.append(
                     f"{name}.{column_name}: server default is {actual_default_original!r}, "
                     f"expected {expected_default_original!r}"
@@ -375,14 +369,10 @@ def drift() -> list[str]:
         expected_checks, actual_checks = _check_expressions(table, inspector, name)
         if set(expected_checks) != set(actual_checks):
             expected_originals = {
-                original
-                for canonical in expected_checks
-                for original in expected_checks[canonical]
+                original for canonical in expected_checks for original in expected_checks[canonical]
             }
             actual_originals = {
-                original
-                for canonical in actual_checks
-                for original in actual_checks[canonical]
+                original for canonical in actual_checks for original in actual_checks[canonical]
             }
             problems.append(
                 f"{name}: check constraints are {_describe(actual_originals)}, "

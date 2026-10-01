@@ -85,7 +85,22 @@ export interface AnalysisResult {
   thresholds: Record<string, number> | null;
   above_threshold: Record<string, boolean> | null;
   above_threshold_findings: string[] | null;
+  // Where each output's evidence sits, from the model's own 7x7 map. Null on a
+  // result recorded before it existed, or a model with no activation to read.
+  topography?: Record<string, Topography> | null;
   created_at: string;
+}
+
+export type TopographySide = "right" | "left" | "bilateral";
+export type TopographyZone = "upper" | "middle" | "lower";
+
+export interface Topography {
+  side: TopographySide;
+  zones: TopographyZone[];
+  right_share: number;
+  zone_shares: Record<TopographyZone, number>;
+  /** "dicom" when PatientOrientation said which way round; "assumed" otherwise. */
+  orientation: "dicom" | "assumed";
 }
 
 export interface Instance {

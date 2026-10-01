@@ -75,6 +75,16 @@ def activation_map(pixels: np.ndarray, pathology: str) -> np.ndarray:
         raise ValueError(f"{pathology} is not an output this deployment explains.")
 
     index = PATHOLOGIES.index(pathology)
+    return _to_unit_scale(contributions(pixels)[index])
+
+
+def contributions(pixels: np.ndarray) -> np.ndarray:
+    """Every output's signed evidence map, shaped (len(PATHOLOGIES), h, w).
+
+    The model's native grid -- 7x7 for this artifact -- with nothing clamped or
+    rescaled, so the spatial mean of row `c` is output `c`'s logit less its bias.
+    One forward pass covers all eighteen, which is what chester.topography needs.
+    """
     prepared = inference.preprocess(pixels).reshape(1, 1, IMAGE_SIZE, IMAGE_SIZE)
     maps = inference.activation(prepared)
     weights = inference.classifier_weights()
@@ -85,8 +95,7 @@ def activation_map(pixels: np.ndarray, pathology: str) -> np.ndarray:
             "the model artifact and this code disagree."
         )
 
-    contribution = np.einsum("k,kxy->xy", weights[index], maps)
-    return _to_unit_scale(contribution)
+    return np.einsum("ck,kxy->cxy", weights, maps)
 
 
 def _to_unit_scale(contribution: np.ndarray) -> np.ndarray:

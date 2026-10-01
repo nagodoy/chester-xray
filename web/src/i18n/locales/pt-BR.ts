@@ -201,6 +201,15 @@ export const ptBR = {
     flag: "Sinal",
     above: "acima",
     below: "abaixo",
+    topography: "Topografia",
+    topographyAssumed: "orientação assumida",
+    topographyAssumedTitle:
+      "A imagem não informa a orientação; lida pela convenção, direita do paciente à esquerda de quem vê.",
+    topographyNote:
+      "Topografia é onde está a evidência usada pelo modelo dentro do quadrado analisado, por hemitórax e terço. Não é localização de lesão.",
+    sides: { right: "HTD", left: "HTE", bilateral: "Bilateral" },
+    zones: { upper: "superior", middle: "médio", lower: "inferior" },
+    diffuse: "difuso",
     distribution: "Distribuição dos scores",
     normalizedScore: "score normalizado de pesquisa",
   },

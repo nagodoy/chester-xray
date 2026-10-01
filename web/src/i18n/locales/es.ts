@@ -207,6 +207,15 @@ export const es: Dictionary = {
     flag: "Señal",
     above: "por encima",
     below: "por debajo",
+    topography: "Topografía",
+    topographyAssumed: "orientación asumida",
+    topographyAssumedTitle:
+      "La imagen no indica su orientación; se lee por convención, derecha del paciente a la izquierda del observador.",
+    topographyNote:
+      "La topografía es dónde está la evidencia usada por el modelo dentro del cuadrado analizado, por hemitórax y tercio. No es la localización de una lesión.",
+    sides: { right: "HTD", left: "HTI", bilateral: "Bilateral" },
+    zones: { upper: "superior", middle: "medio", lower: "inferior" },
+    diffuse: "difuso",
     distribution: "Distribución de las puntuaciones",
     normalizedScore: "puntuación normalizada de investigación",
   },

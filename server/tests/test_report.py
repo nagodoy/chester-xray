@@ -608,3 +608,57 @@ def test_the_destination_defaults_to_the_configured_viewer():
     assert settings.dicom_send_port == 11112
     assert settings.dicom_send_ae_title == "medfusion"
     assert settings.dicom_send_calling_ae_title == "TORAX_AI"
+
+
+class TestTopography:
+    """Where the evidence sits: on the row, on the sheet and in the tags."""
+
+    @pytest.fixture
+    def located(self, result):
+        result.topography = {
+            "Cardiomegaly": {"side": "bilateral", "zones": ["lower"], "orientation": "assumed"},
+            "Effusion": {"side": "right", "zones": ["middle", "lower"], "orientation": "dicom"},
+            "Mass": {"side": "left", "zones": ["upper"], "orientation": "dicom"},
+        }
+        return result
+
+    def test_a_called_or_doubted_finding_carries_its_place(self, located):
+        rows = {row["pathology"]: row for row in report.finding_rows(located)}
+        assert rows["Cardiomegaly"]["topography_label"] == "Bilateral inferior"
+        assert rows["Effusion"]["topography_label"] == "HTD médio/inferior"
+        assert rows["Effusion"]["topography_code"] == "RIGHT/MIDDLE+LOWER"
+
+    def test_a_finding_under_its_point_is_not_placed(self, located):
+        rows = {row["pathology"]: row for row in report.finding_rows(located)}
+        assert rows["Mass"]["confidence"] == report.SIGNAL_BELOW
+        assert rows["Mass"]["topography"] is None
+        assert rows["Mass"]["topography_label"] == "-"
+
+    def test_a_result_from_before_topography_still_reports(self, result):
+        rows = report.finding_rows(result)
+        assert all(row["topography"] is None for row in rows)
+
+    def test_the_place_is_in_each_items_private_block(self, source_dicom, pixels, located):
+        built = build_report_dataset(source_dicom, pixels, located)
+        # Through the file format, which is what a PACS receives.
+        parsed = dcmread(io.BytesIO(dataset_to_bytes(built)))
+        items = parsed.private_block(PRIVATE_GROUP, DEFAULT_PRIVATE_CREATOR)[0x03].value
+        codes = {}
+        for item in items:
+            inner = item.private_block(PRIVATE_GROUP, DEFAULT_PRIVATE_CREATOR)
+            codes[item.CodeMeaning] = inner[0x04].value if 0x04 in inner else None
+        assert codes["EFFUSION"] == "RIGHT/MIDDLE+LOWER"
+        assert codes["CARDIOMEGALY"] == "BILATERAL/LOWER"
+        assert codes["MASS"] is None
+
+    def test_the_sheet_still_renders_with_the_extra_column(self, pixels, located):
+        from chester.imaging.report_image import render_report
+
+        png = render_report(
+            pixels,
+            patient_name="X",
+            accession_number="1",
+            study_date="01/10/2026",
+            rows=report.finding_rows(located),
+        )
+        assert png.startswith(b"\x89PNG")

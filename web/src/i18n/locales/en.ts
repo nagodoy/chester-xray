@@ -208,6 +208,15 @@ export const en: Dictionary = {
     flag: "Flag",
     above: "above",
     below: "below",
+    topography: "Location",
+    topographyAssumed: "orientation assumed",
+    topographyAssumedTitle:
+      "The image does not state its orientation; read by convention, patient's right on the viewer's left.",
+    topographyNote:
+      "Location is where the model's evidence sits within the scored square, by hemithorax and third. It is not a lesion localization.",
+    sides: { right: "Right", left: "Left", bilateral: "Bilateral" },
+    zones: { upper: "upper", middle: "middle", lower: "lower" },
+    diffuse: "diffuse",
     distribution: "Score distribution",
     normalizedScore: "normalized research score",
   },

@@ -3,7 +3,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react
 import { Link, useParams } from "wouter";
 
 import { api } from "../api/client";
-import type { AnalysisResult, StudyDetail as StudyDetailType } from "../api/types";
+import type { AnalysisResult, StudyDetail as StudyDetailType, Topography } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { AppShell } from "../components/AppShell";
 import { ErrorBox, Notice, Panel, Skeleton, StatusPill, Thumbnail } from "../components/common";
@@ -21,7 +21,13 @@ interface Row {
   normalized: number;
   threshold: number;
   above: boolean;
+  /** Only for a finding over its point or within the doubt band, as the sheet. */
+  topography: Topography | null;
 }
+
+// The doubt band of chester.report: a score this close to its operating point is
+// DUVIDOSO on the sheet, and the sheet locates it, so the table does too.
+const DOUBT_BAND = 0.1;
 
 /** Flatten the most recent result into rows, tolerating partially populated maps. */
 const latestRows = (results: AnalysisResult[]): Row[] => {
@@ -34,15 +40,22 @@ const latestRows = (results: AnalysisResult[]): Row[] => {
     ...Object.keys(latest.thresholds ?? {}),
   ]);
 
-  return [...names].map((pathology) => ({
-    pathology,
-    raw: latest.raw_scores?.[pathology] ?? 0,
-    normalized: latest.op_normalized_scores?.[pathology] ?? 0,
-    threshold: latest.thresholds?.[pathology] ?? 0,
-    above:
+  return [...names].map((pathology) => {
+    const raw = latest.raw_scores?.[pathology] ?? 0;
+    const threshold = latest.thresholds?.[pathology] ?? 0;
+    const above =
       latest.above_threshold?.[pathology] ??
-      (latest.above_threshold_findings ?? []).includes(pathology),
-  }));
+      (latest.above_threshold_findings ?? []).includes(pathology);
+    const located = above || Math.abs(raw - threshold) <= DOUBT_BAND * threshold;
+    return {
+      pathology,
+      raw,
+      normalized: latest.op_normalized_scores?.[pathology] ?? 0,
+      threshold,
+      above,
+      topography: located ? (latest.topography?.[pathology] ?? null) : null,
+    };
+  });
 };
 
 export function StudyDetail() {
@@ -305,7 +318,9 @@ export function StudyDetail() {
             title={t.detail.findings}
             aside={<span>{format(t.detail.outputs, { count: rows.length })}</span>}
           >
-            <Notice strong={t.detail.notProbability}>{t.detail.notProbabilityBody}</Notice>
+            <Notice strong={t.detail.notProbability}>
+              {t.detail.notProbabilityBody} {t.detail.topographyNote}
+            </Notice>
             <div className="table-scroll">
               <table>
                 <thead>
@@ -315,6 +330,7 @@ export function StudyDetail() {
                     <th>{t.detail.normalized}</th>
                     <th>{t.detail.threshold}</th>
                     <th>{t.detail.flag}</th>
+                    <th>{t.detail.topography}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -353,6 +369,27 @@ export function StudyDetail() {
                         <span className={row.above ? "pill pill-needs_review" : "pill pill-completed"}>
                           {row.above ? t.detail.above : t.detail.below}
                         </span>
+                      </td>
+                      <td>
+                        {row.topography ? (
+                          <span
+                            title={
+                              row.topography.orientation === "assumed"
+                                ? t.detail.topographyAssumedTitle
+                                : undefined
+                            }
+                          >
+                            {t.detail.sides[row.topography.side]}{" "}
+                            {row.topography.zones.length === 3
+                              ? t.detail.diffuse
+                              : row.topography.zones.map((zone) => t.detail.zones[zone]).join("/")}
+                            {row.topography.orientation === "assumed" && (
+                              <small className="muted"> · {t.detail.topographyAssumed}</small>
+                            )}
+                          </span>
+                        ) : (
+                          t.common.none
+                        )}
                       </td>
                     </tr>
                   ))}

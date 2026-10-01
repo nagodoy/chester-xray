@@ -77,7 +77,7 @@ def _snapshot_and_convert(
         text(
             f'SELECT count(*) FROM "{snapshot}" snapshot '
             f'FULL OUTER JOIN "{table}" live USING (id) '
-            f'WHERE snapshot.id IS NULL OR live.id IS NULL '
+            f"WHERE snapshot.id IS NULL OR live.id IS NULL "
             f'OR snapshot.document IS DISTINCT FROM live."{column}"::jsonb'
         )
     ).scalar_one()
@@ -113,9 +113,7 @@ def migrate(direction: str, db_engine: Engine = engine, *, lock_timeout: str = "
     converted = [f"{table}.{column}" for table, column in pending]
     final_types = column_types(db_engine)
     wrong = [
-        f"{table}.{column}"
-        for (table, column), actual in final_types.items()
-        if actual != target
+        f"{table}.{column}" for (table, column), actual in final_types.items() if actual != target
     ]
     if wrong:
         raise RuntimeError(f"Migration did not produce {target}: {', '.join(wrong)}")

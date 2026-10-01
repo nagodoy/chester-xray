@@ -338,6 +338,9 @@ class AnalysisResult(Base):
     thresholds: Mapped[dict | None] = mapped_column(JsonDocument, nullable=True)
     above_threshold: Mapped[dict | None] = mapped_column(JsonDocument, nullable=True)
     above_threshold_findings: Mapped[list | None] = mapped_column(JsonDocument, nullable=True)
+    # Side and zones of each output's evidence, from chester.topography. Null on
+    # results recorded before it existed and on a model with no activation to read.
+    topography: Mapped[dict | None] = mapped_column(JsonDocument, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
 

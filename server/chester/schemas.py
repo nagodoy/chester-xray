@@ -46,13 +46,20 @@ class AnalysisResultSchema(BaseModel):
     thresholds: dict[str, float] | None
     above_threshold: dict[str, bool] | None
     above_threshold_findings: list[str] | None
+    topography: dict[str, dict[str, Any]] | None = None
     created_at: datetime
 
     @model_validator(mode="after")
     def _drop_suppressed(self):
         from chester.inference import is_reported
 
-        for field in ("raw_scores", "op_normalized_scores", "thresholds", "above_threshold"):
+        for field in (
+            "raw_scores",
+            "op_normalized_scores",
+            "thresholds",
+            "above_threshold",
+            "topography",
+        ):
             stored = getattr(self, field)
             if stored:
                 setattr(self, field, {k: v for k, v in stored.items() if is_reported(k)})

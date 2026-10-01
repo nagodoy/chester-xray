@@ -178,6 +178,11 @@ def _apply_private_block(dataset, rows: list[dict], private_creator: str) -> Non
     score -- so the two halves of the same report disagreed on how much they were
     willing to say. Nothing is removed: a reader that only knows CodeMeaning and
     TextValue sees exactly what it saw before.
+
+    A fourth element, `04`, names where the evidence sits -- RIGHT/LOWER,
+    BILATERAL/MIDDLE+LOWER -- for a finding the report calls ACIMA or DUVIDOSO,
+    the same cell the sheet prints under TOPOGRAFIA. chester.topography says what
+    that is drawn from and how little it claims.
     """
     from pydicom.dataset import Dataset
 
@@ -199,6 +204,10 @@ def _apply_private_block(dataset, rows: list[dict], private_creator: str) -> Non
         scores.add_new(0x01, "DS", _decimal_string(row["score"]))
         scores.add_new(0x02, "DS", _decimal_string(row["threshold"]))
         scores.add_new(0x03, "DS", _decimal_string(row["normalized"]))
+        if row.get("topography_code"):
+            # Side and zones of the evidence, e.g. RIGHT/LOWER: chester.topography.
+            # Absent, not empty, where the report does not locate the finding.
+            scores.add_new(0x04, "LO", row["topography_code"])
         items.append(item)
     block.add_new(0x03, "SQ", items)
     block.add_new(0x04, "SH", "ORIGINAL")
