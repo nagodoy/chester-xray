@@ -161,7 +161,7 @@ class TestPostgresDriftDetection:
                 "studies: check constraints are",
             ),
             (
-                "DROP INDEX ix_studies_body_part",
+                "DROP INDEX ix_studies_status",
                 "studies: missing index",
             ),
             (
@@ -234,13 +234,25 @@ class TestPostgresDriftDetection:
     ):
         from chester.schema import drift
 
-        reflected = "source <> 'test-invalid'::character varying"
         with postgres_schema_engine.begin() as connection:
             connection.execute(
                 text(
-                    f"ALTER TABLE studies ADD CONSTRAINT ck_studies_test_source CHECK ({reflected})"
+                    "ALTER TABLE studies ADD CONSTRAINT ck_studies_test_source "
+                    "CHECK (source <> 'test-invalid'::character varying)"
                 )
             )
+
+        # The spelling reflection returns is PostgreSQL's own, not the one
+        # written -- PostgreSQL 16 adds casts the statement never had -- so it is
+        # read back rather than predicted. That spelling is what the problem must
+        # quote, untouched by the canonical form drift() compares with.
+        from sqlalchemy import inspect
+
+        reflected = next(
+            constraint["sqltext"]
+            for constraint in inspect(postgres_schema_engine).get_check_constraints("studies")
+            if constraint["name"] == "ck_studies_test_source"
+        )
 
         problem = next(
             problem for problem in drift() if "studies: check constraints are" in problem
