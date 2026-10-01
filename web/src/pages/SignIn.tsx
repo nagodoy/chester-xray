@@ -1,4 +1,4 @@
-import { Loader2, Mail } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useLocation } from "wouter";
@@ -13,10 +13,13 @@ import { VerifyCode } from "./VerifyCode";
 export function SignIn() {
   const [, navigate] = useLocation();
   const { signIn } = useAuth();
-  const { t } = useI18n();
+  const { t, format } = useI18n();
 
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
+  // How long the code lasts, as the server said when it sent one. Unknown until
+  // then, and the footnote simply leaves the number out.
+  const [expiresMinutes, setExpiresMinutes] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -28,7 +31,8 @@ export function SignIn() {
     setBusy(true);
     setError("");
     try {
-      await api.requestCode(normalized);
+      const sent = await api.requestCode(normalized);
+      setExpiresMinutes(sent.expires_minutes ?? null);
       setEmail(normalized);
       setStep("code");
     } catch (caught) {
@@ -43,34 +47,35 @@ export function SignIn() {
     navigate("/worklist", { replace: true });
   };
 
+  const footnote =
+    step === "code" && expiresMinutes
+      ? `${format(t.auth.codeValidFor, { minutes: expiresMinutes })} ${t.auth.authorizedOnly}`
+      : t.auth.authorizedOnly;
+
   return (
-    <AuthLayout>
+    <AuthLayout footnote={footnote}>
       {step === "email" ? (
         <>
-          <div className="auth-card-title">
-            <h2>{t.auth.title}</h2>
-          </div>
+          <p className="auth-eyebrow">{t.auth.stepIdentify}</p>
+          <h2 className="auth-heading">{t.auth.title}</h2>
           <p className="auth-subtitle">{t.auth.subtitle}</p>
 
           <form onSubmit={(event) => void submitEmail(event)}>
             <label className="auth-field">
               <span>{t.auth.emailLabel}</span>
-              <div className="auth-input-wrap">
-                <Mail size={16} aria-hidden />
-                <input
-                  className="auth-input"
-                  type="email"
-                  autoComplete="email"
-                  autoFocus
-                  required
-                  value={email}
-                  placeholder={t.auth.emailPlaceholder}
-                  onChange={(event) => {
-                    setEmail(event.target.value);
-                    setError("");
-                  }}
-                />
-              </div>
+              <input
+                className="auth-input"
+                type="email"
+                autoComplete="email"
+                autoFocus
+                required
+                value={email}
+                placeholder={t.auth.emailPlaceholder}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  setError("");
+                }}
+              />
             </label>
 
             {error && (

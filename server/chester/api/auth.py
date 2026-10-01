@@ -165,7 +165,14 @@ def request_code(
         )
     )
     db.commit()
-    return {"ok": True, "message": GENERIC_CODE_SENT}
+    # The lifetime is the deployment's, not the address's: the same number goes
+    # back for an unknown address as for a known one, so the sign-in screen can
+    # say how long the code lasts without the reply telling the two apart.
+    return {
+        "ok": True,
+        "message": GENERIC_CODE_SENT,
+        "expires_minutes": settings.auth_otp_minutes,
+    }
 
 
 @router.post("/verify-code")
