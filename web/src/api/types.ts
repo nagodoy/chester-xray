@@ -94,13 +94,18 @@ export interface AnalysisResult {
 export type TopographySide = "right" | "left" | "bilateral";
 export type TopographyZone = "upper" | "middle" | "lower";
 
+/** Where a finding's evidence sits within the segmented lungs (chester.topography). */
 export interface Topography {
-  side: TopographySide;
-  zones: TopographyZone[];
-  right_share: number;
-  zone_shares: Record<TopographyZone, number>;
-  /** "dicom" when PatientOrientation said which way round; "assumed" otherwise. */
-  orientation: "dicom" | "assumed";
+  version: number;
+  /** "extrapulmonary": the evidence lies mostly outside the lung fields. */
+  status: "located" | "extrapulmonary";
+  thoracic_share: number;
+  side?: TopographySide;
+  zones?: TopographyZone[];
+  right_share?: number;
+  zone_shares?: Record<TopographyZone, number>;
+  /** "uncertain" when the anatomy contradicts the usual display (heart on the viewer's left). */
+  orientation?: "convention" | "uncertain";
 }
 
 export interface Instance {

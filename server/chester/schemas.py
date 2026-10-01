@@ -63,6 +63,12 @@ class AnalysisResultSchema(BaseModel):
             stored = getattr(self, field)
             if stored:
                 setattr(self, field, {k: v for k, v in stored.items() if is_reported(k)})
+        if self.topography:
+            # Only entries from the lung-segmented version reach the interface;
+            # chester.topography.is_current says why the first version is not shown.
+            from chester.topography import is_current
+
+            self.topography = {k: v for k, v in self.topography.items() if is_current(v)}
         if self.above_threshold_findings:
             self.above_threshold_findings = [
                 name for name in self.above_threshold_findings if is_reported(name)

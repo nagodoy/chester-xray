@@ -100,3 +100,27 @@ model's arithmetic.
 
 torch is a **build-time** dependency only. The server needs `onnxruntime`, which is
 roughly 15 MB against torch's ~900 MB.
+
+## The chest segmenter
+
+`models/chest-segmentation-512-int8.onnx` is torchxrayvision's ChestX-Det PSPNet,
+cut to three outputs (right lung, left lung, heart) and stored with int8 weights
+by `tools/export_segmentation.py`, because the float32 graph (~270 MB) is past
+GitHub's file limit. The export compares the int8 masks to the float32 ones on the
+15 images in `examples/` and fails if a lung's IoU drops under 0.95 or the heart's
+under 0.90:
+
+| Structure | Worst IoU, int8 vs float32 |
+| --- | --- |
+| Right lung | 0.966 |
+| Left lung | 0.962 |
+| Heart | 0.942 |
+
+The heart's bar is lower because `chester.topography` only reads which side of the
+image its centre is on. `models/chest-segmentation-512.json` records the same
+figures and where the weights came from.
+
+```bash
+pip install torch torchxrayvision onnx onnxscript onnxruntime numpy pillow
+python tools/export_segmentation.py
+```

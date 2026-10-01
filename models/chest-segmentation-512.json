@@ -1,0 +1,49 @@
+{
+  "source": "torchxrayvision ChestX-Det PSPNet",
+  "weights": "https://github.com/mlmed/torchxrayvision/releases/download/v1/pspnet_chestxray_best_model_4.pth",
+  "all_targets": [
+    "Left Clavicle",
+    "Right Clavicle",
+    "Left Scapula",
+    "Right Scapula",
+    "Left Lung",
+    "Right Lung",
+    "Left Hilus Pulmonis",
+    "Right Hilus Pulmonis",
+    "Heart",
+    "Aorta",
+    "Facies Diaphragmatica",
+    "Mediastinum",
+    "Weasand",
+    "Spine"
+  ],
+  "outputs": [
+    "Right Lung",
+    "Left Lung",
+    "Heart"
+  ],
+  "input": {
+    "name": "image",
+    "shape": [
+      1,
+      1,
+      512,
+      512
+    ],
+    "range": [
+      -1024,
+      1024
+    ]
+  },
+  "output": {
+    "name": "masks",
+    "activation": "sigmoid",
+    "threshold": 0.5
+  },
+  "quantization": "dynamic int8 weights (onnxruntime.quantization.quantize_dynamic)",
+  "worst_iou_int8_vs_fp32_on_examples": {
+    "Right Lung": 0.9659825612432529,
+    "Left Lung": 0.9622210953346856,
+    "Heart": 0.9417587329969985
+  }
+}

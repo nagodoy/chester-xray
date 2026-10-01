@@ -216,11 +216,13 @@ export const es: Dictionary = {
     above: "por encima",
     below: "por debajo",
     topography: "Topografía",
-    topographyAssumed: "orientación asumida",
-    topographyAssumedTitle:
-      "La imagen no indica su orientación; se lee por convención, derecha del paciente a la izquierda del observador.",
+    topographyUncertain: "orientación incierta",
+    topographyUncertainTitle:
+      "El corazón aparece a la izquierda del observador: imagen especular o dextrocardia. No se nombra el lado.",
     topographyNote:
-      "La topografía es dónde está la evidencia usada por el modelo dentro del cuadrado analizado, por hemitórax y tercio. No es la localización de una lesión.",
+      "La topografía es dónde está la evidencia usada por el modelo dentro de los campos pulmonares segmentados, por hemitórax y tercio de cada pulmón. No es la localización de una lesión.",
+    extrapulmonary: "fuera de los campos pulmonares",
+    undeterminedSide: "Lado indeterminado",
     sides: { right: "HTD", left: "HTI", bilateral: "Bilateral" },
     zones: { upper: "superior", middle: "medio", lower: "inferior" },
     diffuse: "difuso",

@@ -216,46 +216,69 @@ thresholds**, que já audita quem mudou o quê. Três cautelas:
   Aqui não há duas leituras; o análogo é escolher o ponto num conjunto e medir
   a sensibilidade em outro.
 
-## 5. Mudança 2 — topografia: hemitórax e terço
+## 5. Mudança 2 — topografia: hemitórax e terço, dentro dos pulmões
 
-`server/chester/topography.py` divide a parte positiva do mapa 7 × 7 de cada
-saída — o mesmo que `chester.saliency` desenha — **exatamente por área** entre as
-duas metades e os três terços do quadrado analisado. Cada célula contribui na
-fração dela que cai de cada lado da linha; nada é reamostrado nem ajustado.
+### A primeira versão errou, e como
+
+A primeira versão dividia o quadrado 224 **inteiro** em metades e terços. Num PA,
+esse quadrado tem o pescoço em cima e o abdome superior embaixo, e o classificador
+põe evidência nos dois. Num estudo real, Lung Opacity e Atelectasis saíram
+"HTD superior/inferior" para uma evidência que estava no pescoço e no estômago.
+Cardiomegaly também recebeu um hemitórax ("HTD médio"), e com o lado trocado.
+
+Essas entradas (sem `version`) **não são mais exibidas** — nem na tela, nem na
+folha, nem no DICOM — e `python -m chester.retopography` recalcula os estudos
+antigos com a versão atual.
+
+### Como é agora
+
+`server/chester/segmentation.py` segmenta, no mesmo quadrado que o classificador
+analisou, **pulmão direito, pulmão esquerdo e coração** com o PSPNet ChestX-Det do
+torchxrayvision (Lian et al., IEEE TMI 2021), exportado com pesos int8 por
+`tools/export_segmentation.py` (`models/chest-segmentation-512-int8.onnx`, 66 MB;
+IoU int8 × fp32 nos 15 exemplos ≥ 0,962 nos pulmões e ≥ 0,942 no coração).
+
+`server/chester/topography.py` espalha a evidência positiva do mapa 7 × 7 pelos
+pixels do quadrado (cada célula é um bloco de 32 × 32, massa preservada) e só
+então mede:
 
 | Regra | Valor |
 | --- | --- |
-| Lado nomeado (HTD/HTE) | ≥ 65% da evidência daquele lado; senão **bilateral** |
-| Terço listado | ≥ 25% da evidência; podem ser vários ("médio/inferior"); os três = **difuso** |
-| Coluna central do mapa (mediastino) | Dividida meio a meio |
-| Lateralidade | Convenção PA: direita do paciente à esquerda de quem vê. `PatientOrientation (0020,0020)` com primeiro valor `R` inverte; sem o tag (PNG, JPEG, DICOM que não informa), a convenção é assumida e o resultado registra `orientation: "assumed"` |
+| Hemitórax | O pulmão segmentado, **estendido para baixo** 25% da altura dele e alargado 10 px, menos o corredor mediastinal entre os pulmões e o coração (o pulmão segmentado atrás do coração continua contando). O segmentador contorna pulmão *aerado*; derrame, consolidação basal e atelectasia são justamente pulmão que deixou de ser aerado. Nos quatro exemplos com derrame, 4–28% da evidência caía na máscara crua, e 53–71% no hemitórax assim definido. Nada se estende para cima: o pescoço fica de fora |
+| Fora do tórax | Menos de 50% da evidência nos hemitóraces → **"Fora dos campos pulmonares"** (`EXTRAPULMONARY`), e nada mais é dito |
+| Lado | O pulmão com ≥ 65% da evidência que está nos pulmões; senão **bilateral** |
+| Terço | Terços da altura **de cada pulmão**, não do quadrado; listados com ≥ 25%; os três = **difuso** |
+| Achados centrais | Cardiomegaly, Enlarged Cardiomediastinum e Hernia não recebem hemitórax |
+| Lateralidade | A dos pixels como são exibidos (direita do paciente à esquerda de quem vê). `PatientOrientation` não é mais usado: no estudo acima, contradizia a imagem. Em vez disso, a anatomia é conferida: coração à esquerda de quem vê (imagem espelhada ou dextrocardia) → **"Lado indeterminado"** (`UNDETERMINED`) |
 
-Onde aparece, sempre só para achados **ACIMA** ou **DUVIDOSO** — um lado ao lado de
-ABAIXO seria lido como achado localizado:
+Onde aparece, sempre só para achados **ACIMA** ou **DUVIDOSO**:
 
-- **Tela do estudo**: coluna *Topografia*, com "orientação assumida" quando for o caso.
-- **Folha do laudo**: coluna TOPOGRAFIA, ex. `HTD médio/inferior`.
+- **Tela do estudo**: coluna *Topografia*; "fora dos campos pulmonares" e
+  "orientação incerta" quando for o caso.
+- **Folha do laudo**: coluna TOPOGRAFIA, ex. `HTD inferior`, `Fora dos campos pulmonares`.
 - **DICOM**: no bloco privado de cada item da sequência `(270F,xx03)`, o elemento
-  `04` (LO) com o código, ex. `RIGHT/MIDDLE+LOWER`, `BILATERAL/LOWER`. Aditivo:
-  quem lê só `CodeMeaning` e `TextValue` vê o mesmo de antes.
-- **Banco**: `analysis_results.topography` (JSON, anulável), com as frações
-  guardadas para a regra ser auditável. Criada no lugar por
-  `python -m chester.schema`; estudos antigos ficam sem topografia e o laudo
-  segue igual.
+  `04` (LO), ex. `RIGHT/LOWER`, `BILATERAL/MIDDLE+LOWER`, `EXTRAPULMONARY`.
+- **Banco**: `analysis_results.topography`, com `version: 2`, as frações e o
+  status, para a regra ser auditável.
 
-No exame de referência com achado franco (`examples/Pneumonia-X-rays-Pictures-7.jpg`)
-a saída é coerente com o mapa de evidência: Effusion 0,923 *Bilateral
-médio/inferior*, Consolidation 0,708 *HTE médio/inferior*, Lung Opacity 0,862
-*Bilateral médio/inferior*.
+Sem o artefato de segmentação, ou sem dois pulmões encontrados (uma imagem que não
+é tórax), não há topografia; os scores seguem iguais.
+
+No exemplo com derrame franco (`examples/Pneumonia-X-rays-Pictures-7.jpg`):
+Effusion *Bilateral inferior*, Consolidation *Bilateral inferior*, Infiltration
+*Bilateral médio/inferior*; Mass e Lung Lesion, cuja evidência está fora, *Fora
+dos campos pulmonares*.
 
 ### O que a topografia não é
 
-- **Não é localização de lesão.** É onde está a evidência que *este modelo* usou.
-  Um modelo que se apoia em algo espúrio aponta para o espúrio.
-- **Os terços são do quadrado analisado, não dos campos pulmonares.** Não há
-  segmentação de pulmão.
-- **Um DICOM espelhado sem `PatientOrientation` sai do lado errado**, e nada nos
-  pixels permite saber. Por isso a orientação assumida é dita, não escondida.
+- **Não é localização de lesão.** É onde está a evidência que *este modelo* usou,
+  dentro dos pulmões como segmentados. Um modelo que se apoia em algo espúrio
+  aponta para o espúrio — e agora isso aparece como "fora dos campos pulmonares"
+  em vez de virar um terço.
+- **O quadrado ainda pode cortar os ápices** num filme em retrato (seção 6): os
+  terços são do pulmão visível no quadrado.
+- **As margens (10 px, 25% abaixo) foram escolhidas nos 15 exemplos**, não
+  calibradas em exames lidos. São constantes nomeadas em `topography.py`.
 
 ## 6. Um limite de sensibilidade que o artigo torna visível
 
