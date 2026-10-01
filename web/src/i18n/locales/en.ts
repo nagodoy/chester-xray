@@ -217,11 +217,13 @@ export const en: Dictionary = {
     above: "above",
     below: "below",
     topography: "Location",
-    topographyAssumed: "orientation assumed",
-    topographyAssumedTitle:
-      "The image does not state its orientation; read by convention, patient's right on the viewer's left.",
+    topographyUncertain: "orientation uncertain",
+    topographyUncertainTitle:
+      "The heart appears on the viewer's left: a mirrored image or dextrocardia. The side is not named.",
     topographyNote:
-      "Location is where the model's evidence sits within the scored square, by hemithorax and third. It is not a lesion localization.",
+      "Location is where the model's evidence sits within the segmented lung fields, by hemithorax and third of each lung. It is not a lesion localization.",
+    extrapulmonary: "outside the lung fields",
+    undeterminedSide: "Side undetermined",
     sides: { right: "Right", left: "Left", bilateral: "Bilateral" },
     zones: { upper: "upper", middle: "middle", lower: "lower" },
     diffuse: "diffuse",

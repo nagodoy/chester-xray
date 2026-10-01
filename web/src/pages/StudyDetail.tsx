@@ -8,6 +8,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { AppShell } from "../components/AppShell";
 import { ErrorBox, Notice, Panel, Skeleton, StatusPill, Thumbnail } from "../components/common";
 import { useI18n } from "../i18n";
+import type { Dictionary } from "../i18n/locales/pt-BR";
 import { patientLabel, useSensitiveData } from "../privacy";
 
 // Charting is a large dependency reachable only from this screen.
@@ -53,9 +54,28 @@ const latestRows = (results: AnalysisResult[]): Row[] => {
       normalized: latest.op_normalized_scores?.[pathology] ?? 0,
       threshold,
       above,
-      topography: located ? (latest.topography?.[pathology] ?? null) : null,
+      // Version 1 placed evidence on the neck and abdomen; only v2 is shown.
+      topography:
+        located && latest.topography?.[pathology]?.version === 2
+          ? latest.topography[pathology]
+          : null,
     };
   });
+};
+
+/** One finding's place in words, from the lung-segmented topography. */
+const describeTopography = (topography: Topography, words: Dictionary["detail"]): string => {
+  if (topography.status === "extrapulmonary") return words.extrapulmonary;
+  const zones = topography.zones ?? [];
+  const side =
+    topography.orientation === "uncertain"
+      ? words.undeterminedSide
+      : topography.side
+        ? words.sides[topography.side]
+        : "";
+  const place =
+    zones.length === 3 ? words.diffuse : zones.map((zone) => words.zones[zone]).join("/");
+  return [side, place].filter(Boolean).join(" ");
 };
 
 export function StudyDetail() {
@@ -374,17 +394,14 @@ export function StudyDetail() {
                         {row.topography ? (
                           <span
                             title={
-                              row.topography.orientation === "assumed"
-                                ? t.detail.topographyAssumedTitle
+                              row.topography.orientation === "uncertain"
+                                ? t.detail.topographyUncertainTitle
                                 : undefined
                             }
                           >
-                            {t.detail.sides[row.topography.side]}{" "}
-                            {row.topography.zones.length === 3
-                              ? t.detail.diffuse
-                              : row.topography.zones.map((zone) => t.detail.zones[zone]).join("/")}
-                            {row.topography.orientation === "assumed" && (
-                              <small className="muted"> · {t.detail.topographyAssumed}</small>
+                            {describeTopography(row.topography, t.detail)}
+                            {row.topography.orientation === "uncertain" && (
+                              <small className="muted"> · {t.detail.topographyUncertain}</small>
                             )}
                           </span>
                         ) : (

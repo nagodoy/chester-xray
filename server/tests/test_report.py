@@ -615,10 +615,11 @@ class TestTopography:
 
     @pytest.fixture
     def located(self, result):
+        current = {"version": 2, "status": "located", "orientation": "convention"}
         result.topography = {
-            "Cardiomegaly": {"side": "bilateral", "zones": ["lower"], "orientation": "assumed"},
-            "Effusion": {"side": "right", "zones": ["middle", "lower"], "orientation": "dicom"},
-            "Mass": {"side": "left", "zones": ["upper"], "orientation": "dicom"},
+            "Cardiomegaly": {**current, "side": "bilateral", "zones": ["lower"]},
+            "Effusion": {**current, "side": "right", "zones": ["middle", "lower"]},
+            "Mass": {**current, "side": "left", "zones": ["upper"]},
         }
         return result
 
@@ -633,6 +634,24 @@ class TestTopography:
         assert rows["Mass"]["confidence"] == report.SIGNAL_BELOW
         assert rows["Mass"]["topography"] is None
         assert rows["Mass"]["topography_label"] == "-"
+
+    def test_an_entry_from_before_segmentation_is_not_printed(self, located):
+        # Version 1 put evidence on the neck and the abdomen in "upper" and "lower".
+        located.topography["Effusion"] = {"side": "right", "zones": ["upper", "lower"]}
+        rows = {row["pathology"]: row for row in report.finding_rows(located)}
+        assert rows["Effusion"]["topography"] is None
+        assert rows["Effusion"]["topography_label"] == "-"
+        assert rows["Effusion"]["topography_code"] == ""
+
+    def test_evidence_outside_the_lungs_is_said_to_be(self, located):
+        located.topography["Effusion"] = {
+            "version": 2,
+            "status": "extrapulmonary",
+            "thoracic_share": 0.2,
+        }
+        rows = {row["pathology"]: row for row in report.finding_rows(located)}
+        assert rows["Effusion"]["topography_label"] == "Fora dos campos pulmonares"
+        assert rows["Effusion"]["topography_code"] == "EXTRAPULMONARY"
 
     def test_a_result_from_before_topography_still_reports(self, result):
         rows = report.finding_rows(result)

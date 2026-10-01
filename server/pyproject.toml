@@ -27,6 +27,9 @@ dependencies = [
     "pynetdicom>=2.1",
     "python-multipart>=0.0.12",
     "scikit-image>=0.24",
+    # chester.topography widens the segmented lungs with scipy.ndimage. It comes
+    # with scikit-image already; named here because it is imported directly.
+    "scipy>=1.11",
     "sqlalchemy>=2.0.36",
     "uvicorn[standard]>=0.32",
 ]

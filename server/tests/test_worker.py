@@ -191,15 +191,27 @@ class TestProcessing:
         _, job = queued_study
         _bind_worker_sessions(monkeypatch, session)
         worker.claim_job(session)
+        entry = {"version": 2, "status": "extrapulmonary", "thoracic_share": 0.1}
+        monkeypatch.setattr("chester.topography.locate_all", lambda pixels: {"Mass": entry})
 
         worker.process_job(job.id)
 
         result = session.query(AnalysisResult).filter_by(job_id=job.id).one()
-        assert result.topography is not None
-        assert set(result.topography) <= set(inference.REPORTED_PATHOLOGIES)
-        for entry in result.topography.values():
-            assert entry["side"] in {"right", "left", "bilateral"}
-            assert entry["zones"]
+        assert result.topography == {"Mass": entry}
+
+    def test_a_film_without_lungs_gets_no_topography(self, session, queued_study, monkeypatch):
+        # The fixture's synthetic DICOM is a gradient, not a chest: nothing for
+        # the segmenter to find, so nothing is located -- and the scores stand.
+        _, job = queued_study
+        _bind_worker_sessions(monkeypatch, session)
+        worker.claim_job(session)
+
+        worker.process_job(job.id)
+
+        assert job.status == "completed"
+        result = session.query(AnalysisResult).filter_by(job_id=job.id).one()
+        assert result.raw_scores
+        assert result.topography is None
 
     def test_a_topography_failure_does_not_cost_the_scores(
         self, session, queued_study, monkeypatch

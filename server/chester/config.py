@@ -73,6 +73,10 @@ class Settings(BaseSettings):
 
     # Model
     model_path: str = "models/chester-all-224.onnx"
+    # The chest anatomy segmenter chester.topography reads the lungs from.
+    # tools/export_segmentation.py writes it; without it, results carry no
+    # topography and everything else is unchanged.
+    segmentation_model_path: str = "models/chest-segmentation-512-int8.onnx"
     inference_timeout_seconds: float = 90.0
 
     # Worker

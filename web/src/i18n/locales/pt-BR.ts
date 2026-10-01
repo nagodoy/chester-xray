@@ -210,11 +210,13 @@ export const ptBR = {
     above: "acima",
     below: "abaixo",
     topography: "Topografia",
-    topographyAssumed: "orientação assumida",
-    topographyAssumedTitle:
-      "A imagem não informa a orientação; lida pela convenção, direita do paciente à esquerda de quem vê.",
+    topographyUncertain: "orientação incerta",
+    topographyUncertainTitle:
+      "O coração aparece à esquerda de quem vê: imagem espelhada ou dextrocardia. O lado não é nomeado.",
     topographyNote:
-      "Topografia é onde está a evidência usada pelo modelo dentro do quadrado analisado, por hemitórax e terço. Não é localização de lesão.",
+      "Topografia é onde está a evidência usada pelo modelo dentro dos campos pulmonares segmentados, por hemitórax e terço de cada pulmão. Não é localização de lesão.",
+    extrapulmonary: "fora dos campos pulmonares",
+    undeterminedSide: "Lado indeterminado",
     sides: { right: "HTD", left: "HTE", bilateral: "Bilateral" },
     zones: { upper: "superior", middle: "médio", lower: "inferior" },
     diffuse: "difuso",

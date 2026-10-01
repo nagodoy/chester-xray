@@ -34,9 +34,11 @@ considering any clinical deployment.
   scored. Needs only `onnxruntime`, which is the point -- see
   `server/chester/onnx_graph.py`
 - A topography per finding called or doubted: the hemithorax (right, left,
-  bilateral) and the thirds that hold that evidence, on the study screen, the
-  report sheet and the DICOM tags. Read from the same map, by the PA convention
-  unless PatientOrientation says otherwise -- see `server/chester/topography.py`
+  bilateral) and the thirds of that lung holding its evidence, or "outside the
+  lung fields" when the evidence is elsewhere, on the study screen, the report
+  sheet and the DICOM tags. The lungs come from a chest anatomy segmenter run on
+  the same square -- see `server/chester/topography.py` and
+  `server/chester/segmentation.py`
 - Patient name and accession number carried from the source instance, shown to
   the roles allowed to reveal identifying fields and omitted from the response
   for every other role
@@ -87,6 +89,17 @@ image, where the thumbnail was taken from the lateral that arrived first:
 cd server
 python -m chester.rethumbnail --dry-run   # report, change nothing
 python -m chester.rethumbnail             # write
+```
+
+Topography recorded before the lungs were segmented divided the whole square into
+thirds, so evidence on the neck read as "upper"; those entries are no longer
+shown. Recompute them from the stored instances -- only the topography is
+written, the scores stay as they were recorded:
+
+```bash
+cd server
+python -m chester.retopography --dry-run  # report, change nothing
+python -m chester.retopography            # write
 ```
 
 Each study is committed on its own, so the run is safe to interrupt, and one

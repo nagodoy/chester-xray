@@ -19,7 +19,7 @@ its own threshold.
 from __future__ import annotations
 
 from chester.inference import REPORTED_PATHOLOGIES
-from chester.topography import dicom_code, sheet_label
+from chester.topography import dicom_code, is_current, sheet_label
 
 SIGNAL_BELOW = "ABAIXO"
 SIGNAL_BORDERLINE = "DUVIDOSO"
@@ -90,7 +90,11 @@ def finding_rows(result) -> list[dict]:
         confidence = classify_confidence(score, threshold)
         # Where the evidence sits, only for a finding the report calls or doubts.
         # A side printed beside ABAIXO would read as a finding located there.
+        # Entries from before the lungs were segmented are dropped, not shown:
+        # they placed evidence on the neck and the abdomen in "upper" and "lower".
         entry = located.get(pathology) if confidence != SIGNAL_BELOW else None
+        if not is_current(entry):
+            entry = None
         rows.append(
             {
                 "pathology": pathology,
