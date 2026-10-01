@@ -144,6 +144,7 @@ def render_report(
     value_font = _font(26, bold=True)
     head_font = _font(26, bold=True)
     cell_font = _font(30)
+    place_font = _font(26)
 
     draw.text((MARGIN, 24), title, font=title_font, fill=TEAL)
     draw.line(
@@ -185,8 +186,13 @@ def render_report(
 
     # --- the findings -------------------------------------------------------
     top = cell[3] + 18
-    achado_x, score_x, confidence_x = MARGIN + 20, WIDTH - 520, WIDTH - 300
+    # Measured at these font sizes: the longest name, Enlarged Cardiomediastinum,
+    # is 436px; the longest place, "Bilateral superior/médio", 314px in the
+    # smaller face the place column uses; CONFIANÇA heads a 172px column.
+    achado_x, place_x = MARGIN + 20, WIDTH - 730
+    score_x, confidence_x = WIDTH - 390, WIDTH - 240
     draw.text((achado_x, top + 12), "ACHADO", font=head_font, fill=INK_SOFT)
+    draw.text((place_x, top + 12), "TOPOGRAFIA", font=head_font, fill=INK_SOFT)
     draw.text((score_x, top + 12), "SCORE", font=head_font, fill=INK_SOFT)
     draw.text((confidence_x, top + 12), "CONFIANÇA", font=head_font, fill=INK_SOFT)
     line_y = top + TABLE_HEADER_HEIGHT - 6
@@ -196,9 +202,17 @@ def render_report(
         y = line_y + 10 + index * ROW_HEIGHT
         draw.text(
             (achado_x, y),
-            _fit_text(draw, str(row["pathology"]), cell_font, score_x - achado_x - 20),
+            _fit_text(draw, str(row["pathology"]), cell_font, place_x - achado_x - 20),
             font=cell_font,
             fill=INK,
+        )
+        draw.text(
+            (place_x, y + 3),
+            _fit_text(
+                draw, str(row.get("topography_label") or "-"), place_font, score_x - place_x - 20
+            ),
+            font=place_font,
+            fill=INK_SOFT,
         )
         draw.text((score_x, y), f"{row['score']:.3f}", font=cell_font, fill=INK_SOFT)
         draw.text(

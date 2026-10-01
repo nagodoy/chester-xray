@@ -185,6 +185,40 @@ class TestProcessing:
         }
         assert set(result.above_threshold_findings) == expected
 
+    def test_the_side_and_zone_of_each_finding_are_recorded(
+        self, session, queued_study, monkeypatch
+    ):
+        _, job = queued_study
+        _bind_worker_sessions(monkeypatch, session)
+        worker.claim_job(session)
+
+        worker.process_job(job.id)
+
+        result = session.query(AnalysisResult).filter_by(job_id=job.id).one()
+        assert result.topography is not None
+        assert set(result.topography) <= set(inference.REPORTED_PATHOLOGIES)
+        for entry in result.topography.values():
+            assert entry["side"] in {"right", "left", "bilateral"}
+            assert entry["zones"]
+
+    def test_a_topography_failure_does_not_cost_the_scores(
+        self, session, queued_study, monkeypatch
+    ):
+        _, job = queued_study
+        _bind_worker_sessions(monkeypatch, session)
+        worker.claim_job(session)
+
+        def _boom(*args, **kwargs):
+            raise RuntimeError("no activation today")
+
+        monkeypatch.setattr("chester.topography.locate_all", _boom)
+        worker.process_job(job.id)
+
+        assert job.status == "completed"
+        result = session.query(AnalysisResult).filter_by(job_id=job.id).one()
+        assert result.raw_scores
+        assert result.topography is None
+
     def test_an_inference_failure_is_recorded_on_the_study(
         self, session, queued_study, monkeypatch
     ):

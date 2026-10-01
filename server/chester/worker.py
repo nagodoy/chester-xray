@@ -80,6 +80,17 @@ def claim_job(db: Session, job_id: uuid.UUID | None = None) -> uuid.UUID | None:
 def load_pixels(db: Session, study: Study):
     """Decode the instance that represents the study into a 0..255 grayscale raster.
 
+    `load_image` without the orientation, for callers that only draw the pixels.
+    """
+    return load_image(db, study)[0]
+
+
+def load_image(db: Session, study: Study):
+    """The representative raster, and whether PatientOrientation says it is mirrored.
+
+    The second value is `chester.topography.mirrored_from_dicom`'s answer: None
+    for an upload that is not DICOM, or a DICOM instance that does not say.
+
     That is the frontal projection where the study holds one, and otherwise the
     oldest instance -- deterministic either way, so a multi-instance study always
     analyses the same image. The model reads frontal films, so a study that also
@@ -105,17 +116,20 @@ def load_pixels(db: Session, study: Study):
         import pydicom
         from pydicom.filebase import DicomBytesIO
 
+        from chester.topography import mirrored_from_dicom
+
         dataset = pydicom.dcmread(DicomBytesIO(raw), force=True)
-        return render_frame_for_model(dataset, frame_index=0)
+        return render_frame_for_model(dataset, frame_index=0), mirrored_from_dicom(dataset)
 
     with Image.open(io.BytesIO(raw)) as image:
-        return np.array(image.convert("RGB"), dtype=np.float32).mean(axis=2)
+        return np.array(image.convert("RGB"), dtype=np.float32).mean(axis=2), None
 
 
 def process_job(job_id: uuid.UUID) -> None:
     """Run one claimed job to completion, recording either a result or the error."""
     from chester import thresholds
     from chester.inference import infer
+    from chester.topography import locate_all
 
     error: str | None = None
     outcome: dict | None = None
@@ -130,7 +144,7 @@ def process_job(job_id: uuid.UUID) -> None:
             _fail(db, job, None, "Study not found")
             return
         try:
-            pixels = load_pixels(db, study)
+            pixels, mirrored = load_image(db, study)
         except Exception as exc:
             logger.exception("Could not load pixels for job %s", job_id)
             _fail(db, job, study, str(exc))
@@ -147,6 +161,16 @@ def process_job(job_id: uuid.UUID) -> None:
     except Exception as exc:
         logger.exception("Inference failed for job %s", job_id)
         error = str(exc)
+
+    located = None
+    if outcome is not None:
+        # Where each finding's evidence sits. Never allowed to cost the result:
+        # a model artifact without the activation, or any failure reading it,
+        # records the scores with no topography, as chester.saliency does.
+        try:
+            located = locate_all(pixels, mirrored=mirrored)
+        except Exception:
+            logger.exception("Could not locate findings for job %s", job_id)
 
     with session_scope() as db:
         job = db.get(AnalysisJob, job_id)
@@ -176,6 +200,7 @@ def process_job(job_id: uuid.UUID) -> None:
                 thresholds=outcome["thresholds"],
                 above_threshold=outcome["above_threshold"],
                 above_threshold_findings=outcome["above_threshold_findings"],
+                topography=located,
             )
         )
         if study is not None:

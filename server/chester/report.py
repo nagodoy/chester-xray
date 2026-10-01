@@ -19,6 +19,7 @@ its own threshold.
 from __future__ import annotations
 
 from chester.inference import REPORTED_PATHOLOGIES
+from chester.topography import dicom_code, sheet_label
 
 SIGNAL_BELOW = "ABAIXO"
 SIGNAL_BORDERLINE = "DUVIDOSO"
@@ -77,19 +78,30 @@ def finding_rows(result) -> list[dict]:
     raw = result.raw_scores or {}
     thresholds = result.thresholds or {}
     normalized = result.op_normalized_scores or {}
-    return [
-        {
-            "pathology": pathology,
-            "code_meaning": dicom_code_meaning(pathology),
-            "score": float(raw[pathology]),
-            "threshold": float(thresholds.get(pathology, 0.0)),
-            "normalized": float(normalized.get(pathology, 0.0)),
-            "confidence": classify_confidence(
-                float(raw[pathology]), float(thresholds.get(pathology, 0.0))
-            ),
-        }
-        # A result carries only the outputs that ran, so a name the document does
-        # not have is skipped rather than reported as a score of zero.
-        for pathology in REPORTED_PATHOLOGIES
-        if pathology in raw
-    ]
+    located = getattr(result, "topography", None) or {}
+    rows = []
+    # A result carries only the outputs that ran, so a name the document does not
+    # have is skipped rather than reported as a score of zero.
+    for pathology in REPORTED_PATHOLOGIES:
+        if pathology not in raw:
+            continue
+        score = float(raw[pathology])
+        threshold = float(thresholds.get(pathology, 0.0))
+        confidence = classify_confidence(score, threshold)
+        # Where the evidence sits, only for a finding the report calls or doubts.
+        # A side printed beside ABAIXO would read as a finding located there.
+        entry = located.get(pathology) if confidence != SIGNAL_BELOW else None
+        rows.append(
+            {
+                "pathology": pathology,
+                "code_meaning": dicom_code_meaning(pathology),
+                "score": score,
+                "threshold": threshold,
+                "normalized": float(normalized.get(pathology, 0.0)),
+                "confidence": confidence,
+                "topography": entry,
+                "topography_label": sheet_label(entry),
+                "topography_code": dicom_code(entry),
+            }
+        )
+    return rows
