@@ -58,6 +58,15 @@
   --emerald: #10b981;
   --emerald-bright: #34d399;
   --emerald-strong: #059669;
+
+  /* The sign-in screen's accent. Blue there and only there: the rest of the
+     application keeps teal, so these are not used outside "Sign in" below. */
+  --sky: #4fb3ff;
+  --blue: #3b82f6;
+  --blue-strong: #2a7fe0;
+  --auth-accent: linear-gradient(100deg, #55b8ff 0%, #2a7fe0 100%);
+  --auth-ground: #0b1120;
+  --auth-field: #111a2b;
   --emerald-soft: rgb(6 78 59 / 40%);
   --amber: #fbbf24;
   --amber-bright: #fcd34d;
@@ -2136,9 +2145,10 @@ tr.is-explained {
 
 /* ---------- Sign in ---------- */
 
-/* The console's sign-in sits one step flatter than the application shell:
-   slate-950 ground, slate-900 card, solid slate-800 edge. Kept that way here
-   so the two products' front doors match. */
+/* `.auth-shell` alone is the centred holding screen App.tsx shows while it
+   checks a session or refuses one. `.auth-split` is the sign-in itself: a
+   brand panel on the left and the step on the right, after the layout of the
+   BoneRad sign-in, in its blue. */
 .auth-shell {
   display: grid;
   place-items: center;
@@ -2147,9 +2157,108 @@ tr.is-explained {
   background: var(--bg);
 }
 
-.auth-wrap {
+.auth-shell.auth-split {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  place-items: stretch;
+  padding: 0;
+  background:
+    radial-gradient(60% 55% at 85% 85%, rgb(42 127 224 / 8%), transparent 70%),
+    var(--auth-ground);
+}
+
+.auth-aside {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 120px;
+  padding: 64px clamp(32px, 6vw, 104px);
+  border-right: 1px solid var(--slate-800);
+  background: linear-gradient(180deg, #0e1729 0%, #0b1220 100%);
+}
+
+.auth-logo {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 28px;
+  border-radius: 14px;
+  background: linear-gradient(150deg, #5cc0ff 0%, #2a7fe0 100%);
+  color: #071a33;
+  box-shadow: 0 10px 28px rgb(42 127 224 / 30%);
+}
+
+.auth-eyebrow {
+  margin: 0 0 12px;
+  color: var(--sky);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.auth-display {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(48px, 5.4vw, 72px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.055em;
+}
+
+.auth-aside-tagline {
+  margin: 18px 0 0;
+  color: var(--ink-muted);
+  font-size: var(--fs-md);
+}
+
+.auth-aside-notes {
+  display: grid;
+  gap: 14px;
+  max-width: 340px;
+}
+
+.auth-aside-note {
+  display: flex;
+  gap: 10px;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--fs-xs);
+  line-height: 1.55;
+}
+
+.auth-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--emerald-bright);
+  box-shadow: 0 0 0 3px rgb(52 211 153 / 15%);
+}
+
+.auth-aside-research {
+  margin: 0 0 0 17px;
+  color: var(--slate-600);
+  font-size: var(--fs-xs);
+}
+
+.auth-main {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 72px 32px;
+}
+
+.auth-locale-corner {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+}
+
+.auth-panel {
   width: 100%;
-  max-width: 384px;
+  max-width: 408px;
   animation: rise 0.4s ease-out both;
 }
 
@@ -2166,7 +2275,7 @@ tr.is-explained {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .auth-wrap {
+  .auth-panel {
     animation: none;
   }
 
@@ -2175,36 +2284,61 @@ tr.is-explained {
   }
 }
 
-.auth-brand {
-  display: grid;
-  justify-items: center;
-  margin-bottom: 40px;
-  text-align: center;
-}
+/* One column on a phone. The brand panel's two halves become grid items of
+   their own (display: contents), so the name and tagline head the screen and
+   the safety notes follow the form rather than vanishing. */
+@media (max-width: 900px) {
+  .auth-shell.auth-split {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+  }
 
-.auth-logo {
-  display: grid;
-  place-items: center;
-  width: 64px;
-  height: 64px;
-  margin-bottom: 16px;
-  border-radius: var(--radius-row);
-  background: linear-gradient(140deg, var(--teal) 0%, var(--emerald) 100%);
-  color: #04211d;
-  box-shadow: 0 10px 24px rgb(19 78 74 / 30%);
-}
+  .auth-aside {
+    display: contents;
+  }
 
-.auth-brand h1 {
-  font-size: var(--fs-2xl);
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  color: var(--ink);
-}
+  .auth-aside-brand {
+    order: 1;
+    padding: 64px 16px 8px;
+  }
 
-.auth-brand p {
-  margin: 4px 0 0;
-  font-size: var(--fs-sm);
-  color: var(--ink-muted);
+  .auth-main {
+    position: static;
+    order: 2;
+    place-items: start stretch;
+    padding: 28px 16px 8px;
+  }
+
+  .auth-aside-notes {
+    order: 3;
+    max-width: none;
+    padding: 24px 16px 40px;
+  }
+
+  .auth-logo {
+    width: 44px;
+    height: 44px;
+    margin-bottom: 18px;
+  }
+
+  .auth-display {
+    font-size: 40px;
+  }
+
+  .auth-aside-tagline {
+    margin-top: 10px;
+    font-size: var(--fs-sm);
+  }
+
+  .auth-locale-corner {
+    top: 16px;
+    right: 16px;
+  }
+
+  .auth-panel {
+    max-width: none;
+  }
 }
 
 /* ---------- Locale switcher ---------- */
@@ -2212,10 +2346,6 @@ tr.is-explained {
 .locale-switch {
   display: inline-flex;
   gap: 6px;
-}
-
-.auth-brand .locale-switch {
-  margin-top: 16px;
 }
 
 /* Flags stay in colour even when inactive. Desaturating them defeats the point:
@@ -2252,81 +2382,48 @@ tr.is-explained {
   font-size: var(--fs-lg);
 }
 
-.auth-card {
-  padding: 32px;
-  border: 1px solid var(--slate-800);
-  border-radius: var(--radius-row);
-  background: #0f172a;
-  text-align: left;
-  box-shadow: var(--shadow-lg);
-}
-
-.auth-card-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--emerald-bright);
-}
-
-.auth-card-title h2 {
-  font-size: var(--fs-lg);
-  font-weight: 600;
+.auth-heading {
+  margin: 0;
   color: var(--ink);
+  font-size: clamp(32px, 3.2vw, 44px);
+  font-weight: 800;
+  line-height: 1.04;
+  letter-spacing: -0.045em;
 }
 
 .auth-subtitle {
-  margin: 4px 0 24px;
+  max-width: 340px;
+  margin: 16px 0 32px;
   color: var(--ink-muted);
   font-size: var(--fs-sm);
-  line-height: 1.55;
-}
-
-.auth-subtitle strong {
-  color: var(--ink);
-  font-weight: 600;
+  line-height: 1.6;
 }
 
 .auth-field {
   display: block;
-  margin-bottom: 16px;
+  margin-bottom: 32px;
 }
 
-.auth-field > span {
+.auth-field > span,
+.auth-field-label {
   display: block;
-  margin-bottom: 6px;
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  letter-spacing: 0.025em;
-  text-transform: uppercase;
-  color: var(--ink-muted);
-}
-
-.auth-input-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 14px;
-  border: 1px solid var(--slate-700);
-  border-radius: var(--radius-card);
-  background: var(--slate-800);
-  color: var(--ink-faint);
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.auth-input-wrap:focus-within {
-  border-color: var(--emerald);
-  box-shadow: 0 0 0 2px rgb(16 185 129 / 50%);
+  margin: 0 0 10px;
+  color: var(--ink-soft);
+  font-size: var(--fs-xs);
+  font-weight: 600;
 }
 
 .auth-input {
-  flex: 1;
-  min-width: 0;
-  padding: 12px 0;
-  border: 0;
-  background: transparent;
+  width: 100%;
+  height: 50px;
+  padding: 0 14px;
+  border: 1px solid var(--slate-700);
+  border-radius: 8px;
+  background: var(--auth-field);
   color: var(--ink);
   font: inherit;
   font-size: var(--fs-sm);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .auth-input::placeholder {
@@ -2334,7 +2431,9 @@ tr.is-explained {
 }
 
 .auth-input:focus {
+  border-color: var(--sky);
   outline: none;
+  box-shadow: 0 0 0 3px rgb(79 179 255 / 18%);
 }
 
 /* Chrome paints its own light ground over autofilled fields. */
@@ -2343,7 +2442,7 @@ tr.is-explained {
 .auth-input:-webkit-autofill:focus,
 .code-input:-webkit-autofill {
   -webkit-text-fill-color: var(--ink);
-  -webkit-box-shadow: 0 0 0 1000px var(--slate-800) inset;
+  -webkit-box-shadow: 0 0 0 1000px var(--auth-field) inset;
   caret-color: var(--ink);
   transition: background-color 5000s ease-in-out 0s;
 }
@@ -2351,40 +2450,52 @@ tr.is-explained {
 /* One box per digit: the code is six separate things, so it reads as six. */
 .code-inputs {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
-  margin-bottom: 20px;
 }
 
 .code-input {
   width: 100%;
-  height: 56px;
+  height: 58px;
   padding: 0;
   border: 1px solid var(--slate-700);
-  border-radius: var(--radius-card);
-  background: var(--slate-800);
+  border-radius: 8px;
+  background: var(--auth-field);
   color: var(--ink);
   font: inherit;
   font-size: var(--fs-2xl);
   font-weight: 700;
   text-align: center;
-  caret-color: var(--emerald-bright);
+  caret-color: var(--sky);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .code-input.is-filled {
-  border-color: var(--emerald);
+  border-color: rgb(79 179 255 / 55%);
 }
 
 .code-input:focus {
-  border-color: var(--emerald);
+  border-color: var(--sky);
   outline: none;
-  box-shadow: 0 0 0 2px rgb(16 185 129 / 50%);
+  box-shadow: 0 0 0 3px rgb(79 179 255 / 18%);
 }
 
 .code-input:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.auth-hint {
+  margin: 10px 0 32px;
+  color: var(--ink-muted);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.auth-hint strong {
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .auth-submit {
@@ -2393,83 +2504,83 @@ tr.is-explained {
   justify-content: center;
   gap: 8px;
   width: 100%;
-  padding: 12px;
+  height: 48px;
+  padding: 0 16px;
   border: 0;
-  border-radius: var(--radius-card);
-  background: var(--emerald-strong);
-  color: var(--ink);
+  border-radius: 8px;
+  background: var(--auth-accent);
+  color: #0b1220;
   font: inherit;
   font-size: var(--fs-sm);
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  box-shadow: 0 8px 24px rgb(42 127 224 / 22%);
+  transition: filter 0.2s, box-shadow 0.2s, opacity 0.2s;
 }
 
 .auth-submit:not(:disabled):hover {
-  background: var(--emerald);
+  filter: brightness(1.08);
+  box-shadow: 0 10px 28px rgb(42 127 224 / 32%);
 }
 
 .auth-submit:disabled {
-  background: var(--slate-700);
-  color: var(--ink-faint);
+  opacity: 0.45;
+  box-shadow: none;
   cursor: not-allowed;
 }
 
 .auth-submit:focus-visible,
-.auth-locale:focus-visible,
 .auth-link:focus-visible,
-.locale-option:focus-visible {
-  outline: 2px solid var(--emerald);
+.auth-input:focus-visible,
+.code-input:focus-visible,
+.auth-shell .locale-option:focus-visible {
+  outline: 2px solid var(--sky);
   outline-offset: 2px;
 }
 
 .auth-actions {
-  display: grid;
-  gap: 2px;
-  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-top: 18px;
 }
 
 .auth-link {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 9px;
+  padding: 4px 0;
   border: 0;
-  border-radius: var(--radius-control);
   background: transparent;
   color: var(--ink-muted);
   font: inherit;
   font-size: var(--fs-sm);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  transition: color 0.15s;
+}
+
+.auth-link.is-accent {
+  color: var(--sky);
 }
 
 .auth-link:not(:disabled):hover {
-  background: rgb(30 41 59 / 60%);
-  color: var(--emerald-bright);
+  color: #8fd0ff;
 }
 
 .auth-link:disabled {
-  color: var(--ink-faint);
+  color: rgb(79 179 255 / 45%);
   cursor: not-allowed;
 }
 
 .auth-status,
 .auth-notice,
 .auth-error {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  margin: 0 0 16px;
+  margin: -16px 0 20px;
   font-size: var(--fs-sm);
-  text-align: center;
 }
 
 .auth-status,
 .auth-notice {
-  color: var(--emerald-bright);
+  color: var(--sky);
 }
 
 .auth-error {
@@ -2477,13 +2588,18 @@ tr.is-explained {
 }
 
 .auth-footnote {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  margin: 24px 0 0;
-  color: var(--slate-600);
-  font-size: var(--fs-sm);
+  margin: 36px 0 0;
+  padding-top: 22px;
+  border-top: 1px solid var(--slate-800);
+  color: var(--ink-faint);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+}
+
+/* The language flags, recoloured to the sign-in accent. */
+.auth-shell .locale-option.is-active {
+  background: rgb(42 127 224 / 18%);
+  box-shadow: 0 0 0 2px rgb(79 179 255 / 70%);
 }
 
 .spin {

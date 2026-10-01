@@ -96,7 +96,8 @@ const json = (body: unknown): RequestInit => ({
 
 export const api = {
   requestCode: (email: string) =>
-    request<{ ok: boolean; message: string }>("/api/auth/request-code", {
+    // expires_minutes is the code's lifetime; older servers do not send it.
+    request<{ ok: boolean; message: string; expires_minutes?: number }>("/api/auth/request-code", {
       method: "POST",
       ...json({ email }),
     }),

@@ -1,4 +1,4 @@
-import { ArrowLeft, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ClipboardEvent, KeyboardEvent } from "react";
 
@@ -8,16 +8,6 @@ import { useI18n } from "../i18n";
 
 const CODE_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
-
-/** Show enough of the address to recognize it, not enough to disclose it. */
-export function maskEmail(email: string): string {
-  const at = email.lastIndexOf("@");
-  if (at <= 0) return email;
-  const local = email.slice(0, at);
-  const domain = email.slice(at);
-  if (local.length <= 2) return `${local}${domain}`;
-  return `${local.slice(0, 2)}${"*".repeat(local.length - 2)}${domain}`;
-}
 
 interface Props {
   email: string;
@@ -132,18 +122,18 @@ export function VerifyCode({ email, onVerified, onBack }: Props) {
     }
   };
 
+  const complete = digits.every((digit) => digit !== "");
+
   return (
     <>
-      <div className="auth-card-title">
-        <ShieldCheck size={18} aria-hidden />
-        <h2>{t.auth.verifyTitle}</h2>
-      </div>
-      <p className="auth-subtitle">
-        {format(t.auth.verifySubtitle, { email: "" }).replace(/\s*\.\s*$/, "")}{" "}
-        <strong>{maskEmail(email)}</strong>.
-      </p>
+      <p className="auth-eyebrow">{t.auth.stepConfirm}</p>
+      <h2 className="auth-heading">{t.auth.verifyTitle}</h2>
+      <p className="auth-subtitle">{t.auth.verifySubtitle}</p>
 
-      <div className="code-inputs" onPaste={onPaste}>
+      <p className="auth-field-label" id="code-label">
+        {t.auth.codeLabel}
+      </p>
+      <div className="code-inputs" role="group" aria-labelledby="code-label" onPaste={onPaste}>
         {digits.map((digit, index) => (
           <input
             // The boxes are positional, so the index is the identity.
@@ -165,13 +155,16 @@ export function VerifyCode({ email, onVerified, onBack }: Props) {
           />
         ))}
       </div>
+      <p className="auth-hint">
+        {/* Split on the placeholder so the address can be set in bold. */}
+        {t.auth.codeSentTo.split("{email}").map((part, index) => (
+          <span key={index}>
+            {index > 0 && <strong>{email}</strong>}
+            {part}
+          </span>
+        ))}
+      </p>
 
-      {busy && (
-        <p className="auth-status" role="status">
-          <Loader2 size={15} className="spin" aria-hidden />
-          {t.auth.validating}
-        </p>
-      )}
       {error && (
         <p className="auth-error" role="alert">
           {error}
@@ -183,18 +176,37 @@ export function VerifyCode({ email, onVerified, onBack }: Props) {
         </p>
       )}
 
+      <button
+        type="button"
+        className="auth-submit"
+        disabled={!complete || busy}
+        onClick={() => void submit(digits.join(""))}
+      >
+        {busy ? (
+          <>
+            <Loader2 size={16} className="spin" aria-hidden />
+            {t.auth.validating}
+          </>
+        ) : (
+          t.auth.confirm
+        )}
+      </button>
+
       <div className="auth-actions">
-        <button type="button" className="auth-link" disabled={cooldown > 0 || resending} onClick={() => void resend()}>
-          <RefreshCw size={15} className={resending ? "spin" : undefined} aria-hidden />
+        <button type="button" className="auth-link is-accent" onClick={onBack}>
+          {t.auth.useAnotherEmail}
+        </button>
+        <button
+          type="button"
+          className="auth-link"
+          disabled={cooldown > 0 || resending}
+          onClick={() => void resend()}
+        >
           {cooldown > 0
             ? format(t.auth.resendIn, { sec: cooldown })
             : resending
               ? t.auth.resending
               : t.auth.resend}
-        </button>
-        <button type="button" className="auth-link" onClick={onBack}>
-          <ArrowLeft size={15} aria-hidden />
-          {t.auth.useAnotherEmail}
         </button>
       </div>
     </>

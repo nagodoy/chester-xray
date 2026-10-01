@@ -75,6 +75,18 @@ def test_unauthorized_addresses_get_the_same_response_as_authorized_ones(
     assert [recipient for recipient, _ in capture_otp] == ["reader@example.com"]
 
 
+def test_the_reply_says_how_long_the_code_lasts(client, capture_otp, authorized_user):
+    """The sign-in screen prints this, so it must be the deployment's own lifetime."""
+    from chester.config import settings
+
+    known = client.post("/api/auth/request-code", json={"email": "reader@example.com"})
+    unknown = client.post("/api/auth/request-code", json={"email": "nobody@elsewhere.test"})
+
+    assert known.json()["expires_minutes"] == settings.auth_otp_minutes
+    # The same for an address that gets no code, or the field would be an oracle.
+    assert unknown.json()["expires_minutes"] == settings.auth_otp_minutes
+
+
 def test_a_wrong_code_spends_an_attempt(client, capture_otp, authorized_user, session):
     client.post("/api/auth/request-code", json={"email": "reader@example.com"})
 
