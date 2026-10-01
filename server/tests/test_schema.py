@@ -118,6 +118,7 @@ def test_creating_the_schema_twice_is_harmless(schema_engine):
     create()
     assert drift() == []
 
+
 def test_json_migration_declares_the_nine_legacy_columns():
     from chester.json_migration import JSON_COLUMNS
 
@@ -220,9 +221,7 @@ class TestPostgresDriftDetection:
         from chester.schema import drift
 
         with postgres_schema_engine.begin() as connection:
-            connection.execute(
-                text("ALTER TABLE studies ALTER COLUMN source SET DEFAULT 'upload'")
-            )
+            connection.execute(text("ALTER TABLE studies ALTER COLUMN source SET DEFAULT 'upload'"))
 
         problem = next(
             problem for problem in drift() if "studies.source: server default" in problem
@@ -239,8 +238,7 @@ class TestPostgresDriftDetection:
         with postgres_schema_engine.begin() as connection:
             connection.execute(
                 text(
-                    "ALTER TABLE studies ADD CONSTRAINT ck_studies_test_source "
-                    f"CHECK ({reflected})"
+                    f"ALTER TABLE studies ADD CONSTRAINT ck_studies_test_source CHECK ({reflected})"
                 )
             )
 
@@ -399,6 +397,7 @@ def test_worker_startup_refuses_schema_drift(monkeypatch):
     monkeypatch.setattr(worker, "schema_drift", lambda: ["studies.body_part: incompatible"])
 
     assert worker.main() == 1
+
 
 def test_json_migration_refuses_non_postgresql(schema_engine):
     from chester.json_migration import column_types, migrate
