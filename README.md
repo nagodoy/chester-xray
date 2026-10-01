@@ -33,6 +33,10 @@ considering any clinical deployment.
   read out of the model's own pre-pool activation and drawn over the square it
   scored. Needs only `onnxruntime`, which is the point -- see
   `server/chester/onnx_graph.py`
+- A topography per finding called or doubted: the hemithorax (right, left,
+  bilateral) and the thirds that hold that evidence, on the study screen, the
+  report sheet and the DICOM tags. Read from the same map, by the PA convention
+  unless PatientOrientation says otherwise -- see `server/chester/topography.py`
 - Patient name and accession number carried from the source instance, shown to
   the roles allowed to reveal identifying fields and omitted from the response
   for every other role
@@ -278,12 +282,21 @@ override applies to future analyses only -- a finished study keeps the points
 that were in force when it ran, so a report stays reproducible.
 
 `tools/calibrate_thresholds.py` runs that measurement over exams a radiologist
-has read, and proposes a threshold per output:
+has read, and proposes a threshold per output -- by target specificity (the
+default), by Youden's J, or as the highest point still keeping a target
+sensitivity -- with each output's AUC and whether Settings would accept the
+proposal. Labels may carry the reader's 0-4 confidence (`Effusion:3`), read
+under one of the four reference standards of Rudolph et al., CHEST 2024:
 
 ```bash
 python tools/calibrate_thresholds.py --manifest exams.csv
 python tools/calibrate_thresholds.py --from-filenames examples/0000000[123]*.png
+python tools/calibrate_thresholds.py --manifest graded.csv --reference-standard IV --method youden
+python tools/calibrate_thresholds.py --manifest exams.csv --method sensitivity --target-sensitivity 0.9
 ```
+
+[`docs/rudolph-2024-ia-raiox-torax.md`](docs/rudolph-2024-ia-raiox-torax.md)
+reads that study against this deployment.
 
 Regenerate and re-verify it with:
 
