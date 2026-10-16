@@ -54,7 +54,7 @@ localPort = 5011
 externalPort = 3000
 
 [deployment]
-deploymentTarget = "vm"
+deploymentTarget = "cloudrun"
 build = ["npm", "run", "build"]
 run = ["bash", "server/run_production.sh"]
 
