@@ -23,7 +23,7 @@ import type { Study, StudyList, StudyStatus } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { AppShell, PageHeading } from "../components/AppShell";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { ErrorBox, Skeleton, StatusPill, Thumbnail } from "../components/common";
+import { ErrorBox, Pagination, Skeleton, StatusPill, Thumbnail } from "../components/common";
 import { useI18n } from "../i18n";
 import type { Dictionary } from "../i18n";
 import { validationReason } from "../i18n/validation";
@@ -32,6 +32,7 @@ import { UploadPanel } from "./UploadPanel";
 
 const ACTIVE_STATUSES: StudyStatus[] = ["received", "validating", "queued", "processing"];
 const POLL_INTERVAL_MS = 4000;
+const PAGE_SIZE = 40;
 const ALL_STATUSES: StudyStatus[] = [
   "received",
   "validating",
@@ -226,6 +227,7 @@ export function Worklist() {
   const [query, setQuery] = useState("");
   const [accession, setAccession] = useState("");
   const [status, setStatus] = useState("");
+  const [page, setPage] = useState(0);
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [data, setData] = useState<StudyList | null>(null);
@@ -239,16 +241,25 @@ export function Worklist() {
 
   useEffect(() => {
     setStatus(new URLSearchParams(search).get("status") ?? "");
+    setPage(0);
   }, [search]);
 
   const load = useCallback(async () => {
     try {
       setError("");
-      setData(await api.listStudies({ search: query, accession, status }));
+      setData(
+        await api.listStudies({
+          search: query,
+          accession,
+          status,
+          limit: PAGE_SIZE,
+          offset: page * PAGE_SIZE,
+        }),
+      );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     }
-  }, [accession, query, status]);
+  }, [accession, page, query, status]);
 
   useEffect(() => {
     void load();
@@ -272,6 +283,12 @@ export function Worklist() {
     const timer = window.setInterval(() => void load(), POLL_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, [hasActiveWork, load]);
+
+  useEffect(() => {
+    if (data && page > 0 && page * PAGE_SIZE >= data.total) {
+      setPage(Math.max(0, Math.ceil(data.total / PAGE_SIZE) - 1));
+    }
+  }, [data, page]);
 
   const counts = data?.counts ?? {};
   const items = data?.items ?? [];
@@ -452,7 +469,10 @@ export function Worklist() {
                   className="input"
                   placeholder={t.worklist.searchPlaceholder}
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) => {
+                    setPage(0);
+                    setQuery(event.target.value);
+                  }}
                 />
               </div>
             </label>
@@ -465,7 +485,10 @@ export function Worklist() {
                     className="input"
                     placeholder={t.worklist.accessionPlaceholder}
                     value={accession}
-                    onChange={(event) => setAccession(event.target.value)}
+                    onChange={(event) => {
+                      setPage(0);
+                      setAccession(event.target.value);
+                    }}
                   />
                 </div>
               </label>
@@ -475,7 +498,10 @@ export function Worklist() {
               <select
                 className="select"
                 value={status}
-                onChange={(event) => setStatus(event.target.value)}
+                onChange={(event) => {
+                  setPage(0);
+                  setStatus(event.target.value);
+                }}
               >
                 <option value="">{t.worklist.allStatuses}</option>
                 {ALL_STATUSES.filter(
@@ -492,6 +518,7 @@ export function Worklist() {
               className="btn btn-subtle"
               disabled={!hasFilters}
               onClick={() => {
+                setPage(0);
                 setQuery("");
                 setAccession("");
                 setStatus("");
@@ -506,7 +533,11 @@ export function Worklist() {
 
       <div className="list-summary">
         <span>
-          {format(t.worklist.selection, { shown: items.length, total: data?.total ?? 0 })}
+          {format(t.worklist.selection, {
+            shown: items.length,
+            remaining: Math.max(0, (data?.total ?? 0) - page * PAGE_SIZE - items.length),
+            total: data?.total ?? 0,
+          })}
         </span>
         <span className="list-summary-right">
           {hasFilters && <small>{t.worklist.globalNote}</small>}
@@ -595,6 +626,15 @@ export function Worklist() {
           <h3>{t.worklist.emptyTitle}</h3>
           <p>{t.worklist.emptyBody}</p>
         </div>
+      )}
+
+      {data && (
+        <Pagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={data.total}
+          onChange={setPage}
+        />
       )}
 
       {pending !== null && (

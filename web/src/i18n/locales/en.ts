@@ -129,7 +129,7 @@ export const en: Dictionary = {
     statusLabel: "Status",
     allStatuses: "All",
     clearFilters: "Clear filters",
-    selection: "{shown} of {total} studies in this selection",
+    selection: "{shown} visible on this page · {remaining} remaining of {total} filtered",
     globalNote: "Indicators keep the overall picture",
     unavailable: "Worklist unavailable",
     emptyTitle: "No studies in this selection",

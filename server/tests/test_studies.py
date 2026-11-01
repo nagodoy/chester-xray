@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from chester.models import AnalysisJob, Organization, Study
@@ -78,6 +80,45 @@ def test_counts_respect_the_same_visibility_rule(client, signed_in, worklist):
     owner_counts = client.get("/api/studies", headers=owner_headers).json()["counts"]
 
     assert owner_counts == {"completed": 1}
+
+
+def test_status_filter_keeps_total_and_counts_across_pages(
+    client, signed_in, worklist, session
+):
+    base_time = datetime.now(timezone.utc)
+    session.add_all(
+        [
+            Study(
+                owner_user_id=worklist["owner"].id,
+                organization_id=worklist["mine"].organization_id,
+                status="completed",
+                description=f"Completed {index}",
+                created_at=base_time - timedelta(seconds=index),
+            )
+            for index in range(4)
+        ]
+    )
+    session.flush()
+    headers, _ = signed_in("boss@example.com")
+
+    first = client.get(
+        "/api/studies",
+        params={"status": "completed", "limit": 2, "offset": 0},
+        headers=headers,
+    ).json()
+    second = client.get(
+        "/api/studies",
+        params={"status": "completed", "limit": 2, "offset": 2},
+        headers=headers,
+    ).json()
+
+    assert first["total"] == second["total"] == 5
+    assert first["counts"]["completed"] == second["counts"]["completed"] == 5
+    assert len(first["items"]) == len(second["items"]) == 2
+    assert {item["id"] for item in first["items"]}.isdisjoint(
+        {item["id"] for item in second["items"]}
+    )
+    assert all(item["status"] == "completed" for item in first["items"] + second["items"])
 
 
 def test_another_organizations_study_is_not_found(client, signed_in, worklist):

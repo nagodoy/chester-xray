@@ -128,7 +128,7 @@ export const es: Dictionary = {
     statusLabel: "Estado",
     allStatuses: "Todos",
     clearFilters: "Limpiar filtros",
-    selection: "{shown} de {total} estudios en esta selección",
+    selection: "{shown} visibles en esta página · {remaining} restantes de {total} filtrados",
     globalNote: "Los indicadores mantienen la vista global",
     unavailable: "Worklist no disponible",
     emptyTitle: "Ningún estudio en esta selección",

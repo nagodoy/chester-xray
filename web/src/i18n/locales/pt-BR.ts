@@ -122,7 +122,7 @@ export const ptBR = {
     statusLabel: "Status",
     allStatuses: "Todos",
     clearFilters: "Limpar filtros",
-    selection: "{shown} de {total} estudos nesta seleção",
+    selection: "{shown} visíveis nesta página · {remaining} restantes de {total} filtrados",
     globalNote: "Os indicadores mantêm o panorama global",
     unavailable: "Worklist indisponível",
     emptyTitle: "Nenhum estudo nesta seleção",

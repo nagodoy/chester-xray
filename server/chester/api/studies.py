@@ -115,7 +115,7 @@ def list_studies(
     search: str | None = Query(None),
     accession: str | None = Query(None),
     study_status: str | None = Query(None, alias="status"),
-    limit: int = Query(20, ge=1, le=200),
+    limit: int = Query(40, ge=1, le=200),
     offset: int = Query(0, ge=0),
     access: AccessContext = Depends(require_page("worklist")),
     db: Session = Depends(get_session),
@@ -160,7 +160,12 @@ def list_studies(
         query = query.filter(Study.status == study_status)
 
     total = query.count()
-    items = query.order_by(Study.created_at.desc()).offset(offset).limit(limit).all()
+    items = (
+        query.order_by(Study.created_at.desc(), Study.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
     counts = dict(
         visible_studies(db.query(Study.status, func.count(Study.id)), access)
