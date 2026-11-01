@@ -10,7 +10,7 @@ from datetime import timedelta
 import pytest
 
 from chester import inference, worker
-from chester.models import AnalysisJob, AnalysisResult, Instance, Study, utcnow
+from chester.models import AnalysisJob, AnalysisResult, DeliveryJob, Instance, Study, utcnow
 from chester.security.roles import ROLE_ADMIN
 
 
@@ -86,6 +86,81 @@ class TestLeaseRecovery:
         assert worker.recover_expired_leases(session) == 0
         assert job.status == "processing"
         assert job.lease_owner == worker.WORKER_ID
+
+
+class TestPostgresDeliveryLeaseRecovery:
+    def test_expired_delivery_is_reclaimed_without_touching_a_live_lease(
+        self, postgres_schema_engine, monkeypatch
+    ):
+        from sqlalchemy.orm import sessionmaker
+
+        from chester.models import Organization, SendDestination, User
+
+        factory = sessionmaker(bind=postgres_schema_engine)
+        now = utcnow()
+        db = factory()
+        try:
+            organization = Organization(name="Lease Test", slug="lease-test")
+            db.add(organization)
+            db.flush()
+            user = User(
+                email="lease-test@example.com",
+                organization_id=organization.id,
+                role=ROLE_ADMIN,
+            )
+            db.add(user)
+            db.flush()
+            study = Study(
+                owner_user_id=user.id,
+                organization_id=organization.id,
+                status="completed",
+            )
+            destination = SendDestination(
+                organization_id=organization.id,
+                name="PACS",
+                host="pacs.example.org",
+                ae_title="PACS",
+                auto_send=True,
+            )
+            db.add_all([study, destination])
+            db.flush()
+            live_job = DeliveryJob(
+                study_id=study.id,
+                destination_id=destination.id,
+                next_attempt_at=now - timedelta(minutes=3),
+            )
+            expired_job = DeliveryJob(
+                study_id=study.id,
+                destination_id=destination.id,
+                next_attempt_at=now - timedelta(minutes=2),
+            )
+            db.add_all([live_job, expired_job])
+            db.flush()
+
+            monkeypatch.setattr(worker, "WORKER_ID", "worker-that-stopped")
+            assert worker.claim_delivery(db) == live_job.id
+            assert worker.claim_delivery(db) == expired_job.id
+            expired_job.lease_expires_at = now - timedelta(minutes=1)
+            db.flush()
+
+            assert worker.recover_expired_leases(db) == 1
+            assert expired_job.status == "queued"
+            assert expired_job.lease_owner is None
+            assert expired_job.lease_expires_at is None
+            assert live_job.status == "processing"
+            assert live_job.lease_owner == "worker-that-stopped"
+            assert live_job.lease_expires_at > now
+            assert live_job.attempt == 1
+
+            monkeypatch.setattr(worker, "WORKER_ID", "replacement-worker")
+            assert worker.claim_delivery(db) == expired_job.id
+            assert expired_job.status == "processing"
+            assert expired_job.lease_owner == "replacement-worker"
+            assert expired_job.attempt == 2
+            assert live_job.attempt == 1
+            assert worker.claim_delivery(db) is None
+        finally:
+            db.close()
 
 
 class TestQueueScaling:
