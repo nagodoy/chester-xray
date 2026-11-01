@@ -423,14 +423,15 @@ def run(stop: threading.Event | None = None) -> None:
             if job_id is not None:
                 logger.info("Processing job %s", job_id)
                 process_job(job_id)
-                continue
 
-            # Analysis first: a delivery is worth nothing until the report it
-            # carries exists.
+            # Analysis stays first, but check for one due delivery on every pass.
+            # Continuing immediately after each analysis starves reports for as
+            # long as the analysis queue remains non-empty.
             with session_scope() as db:
                 delivery_id = claim_delivery(db)
             if delivery_id is None:
-                stop.wait(timeout=settings.worker_poll_seconds)
+                if job_id is None:
+                    stop.wait(timeout=settings.worker_poll_seconds)
                 continue
             logger.info("Processing delivery %s", delivery_id)
             process_delivery(delivery_id)

@@ -267,6 +267,44 @@ class TestProcessing:
         assert job.lease_owner == "someone-else"
 
 
+def test_due_deliveries_are_not_starved_by_a_busy_analysis_queue(monkeypatch):
+    import contextlib
+
+    stop = threading.Event()
+    job_id = uuid.uuid4()
+    delivery_id = uuid.uuid4()
+    events = []
+    claim_count = 0
+
+    @contextlib.contextmanager
+    def _scope():
+        yield object()
+
+    def _claim_job(_db):
+        nonlocal claim_count
+        claim_count += 1
+        if claim_count > 1:
+            # A second analysis claim means the worker skipped delivery.
+            stop.set()
+        return job_id
+
+    def _process_delivery(_delivery_id):
+        events.append("delivery")
+        stop.set()
+
+    monkeypatch.setattr(worker, "session_scope", _scope)
+    monkeypatch.setattr(worker, "recover_expired_leases", lambda _db: 0)
+    monkeypatch.setattr(worker, "sweep_retention", lambda last_sweep: last_sweep)
+    monkeypatch.setattr(worker, "claim_job", _claim_job)
+    monkeypatch.setattr(worker, "claim_delivery", lambda _db: delivery_id)
+    monkeypatch.setattr(worker, "process_job", lambda _job_id: events.append("analysis"))
+    monkeypatch.setattr(worker, "process_delivery", _process_delivery)
+
+    worker.run(stop)
+
+    assert events == ["analysis", "delivery"]
+
+
 def _bind_worker_sessions(monkeypatch, session):
     """Make the worker's own session_scope reuse the test's transaction."""
     import contextlib
