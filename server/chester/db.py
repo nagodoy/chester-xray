@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -65,10 +66,16 @@ def _engine_kwargs(url: str) -> tuple[str, dict]:
     """Normalize the URL and pick pooling appropriate to the driver."""
     if url.startswith("sqlite"):
         return url, {"connect_args": {"check_same_thread": False}}
-    # Managed Postgres hands out a plain postgresql:// URL while this project uses
-    # psycopg 3 rather than the legacy psycopg2 driver.
+    # Managed Postgres hands out a plain postgresql:// URL while this project
+    # uses psycopg 3 rather than the legacy psycopg2 driver.
     if url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+    if os.environ.get("CHESTER_PROCESS_ROLE") == "worker":
+        return url, {
+            "pool_pre_ping": True,
+            "pool_size": settings.worker_database_pool_size,
+            "max_overflow": 0,
+        }
     return url, {"pool_pre_ping": True, "pool_size": 5, "max_overflow": 10}
 
 

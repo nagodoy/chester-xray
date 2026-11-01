@@ -68,14 +68,23 @@ export SESSION_SECRET=... PSEUDONYM_SECRET=... DICOM_INGEST_TOKEN=...
 export ADMIN_USERS=you@example.com
 python -m chester.schema
 uvicorn chester.main:app --port 5000     # in one shell
-python -m chester.worker                 # in another
+bash run_worker.sh                       # in another
 
 # Frontend
 cd web && npm install && npm run dev
 ```
 
-`npm start` at the repository root builds the frontend and serves everything from
-the API process, which is what the deployment does.
+`npm start` at the repository root builds the frontend and serves the API. The
+production API command (`bash server/run_production.sh`) does not start a worker.
+Deploy the same source separately with `bash server/run_worker.sh` to scale the
+worker independently; it uses one database connection and processes one job at a
+time per replica.
+
+An external scaler can poll `bash server/run_worker.sh --queue-stats` for queued
+analysis count, due report count, oldest-ready age, and `desired_replicas`. The
+default recommendation is bounded at four worker replicas, targets four queued
+jobs per replica, and adds capacity when the oldest ready job exceeds five
+minutes. Configure the scaler's replica ceiling to honor `WORKER_MAX_REPLICAS`.
 
 ## Maintenance
 

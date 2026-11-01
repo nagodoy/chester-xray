@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from functools import cached_property
 
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -82,6 +83,13 @@ class Settings(BaseSettings):
     # Worker
     job_lease_minutes: int = 30
     worker_poll_seconds: float = 5.0
+    # Queue pressure emits a desired replica count for a separately scaled worker
+    # service. Each replica processes at most one analysis or delivery at a time.
+    worker_min_replicas: int = Field(default=0, ge=0)
+    worker_max_replicas: int = Field(default=4, ge=1)
+    worker_jobs_per_replica: int = Field(default=4, ge=1)
+    worker_target_queue_age_seconds: int = Field(default=300, ge=1)
+    worker_database_pool_size: int = Field(default=1, ge=1)
     # Automatic delivery: how many times an attempt is repeated, and how long a
     # failed one waits before the next.
     delivery_max_attempts: int = 3
@@ -93,6 +101,12 @@ class Settings(BaseSettings):
 
     debug: bool = False
     testing: bool = False
+
+    @model_validator(mode="after")
+    def validate_worker_replica_bounds(self) -> Settings:
+        if self.worker_max_replicas < self.worker_min_replicas:
+            raise ValueError("WORKER_MAX_REPLICAS must be at least WORKER_MIN_REPLICAS.")
+        return self
 
     @cached_property
     def admin_emails(self) -> tuple[str, ...]:

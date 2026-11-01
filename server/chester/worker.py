@@ -11,7 +11,10 @@ against one database without processing the same job twice.
 
 from __future__ import annotations
 
+import argparse
+import json
 import logging
+import math
 import os
 import signal
 import socket
@@ -19,8 +22,9 @@ import threading
 import time
 import uuid
 from datetime import timedelta
+from typing import Any
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from chester import retention
@@ -50,7 +54,12 @@ def _lease_expiry():
     return utcnow() + timedelta(minutes=settings.job_lease_minutes)
 
 
-def claim_job(db: Session, job_id: uuid.UUID | None = None) -> uuid.UUID | None:
+def claim_job(
+    db: Session,
+    job_id: uuid.UUID | None = None,
+    *,
+    worker_id: str = WORKER_ID,
+) -> uuid.UUID | None:
     """Take ownership of one queued job, or return None if there is nothing to do.
 
     SKIP LOCKED is what makes concurrent workers safe: a row another transaction
@@ -67,7 +76,7 @@ def claim_job(db: Session, job_id: uuid.UUID | None = None) -> uuid.UUID | None:
     job.status = STATUS_PROCESSING
     job.started_at = utcnow()
     job.attempt = (job.attempt or 0) + 1
-    job.lease_owner = WORKER_ID
+    job.lease_owner = worker_id
     job.lease_expires_at = _lease_expiry()
 
     study = db.get(Study, job.study_id)
@@ -374,6 +383,70 @@ def recover_expired_leases(db: Session) -> int:
     return len(stale) + len(deliveries)
 
 
+def queue_pressure(db: Session, *, now=None) -> dict[str, int | float]:
+    """Return queue depth and age without exposing job or patient identifiers."""
+    now = now or utcnow()
+
+    analysis_count = (
+        db.query(func.count(AnalysisJob.id))
+        .filter(AnalysisJob.status == STATUS_QUEUED)
+        .scalar()
+        or 0
+    )
+    oldest_analysis = (
+        db.query(func.min(AnalysisJob.created_at))
+        .filter(AnalysisJob.status == STATUS_QUEUED)
+        .scalar()
+    )
+
+    due_deliveries = and_(
+        DeliveryJob.status == STATUS_QUEUED,
+        DeliveryJob.next_attempt_at <= now,
+    )
+    delivery_count = db.query(func.count(DeliveryJob.id)).filter(due_deliveries).scalar() or 0
+    oldest_delivery_ready = (
+        db.query(func.min(DeliveryJob.next_attempt_at)).filter(due_deliveries).scalar()
+    )
+
+    oldest_ready = min(
+        (value for value in (oldest_analysis, oldest_delivery_ready) if value is not None),
+        default=None,
+    )
+    oldest_age = max(0.0, (now - oldest_ready).total_seconds()) if oldest_ready else 0.0
+    return {
+        "queued_analysis": int(analysis_count),
+        "due_deliveries": int(delivery_count),
+        "queued_total": int(analysis_count + delivery_count),
+        "oldest_ready_seconds": oldest_age,
+    }
+
+
+def desired_worker_replicas(pressure: dict[str, Any]) -> int:
+    """Recommend bounded replicas from both backlog size and oldest-job age.
+
+    This is intentionally a recommendation rather than a platform-specific API:
+    an external scaler can poll ``python -m chester.worker --queue-stats`` and
+    apply ``desired_replicas`` to the independent worker service.
+    """
+    if settings.worker_jobs_per_replica < 1 or settings.worker_target_queue_age_seconds < 1:
+        raise ValueError("Worker scale thresholds must be greater than zero.")
+    if settings.worker_max_replicas < settings.worker_min_replicas:
+        raise ValueError("WORKER_MAX_REPLICAS must be at least WORKER_MIN_REPLICAS.")
+
+    queued = int(pressure["queued_total"])
+    if queued == 0:
+        return settings.worker_min_replicas
+
+    by_depth = math.ceil(queued / settings.worker_jobs_per_replica)
+    by_age = math.ceil(
+        float(pressure["oldest_ready_seconds"]) / settings.worker_target_queue_age_seconds
+    )
+    return min(
+        settings.worker_max_replicas,
+        max(settings.worker_min_replicas, 1, by_depth, by_age),
+    )
+
+
 def sweep_retention(last_sweep: float) -> float:
     """Apply every organization's retention window if one is due.
 
@@ -442,9 +515,23 @@ def run(stop: threading.Event | None = None) -> None:
     logger.info("Worker %s stopped", WORKER_ID)
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Chester background analysis worker")
+    parser.add_argument(
+        "--queue-stats",
+        action="store_true",
+        help="print queue depth, oldest-ready age, and bounded worker replica recommendation",
+    )
+    args = parser.parse_args(argv)
+
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     settings.require_production_secrets()
+    if args.queue_stats:
+        with session_scope() as db:
+            pressure = queue_pressure(db)
+        print(json.dumps({**pressure, "desired_replicas": desired_worker_replicas(pressure)}))
+        return 0
+
     problems = schema_drift()
     if problems:
         logger.error(

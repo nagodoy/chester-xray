@@ -35,15 +35,15 @@ waitForPort = 5000
 [workflows.workflow.metadata]
 outputType = "webview"
 
-# Inference runs in its own process. Running it inside the web server loaded the
-# model into every worker and made analysis compete with request handling.
+# Inference runs in its own process and can be deployed/scaled separately from
+# the HTTP API. Each worker replica handles one job at a time.
 [[workflows.workflow]]
 name = "Worker"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd server && python -m chester.worker"
+args = "bash server/run_worker.sh"
 
 [[ports]]
 localPort = 5000
@@ -56,6 +56,9 @@ externalPort = 3000
 [deployment]
 deploymentTarget = "cloudrun"
 build = ["npm", "run", "build"]
+# API-only deployment. A separate worker deployment can use
+# `bash server/run_worker.sh`; use `python -m chester.worker --queue-stats`
+# as the queue-depth/age signal for an external replica scaler.
 run = ["bash", "server/run_production.sh"]
 
 [userenv]

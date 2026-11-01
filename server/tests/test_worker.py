@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import threading
 import uuid
+from datetime import timedelta
 
 import pytest
 
@@ -55,12 +56,27 @@ class TestLeaseRecovery:
     def test_an_expired_lease_is_requeued(self, session, queued_study):
         _, job = queued_study
         worker.claim_job(session)
-        job.lease_expires_at = utcnow() - __import__("datetime").timedelta(minutes=1)
+        job.lease_expires_at = utcnow() - timedelta(minutes=1)
         session.flush()
 
         assert worker.recover_expired_leases(session) == 1
         assert job.status == "queued"
         assert job.lease_owner is None
+
+    def test_recovered_job_can_be_claimed_by_a_different_worker(
+        self, session, queued_study
+    ):
+        _, job = queued_study
+        worker.claim_job(session, worker_id="worker-that-stopped")
+        job.lease_expires_at = utcnow() - timedelta(minutes=1)
+        session.flush()
+
+        assert worker.recover_expired_leases(session) == 1
+        claimed = worker.claim_job(session, worker_id="replacement-worker")
+
+        assert claimed == job.id
+        assert job.attempt == 2
+        assert job.lease_owner == "replacement-worker"
 
     def test_a_live_lease_is_left_alone(self, session, queued_study):
         """Another worker may still be running it."""
@@ -70,6 +86,45 @@ class TestLeaseRecovery:
         assert worker.recover_expired_leases(session) == 0
         assert job.status == "processing"
         assert job.lease_owner == worker.WORKER_ID
+
+
+class TestQueueScaling:
+    def test_queue_pressure_reports_depth_and_oldest_ready_age(
+        self, session, queued_study
+    ):
+        _, job = queued_study
+        now = utcnow()
+        job.created_at = now - timedelta(minutes=8)
+        session.flush()
+
+        pressure = worker.queue_pressure(session, now=now)
+
+        assert pressure == {
+            "queued_analysis": 1,
+            "due_deliveries": 0,
+            "queued_total": 1,
+            "oldest_ready_seconds": pytest.approx(480, abs=1),
+        }
+
+    @pytest.mark.parametrize(
+        ("pressure", "expected"),
+        [
+            ({"queued_total": 0, "oldest_ready_seconds": 0}, 0),
+            ({"queued_total": 1, "oldest_ready_seconds": 0}, 1),
+            ({"queued_total": 9, "oldest_ready_seconds": 0}, 3),
+            ({"queued_total": 1, "oldest_ready_seconds": 601}, 3),
+            ({"queued_total": 100, "oldest_ready_seconds": 3600}, 4),
+        ],
+    )
+    def test_replica_recommendation_uses_depth_and_age_and_is_bounded(
+        self, monkeypatch, pressure, expected
+    ):
+        monkeypatch.setattr(worker.settings, "worker_min_replicas", 0)
+        monkeypatch.setattr(worker.settings, "worker_max_replicas", 4)
+        monkeypatch.setattr(worker.settings, "worker_jobs_per_replica", 4)
+        monkeypatch.setattr(worker.settings, "worker_target_queue_age_seconds", 300)
+
+        assert worker.desired_worker_replicas(pressure) == expected
 
 
 class TestInstanceSelection:
@@ -305,6 +360,18 @@ def test_due_deliveries_are_not_starved_by_a_busy_analysis_queue(monkeypatch):
     assert events == ["analysis", "delivery"]
 
 
+def test_worker_database_pool_uses_psycopg_and_a_single_connection(monkeypatch):
+    from chester.db import _engine_kwargs
+
+    monkeypatch.setenv("CHESTER_PROCESS_ROLE", "worker")
+
+    url, options = _engine_kwargs("postgresql://db.example/chester")
+
+    assert url == "postgresql+psycopg://db.example/chester"
+    assert options["pool_size"] == 1
+    assert options["max_overflow"] == 0
+
+
 def _bind_worker_sessions(monkeypatch, session):
     """Make the worker's own session_scope reuse the test's transaction."""
     import contextlib
@@ -391,25 +458,27 @@ class TestConcurrency:
         setup.commit()
         setup.close()
 
-        claimed: list[uuid.UUID] = []
+        claimed: list[tuple[uuid.UUID, str]] = []
         lock = threading.Lock()
 
-        def _claim():
+        def _claim(index):
             db = factory()
+            worker_id = f"test-worker-{index}"
             try:
-                job_id = worker.claim_job(db)
+                job_id = worker.claim_job(db, worker_id=worker_id)
                 db.commit()
                 if job_id is not None:
                     with lock:
-                        claimed.append(job_id)
+                        claimed.append((job_id, worker_id))
             finally:
                 db.close()
 
-        threads = [threading.Thread(target=_claim) for _ in range(2)]
+        threads = [threading.Thread(target=_claim, args=(index,)) for index in range(2)]
         for thread in threads:
             thread.start()
         for thread in threads:
             thread.join()
 
         assert len(claimed) == 2
-        assert len(set(claimed)) == 2, "the same job was claimed twice"
+        assert len({job_id for job_id, _worker_id in claimed}) == 2
+        assert len({worker_id for _job_id, worker_id in claimed}) == 2
