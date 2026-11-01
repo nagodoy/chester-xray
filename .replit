@@ -37,6 +37,8 @@ outputType = "webview"
 
 # Inference runs in its own process and can be deployed/scaled separately from
 # the HTTP API. Each worker replica handles one job at a time.
+# Deploy `bash server/run_scaler.sh` as a separate, continuously running Railway
+# service with the scaler environment variables documented in README.md.
 [[workflows.workflow]]
 name = "Worker"
 author = "agent"
@@ -58,7 +60,8 @@ deploymentTarget = "cloudrun"
 build = ["npm", "run", "build"]
 # API-only deployment. A separate worker deployment can use
 # `bash server/run_worker.sh`; use `python -m chester.worker --queue-stats`
-# as the queue-depth/age signal for an external replica scaler.
+# to inspect the queue signal. Deploy `bash server/run_scaler.sh` as a separate
+# Railway service to apply that signal to the worker service's replica count.
 run = ["bash", "server/run_production.sh"]
 
 [userenv]

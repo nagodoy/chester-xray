@@ -80,11 +80,32 @@ Deploy the same source separately with `bash server/run_worker.sh` to scale the
 worker independently; it uses one database connection and processes one job at a
 time per replica.
 
-An external scaler can poll `bash server/run_worker.sh --queue-stats` for queued
-analysis count, due report count, oldest-ready age, and `desired_replicas`. The
-default recommendation is bounded at four worker replicas, targets four queued
-jobs per replica, and adds capacity when the oldest ready job exceeds five
-minutes. Configure the scaler's replica ceiling to honor `WORKER_MAX_REPLICAS`.
+For automatic Railway scaling, deploy `bash server/run_scaler.sh` as a separate,
+continuously running service in the same environment as the worker. Give it the
+same `DATABASE_URL` as the worker, plus:
+
+- `RAILWAY_API_TOKEN`: a project token scoped to the target environment
+- `RAILWAY_TARGET_WORKER_SERVICE_ID`: the worker service ID
+- `RAILWAY_TARGET_ENVIRONMENT_ID`: the Railway environment ID
+- `WORKER_MAX_REPLICAS`: the hard ceiling used by both the recommendation and
+  the scaler
+
+Use the same worker queue tuning variables as needed (`WORKER_MIN_REPLICAS`,
+`WORKER_JOBS_PER_REPLICA`, and `WORKER_TARGET_QUEUE_AGE_SECONDS`). The scaler
+does not need the API's authentication or DICOM-ingest secrets.
+
+The scaler reads queue depth and oldest-ready age from the database and applies
+the recommendation through Railway's Public API. It polls every 30 seconds by
+default (`WORKER_SCALER_POLL_SECONDS` can raise that interval), goes to zero
+replicas when the queue is empty, and skips unchanged targets. Keep it running
+even when the worker count is zero so it can scale workers back up when new jobs
+arrive. It has no inbound port and should not be given a public domain. Railway
+API or database errors are logged and retried on the next poll; the API and
+analysis worker run independently.
+
+To inspect the source signal manually, run `bash server/run_worker.sh
+--queue-stats`. The default recommendation targets four queued jobs per replica
+and adds capacity when the oldest ready job exceeds five minutes.
 
 ## Maintenance
 

@@ -6,3 +6,4 @@
 - [OsiriX STOW interoperability](osirix-stow-interoperability.md) — support OsiriX WADO-style STOW paths and HTTPS Basic token authentication without accepting uploads at the app root.
 - [Publish snapshots and rebases](publish-snapshots-rebases.md) — never publish while Git is rebasing; the build may capture stale deployment settings despite later workspace fixes.
 - [Dependency scan scope](dependency-scan-scope.md) — a clean manifest audit does not prove old, undeclared packages are absent from the workspace.
+- [Replit config updates](replit-config-updates.md) — validate `.replit` replacements with the platform helper; direct edits are rejected.

@@ -90,6 +90,7 @@ class Settings(BaseSettings):
     worker_jobs_per_replica: int = Field(default=4, ge=1)
     worker_target_queue_age_seconds: int = Field(default=300, ge=1)
     worker_database_pool_size: int = Field(default=1, ge=1)
+    worker_scaler_poll_seconds: int = Field(default=30, ge=5)
     # Automatic delivery: how many times an attempt is repeated, and how long a
     # failed one waits before the next.
     delivery_max_attempts: int = 3

@@ -408,7 +408,7 @@ def test_worker_startup_refuses_schema_drift(monkeypatch):
 
     monkeypatch.setattr(worker, "schema_drift", lambda: ["studies.body_part: incompatible"])
 
-    assert worker.main() == 1
+    assert worker.main([]) == 1
 
 
 def test_json_migration_refuses_non_postgresql(schema_engine):
