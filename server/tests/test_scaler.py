@@ -71,6 +71,22 @@ class TestRailwayGraphql:
 
 
 class TestScaling:
+    def test_live_schema_reads_legacy_count_and_writes_explicit_region(self, monkeypatch):
+        monkeypatch.setenv("RAILWAY_TARGET_WORKER_SERVICE_ID", "worker")
+        monkeypatch.setenv("RAILWAY_TARGET_ENVIRONMENT_ID", "production")
+        monkeypatch.setenv("RAILWAY_TARGET_WORKER_REGION", "sfo")
+        monkeypatch.setattr(
+            scaler, "worker_instance", lambda: {"numReplicas": 1, "region": None},
+        )
+        calls = []
+        monkeypatch.setattr(scaler, "_graphql", lambda query, variables: calls.append(variables))
+        assert scaler.current_replicas() == 1
+        scaler.set_replicas(0)
+        assert calls[0]["input"] == {
+            "numReplicas": 0,
+            "multiRegionConfig": {"sfo": {"numReplicas": 0}},
+        }
+
     def test_explicit_region_count_overrides_legacy_count(self, monkeypatch):
         monkeypatch.setattr(
             scaler, "worker_instance",

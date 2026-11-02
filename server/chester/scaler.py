@@ -29,7 +29,7 @@ REPLICAS_QUERY = """
 query ($serviceId: String!, $environmentId: String!) {
   serviceInstance(serviceId: $serviceId, environmentId: $environmentId) {
     numReplicas
-    multiRegionConfig
+    region
   }
 }
 """
@@ -86,7 +86,18 @@ def _graphql(query: str, variables: dict[str, Any]) -> dict[str, Any]:
         with urlopen(request, timeout=20) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
-        raise RuntimeError(f"Railway GraphQL returned HTTP {exc.code}.") from None
+        detail = ""
+        try:
+            error_payload = json.loads(exc.read(8192).decode("utf-8"))
+            messages = [
+                str(error.get("message", ""))[:300].replace(token, "[redacted]")
+                for error in error_payload.get("errors", [])
+                if isinstance(error, dict)
+            ]
+            detail = " " + "; ".join(messages) if messages else ""
+        except (ValueError, AttributeError):
+            pass
+        raise RuntimeError(f"Railway GraphQL returned HTTP {exc.code}.{detail}") from None
 
     if not isinstance(payload, dict):
         raise RuntimeError("Railway GraphQL returned an invalid response.")
@@ -141,6 +152,11 @@ def set_replicas(target: int) -> None:
         update["multiRegionConfig"] = {
             region: {**config, "numReplicas": target},
         }
+    else:
+        region = os.environ.get("RAILWAY_TARGET_WORKER_REGION") or instance.get("region")
+        if not region:
+            raise RuntimeError("RAILWAY_TARGET_WORKER_REGION must identify the worker region.")
+        update["multiRegionConfig"] = {region: {"numReplicas": target}}
     _graphql(
         REPLICAS_MUTATION,
         {

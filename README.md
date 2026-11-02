@@ -115,6 +115,8 @@ same `DATABASE_URL` as the worker, plus:
 - `RAILWAY_API_TOKEN`: a project token scoped to the target environment
 - `RAILWAY_TARGET_WORKER_SERVICE_ID`: the worker service ID
 - `RAILWAY_TARGET_ENVIRONMENT_ID`: the Railway environment ID
+- `RAILWAY_TARGET_WORKER_REGION`: the single worker region (for example `sfo`);
+  keep it aligned with the worker's Railway region configuration
 - `WORKER_MAX_REPLICAS`: the hard ceiling used by both the recommendation and
   the scaler
 
