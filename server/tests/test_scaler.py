@@ -71,6 +71,29 @@ class TestRailwayGraphql:
 
 
 class TestScaling:
+    def test_region_count_is_read_from_environment_not_legacy_field(self, monkeypatch):
+        monkeypatch.setenv("RAILWAY_TARGET_WORKER_SERVICE_ID", "worker")
+        monkeypatch.setenv("RAILWAY_TARGET_ENVIRONMENT_ID", "production")
+        monkeypatch.setattr(scaler, "_graphql", lambda *_args: {
+            "serviceInstance": {"numReplicas": 1, "region": None},
+            "environment": {"config": {"services": {"worker": {
+                "deploy": {"multiRegionConfig": {"sfo": {"numReplicas": 3}}},
+            }}}},
+        })
+        assert scaler.current_replicas() == 3
+        assert "decryptVariables: false" in scaler.REPLICAS_QUERY
+
+    def test_empty_queue_recommendation_respects_provider_minimum(self, monkeypatch):
+        monkeypatch.setattr(scaler.settings, "worker_min_replicas", 0)
+        monkeypatch.setattr(scaler.settings, "worker_max_replicas", 4)
+        monkeypatch.setattr(
+            scaler.worker, "queue_pressure",
+            lambda _db: {"queued_total": 0, "processing_total": 0, "oldest_ready_seconds": 0},
+        )
+        monkeypatch.setattr(scaler.worker, "desired_worker_replicas", lambda _: 0)
+        monkeypatch.setattr(scaler, "session_scope", lambda: _fake_session_scope())
+        assert scaler.recommended_replicas()[1] == 1
+
     def test_live_schema_reads_legacy_count_and_writes_explicit_region(self, monkeypatch):
         monkeypatch.setenv("RAILWAY_TARGET_WORKER_SERVICE_ID", "worker")
         monkeypatch.setenv("RAILWAY_TARGET_ENVIRONMENT_ID", "production")
@@ -81,10 +104,10 @@ class TestScaling:
         calls = []
         monkeypatch.setattr(scaler, "_graphql", lambda query, variables: calls.append(variables))
         assert scaler.current_replicas() == 1
-        scaler.set_replicas(0)
+        scaler.set_replicas(1)
         assert calls[0]["input"] == {
-            "numReplicas": 0,
-            "multiRegionConfig": {"sfo": {"numReplicas": 0}},
+            "numReplicas": 1,
+            "multiRegionConfig": {"sfo": {"numReplicas": 1}},
         }
 
     def test_explicit_region_count_overrides_legacy_count(self, monkeypatch):
@@ -103,10 +126,10 @@ class TestScaling:
         )
         calls = []
         monkeypatch.setattr(scaler, "_graphql", lambda query, variables: calls.append(variables))
-        scaler.set_replicas(0)
+        scaler.set_replicas(1)
         assert calls[0]["input"] == {
-            "numReplicas": 0,
-            "multiRegionConfig": {"sfo": {"numReplicas": 0}},
+            "numReplicas": 1,
+            "multiRegionConfig": {"sfo": {"numReplicas": 1}},
         }
 
     def test_scale_up_to_bounded_target_and_skip_when_unchanged(self, monkeypatch):
@@ -129,21 +152,21 @@ class TestScaling:
         assert scaler.scale_once() == 3
         assert applied == [3]
 
-    def test_empty_queue_target_can_be_zero(self, monkeypatch):
+    def test_idle_fleet_scales_down_to_one(self, monkeypatch):
         monkeypatch.setattr(
             scaler,
             "recommended_replicas",
             lambda: (
                 {"queued_total": 0, "processing_total": 0, "oldest_ready_seconds": 0},
-                0,
+                1,
             ),
         )
-        monkeypatch.setattr(scaler, "current_replicas", lambda: 1)
+        monkeypatch.setattr(scaler, "current_replicas", lambda: 2)
         applied = []
         monkeypatch.setattr(scaler, "set_replicas", applied.append)
 
-        assert scaler.scale_once() == 0
-        assert applied == [0]
+        assert scaler.scale_once() == 1
+        assert applied == [1]
 
     @pytest.mark.parametrize("queued,processing", [(0, 1), (0, 4), (1, 0), (2, 2)])
     def test_busy_fleet_is_not_scaled_down(self, monkeypatch, queued, processing):

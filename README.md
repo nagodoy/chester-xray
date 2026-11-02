@@ -126,12 +126,14 @@ does not need the API's authentication or DICOM-ingest secrets.
 
 The scaler reads queue depth and oldest-ready age from the database and applies
 the recommendation through Railway's Public API. It polls every 30 seconds by
-default (`WORKER_SCALER_POLL_SECONDS` can raise that interval), goes to zero
-replicas when the queue is empty, and skips unchanged targets.
+default (`WORKER_SCALER_POLL_SECONDS` can raise that interval), keeps one
+replica when the queue is empty, and skips unchanged targets. The live Railway
+replica API rejects zero, so this controller enforces a minimum of one replica
+even if the generic queue recommendation requests zero.
 The controller only reduces replicas after both the ready queue and all in-progress analyses
 and deliveries are empty, since Railway chooses which replicas to remove.
 Keep the controller running
-even when the worker count is zero so it can scale workers back up when new jobs
+so it can scale workers up when new jobs
 arrive. It has no inbound port and should not be given a public domain. Railway
 API or database errors are logged and retried on the next poll; the API and
 analysis worker run independently.

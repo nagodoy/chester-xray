@@ -1,8 +1,8 @@
 """Apply the worker queue's replica recommendation to a Railway service.
 
 Run this as a separate, continuously running process from the API and worker.
-Keeping the scaler alive at zero worker replicas lets it notice new jobs and
-start worker replicas again.
+The controller stays alive to add capacity when new jobs arrive. Railway's
+replica API currently requires at least one worker replica.
 """
 
 from __future__ import annotations
@@ -27,6 +27,9 @@ RAILWAY_GRAPHQL_URL = "https://backboard.railway.com/graphql/v2"
 RAILWAY_MAX_REPLICAS = 50
 REPLICAS_QUERY = """
 query ($serviceId: String!, $environmentId: String!) {
+  environment(id: $environmentId) {
+    config(decryptVariables: false)
+  }
   serviceInstance(serviceId: $serviceId, environmentId: $environmentId) {
     numReplicas
     region
@@ -126,6 +129,16 @@ def worker_instance() -> dict[str, Any]:
     instance = data.get("serviceInstance")
     if not isinstance(instance, dict):
         raise RuntimeError("Railway did not return the configured worker service.")
+    # Regional counts are in the environment config, not ServiceInstance.
+    # Do not request decrypted variables or log this configuration document.
+    environment = data.get("environment")
+    config = environment.get("config") if isinstance(environment, dict) else None
+    if not isinstance(config, dict):
+        raise RuntimeError("Railway did not return its environment configuration.")
+    services = config.get("services", {})
+    service = services.get(_required_env("RAILWAY_TARGET_WORKER_SERVICE_ID"), {})
+    deploy = service.get("deploy", {})
+    instance = {**instance, "multiRegionConfig": deploy.get("multiRegionConfig")}
     regions = instance.get("multiRegionConfig")
     if regions and (not isinstance(regions, dict) or len(regions) != 1):
         raise RuntimeError("The queue scaler requires a single worker region.")
@@ -143,6 +156,8 @@ def current_replicas() -> int:
 
 
 def set_replicas(target: int) -> None:
+    if not 1 <= target <= min(settings.worker_max_replicas, RAILWAY_MAX_REPLICAS):
+        raise ValueError("Worker replica target is outside the Railway capacity bounds.")
     instance = worker_instance()
     regions = instance.get("multiRegionConfig")
     update: dict[str, Any] = {"numReplicas": target}
@@ -172,7 +187,8 @@ def recommended_replicas() -> tuple[dict[str, int | float], int]:
         pressure = worker.queue_pressure(db)
     desired = worker.desired_worker_replicas(pressure)
     ceiling = min(settings.worker_max_replicas, RAILWAY_MAX_REPLICAS)
-    target = min(ceiling, max(settings.worker_min_replicas, desired))
+    # The live Railway replica API rejects zero; retain one consumer.
+    target = min(ceiling, max(1, settings.worker_min_replicas, desired))
     return pressure, target
 
 

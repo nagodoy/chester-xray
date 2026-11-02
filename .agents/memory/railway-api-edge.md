@@ -8,3 +8,9 @@ Railway's GraphQL endpoint can reject Python urllib's default user agent with HT
 **Why:** The same unauthenticated query succeeded with an application-specific user agent but failed with the Python default.
 
 **How to apply:** Use a stable application user agent for controllers, and distinguish edge blocks from GraphQL authorization errors before asking the user to replace credentials.
+
+Do not promise zero idle worker cost through replica-count updates: the deployed Railway replica API rejected zero. The controller uses a minimum of one worker.
+
+**Why:** A zero target was rejected with replica input validation errors; leaving it configured caused repeated failed scaling checks.
+
+**How to apply:** Separate horizontal replica scaling from true suspend/resume support, and explain the remaining worker and database-polling costs.
