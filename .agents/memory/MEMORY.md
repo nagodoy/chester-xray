@@ -8,3 +8,4 @@
 - [Dependency scan scope](dependency-scan-scope.md) — a clean manifest audit does not prove old, undeclared packages are absent from the workspace.
 - [Replit config updates](replit-config-updates.md) — validate `.replit` replacements with the platform helper; direct edits are rejected.
 - [Worker separation rollout](worker-separation-rollout.md) — confirm the external consumer processes the production queue before publishing an API-only startup.
+- [Railway API edge](railway-api-edge.md) — distinguish Python user-agent blocks from credential failures before asking for new tokens.

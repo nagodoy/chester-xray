@@ -29,6 +29,7 @@ REPLICAS_QUERY = """
 query ($serviceId: String!, $environmentId: String!) {
   serviceInstance(serviceId: $serviceId, environmentId: $environmentId) {
     numReplicas
+    multiRegionConfig
   }
 }
 """
@@ -75,6 +76,9 @@ def _graphql(query: str, variables: dict[str, Any]) -> dict[str, Any]:
         headers={
             auth_header: auth_value,
             "Content-Type": "application/json",
+            "Accept": "application/json",
+            # Railway's edge rejects urllib's default Python user agent (1010).
+            "User-Agent": "torax-queue-scaler/1.0",
         },
         method="POST",
     )
@@ -100,7 +104,7 @@ def _graphql(query: str, variables: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
-def current_replicas() -> int:
+def worker_instance() -> dict[str, Any]:
     data = _graphql(
         REPLICAS_QUERY,
         {
@@ -111,17 +115,38 @@ def current_replicas() -> int:
     instance = data.get("serviceInstance")
     if not isinstance(instance, dict):
         raise RuntimeError("Railway did not return the configured worker service.")
+    regions = instance.get("multiRegionConfig")
+    if regions and (not isinstance(regions, dict) or len(regions) != 1):
+        raise RuntimeError("The queue scaler requires a single worker region.")
+    return instance
+
+
+def current_replicas() -> int:
+    instance = worker_instance()
+    regions = instance.get("multiRegionConfig")
+    if regions:
+        config = next(iter(regions.values()))
+        return int(config["numReplicas"])
     # A null setting means the service is using Railway's default of one replica.
     return int(instance["numReplicas"]) if instance.get("numReplicas") is not None else 1
 
 
 def set_replicas(target: int) -> None:
+    instance = worker_instance()
+    regions = instance.get("multiRegionConfig")
+    update: dict[str, Any] = {"numReplicas": target}
+    if regions:
+        # An explicit region map overrides the legacy top-level replica count.
+        region, config = next(iter(regions.items()))
+        update["multiRegionConfig"] = {
+            region: {**config, "numReplicas": target},
+        }
     _graphql(
         REPLICAS_MUTATION,
         {
             "serviceId": _required_env("RAILWAY_TARGET_WORKER_SERVICE_ID"),
             "environmentId": _required_env("RAILWAY_TARGET_ENVIRONMENT_ID"),
-            "input": {"numReplicas": target},
+            "input": update,
         },
     )
 

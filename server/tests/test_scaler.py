@@ -28,6 +28,8 @@ class TestRailwayGraphql:
             captured["header"] = request.get_header("Project-access-token")
             captured["timeout"] = timeout
             captured["body"] = json.loads(request.data)
+            assert request.get_header("User-agent") == "torax-queue-scaler/1.0"
+            assert request.get_header("Accept") == "application/json"
             return FakeResponse(b'{"data":{"ok":true}}')
 
         monkeypatch.setattr(scaler, "urlopen", fake_urlopen)
@@ -69,6 +71,28 @@ class TestRailwayGraphql:
 
 
 class TestScaling:
+    def test_explicit_region_count_overrides_legacy_count(self, monkeypatch):
+        monkeypatch.setattr(
+            scaler, "worker_instance",
+            lambda: {"numReplicas": 1, "multiRegionConfig": {"sfo": {"numReplicas": 4}}},
+        )
+        assert scaler.current_replicas() == 4
+
+    def test_scale_updates_existing_region_and_legacy_count(self, monkeypatch):
+        monkeypatch.setenv("RAILWAY_TARGET_WORKER_SERVICE_ID", "worker")
+        monkeypatch.setenv("RAILWAY_TARGET_ENVIRONMENT_ID", "production")
+        monkeypatch.setattr(
+            scaler, "worker_instance",
+            lambda: {"numReplicas": 1, "multiRegionConfig": {"sfo": {"numReplicas": 4}}},
+        )
+        calls = []
+        monkeypatch.setattr(scaler, "_graphql", lambda query, variables: calls.append(variables))
+        scaler.set_replicas(0)
+        assert calls[0]["input"] == {
+            "numReplicas": 0,
+            "multiRegionConfig": {"sfo": {"numReplicas": 0}},
+        }
+
     def test_scale_up_to_bounded_target_and_skip_when_unchanged(self, monkeypatch):
         monkeypatch.setattr(
             scaler,
