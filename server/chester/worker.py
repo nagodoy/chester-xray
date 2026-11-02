@@ -413,10 +413,23 @@ def queue_pressure(db: Session, *, now=None) -> dict[str, int | float]:
         default=None,
     )
     oldest_age = max(0.0, (now - oldest_ready).total_seconds()) if oldest_ready else 0.0
+    processing_analysis = (
+        db.query(func.count(AnalysisJob.id))
+        .filter(AnalysisJob.status == STATUS_PROCESSING)
+        .scalar()
+        or 0
+    )
+    processing_deliveries = (
+        db.query(func.count(DeliveryJob.id))
+        .filter(DeliveryJob.status == STATUS_PROCESSING)
+        .scalar()
+        or 0
+    )
     return {
         "queued_analysis": int(analysis_count),
         "due_deliveries": int(delivery_count),
         "queued_total": int(analysis_count + delivery_count),
+        "processing_total": int(processing_analysis + processing_deliveries),
         "oldest_ready_seconds": oldest_age,
     }
 

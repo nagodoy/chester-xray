@@ -109,6 +109,7 @@ both been configured. An empty Railway service alone does not process the queue.
 
 For automatic Railway scaling, deploy `bash server/run_scaler.sh` as a separate,
 continuously running service in the same environment as the worker. Give it the
+`RAILPACK_CONFIG_FILE=railpack.scaler.json` build configuration and the
 same `DATABASE_URL` as the worker, plus:
 
 - `RAILWAY_API_TOKEN`: a project token scoped to the target environment
@@ -124,7 +125,10 @@ does not need the API's authentication or DICOM-ingest secrets.
 The scaler reads queue depth and oldest-ready age from the database and applies
 the recommendation through Railway's Public API. It polls every 30 seconds by
 default (`WORKER_SCALER_POLL_SECONDS` can raise that interval), goes to zero
-replicas when the queue is empty, and skips unchanged targets. Keep it running
+replicas when the queue is empty, and skips unchanged targets.
+The controller only reduces replicas after both the ready queue and all in-progress analyses
+and deliveries are empty, since Railway chooses which replicas to remove.
+Keep the controller running
 even when the worker count is zero so it can scale workers back up when new jobs
 arrive. It has no inbound port and should not be given a public domain. Railway
 API or database errors are logged and retried on the next poll; the API and

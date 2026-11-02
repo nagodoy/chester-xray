@@ -93,7 +93,10 @@ class TestScaling:
         monkeypatch.setattr(
             scaler,
             "recommended_replicas",
-            lambda: ({"queued_total": 0, "oldest_ready_seconds": 0}, 0),
+            lambda: (
+                {"queued_total": 0, "processing_total": 0, "oldest_ready_seconds": 0},
+                0,
+            ),
         )
         monkeypatch.setattr(scaler, "current_replicas", lambda: 1)
         applied = []
@@ -101,6 +104,27 @@ class TestScaling:
 
         assert scaler.scale_once() == 0
         assert applied == [0]
+
+    @pytest.mark.parametrize("queued,processing", [(0, 1), (0, 4), (1, 0), (2, 2)])
+    def test_busy_fleet_is_not_scaled_down(self, monkeypatch, queued, processing):
+        monkeypatch.setattr(
+            scaler,
+            "recommended_replicas",
+            lambda: (
+                {
+                    "queued_total": queued,
+                    "processing_total": processing,
+                    "oldest_ready_seconds": 0,
+                },
+                0 if queued == 0 else 1,
+            ),
+        )
+        monkeypatch.setattr(scaler, "current_replicas", lambda: 4)
+        applied = []
+        monkeypatch.setattr(scaler, "set_replicas", applied.append)
+
+        assert scaler.scale_once() == 4
+        assert applied == []
 
     def test_failed_scaling_is_propagated_in_single_check_mode(self, monkeypatch):
         monkeypatch.setattr(

@@ -164,6 +164,33 @@ class TestPostgresDeliveryLeaseRecovery:
 
 
 class TestQueueScaling:
+    def test_claimed_analysis_and_delivery_still_count_as_busy(
+        self, session, queued_study
+    ):
+        from chester.models import SendDestination
+
+        study, job = queued_study
+        worker.claim_job(session)
+        destination = SendDestination(
+            organization_id=study.organization_id,
+            name="Scaling test",
+            host="pacs.example.org",
+            ae_title="PACS",
+        )
+        session.add(destination)
+        session.flush()
+        session.add(DeliveryJob(
+            study_id=study.id,
+            destination_id=destination.id,
+            status="processing",
+        ))
+        session.flush()
+
+        pressure = worker.queue_pressure(session)
+
+        assert pressure["queued_total"] == 0
+        assert pressure["processing_total"] == 2
+
     def test_queue_pressure_reports_depth_and_oldest_ready_age(
         self, session, queued_study
     ):
@@ -178,6 +205,7 @@ class TestQueueScaling:
             "queued_analysis": 1,
             "due_deliveries": 0,
             "queued_total": 1,
+            "processing_total": 0,
             "oldest_ready_seconds": pytest.approx(480, abs=1),
         }
 

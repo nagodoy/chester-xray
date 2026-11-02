@@ -148,6 +148,19 @@ def scale_once() -> int:
         )
         return target
 
+    # Railway chooses which replicas to remove. Do not reduce a busy fleet:
+    # an empty *waiting* queue does not mean the claimed jobs have finished.
+    if target < current and (
+        pressure["queued_total"] or pressure["processing_total"]
+    ):
+        logger.info(
+            "Worker scale-down deferred: replicas=%d queued=%d processing=%d",
+            current,
+            pressure["queued_total"],
+            pressure["processing_total"],
+        )
+        return current
+
     set_replicas(target)
     logger.info(
         "Worker scale applied: replicas=%d->%d queued=%d oldest_ready_seconds=%.1f",
