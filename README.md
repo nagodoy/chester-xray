@@ -80,6 +80,33 @@ Deploy the same source separately with `bash server/run_worker.sh` to scale the
 worker independently; it uses one database connection and processes one job at a
 time per replica.
 
+### Railway worker deployment
+
+Build from the repository root, using the `RAILPACK` builder and
+`RAILPACK_CONFIG_FILE=railpack.worker.json`. The Python build installs
+`./server` from the root `requirements.txt`; the model files must remain in the
+build context. Start with `bash server/run_railway_worker.sh`. Do not configure a
+public domain or HTTP healthcheck for this background service.
+
+Before attaching the GitHub source and starting the worker, enter these values
+directly in Railway Variables (never in chat or source control):
+
+- `DATABASE_URL`: the **production** connection string from Replit Database →
+  production → Settings, not the workspace/development database.
+- `SESSION_SECRET`, `PSEUDONYM_SECRET`, `DICOM_INGEST_TOKEN`: the existing
+  production values. Do not rotate these just to create the worker.
+
+The external startup script refuses missing credentials, non-PostgreSQL URLs,
+or missing model files before starting the worker. Normal startup also checks
+the database schema without migrating it. Never use `DEBUG` or `TESTING` to
+bypass production checks.
+
+Initially use one replica, `WORKER_DATABASE_POOL_SIZE=1`, and a bounded restart
+policy. Confirm that jobs are claimed and results appear in the production
+worklist before enabling the separate queue scaler. The service has no work
+until the real production connection and the current application source have
+both been configured. An empty Railway service alone does not process the queue.
+
 For automatic Railway scaling, deploy `bash server/run_scaler.sh` as a separate,
 continuously running service in the same environment as the worker. Give it the
 same `DATABASE_URL` as the worker, plus:

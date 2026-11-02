@@ -1,0 +1,3 @@
+# Railway's Python builder installs the existing backend package.
+# Application dependencies remain defined in server/pyproject.toml.
+./server

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "python",
+  "packages": {
+    "python": "3.11"
+  },
+  "steps": {
+    "install": {
+      "inputs": [
+        "...",
+        { "local": true, "include": ["server"] }
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "bash server/run_railway_worker.sh",
+    "aptPackages": ["libgomp1", "libstdc++6"]
+  }
+}
